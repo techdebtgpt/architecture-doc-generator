@@ -1,0 +1,15 @@
+dist
+coverage
+*.log
+.env
+.env.local
+tests
+examples
+docs
+.github
+tsconfig.json
+jest.config.js
+.eslintrc.js
+.prettierrc
+*.md
+!README.md

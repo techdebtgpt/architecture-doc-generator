@@ -1,0 +1,54 @@
+{
+  "projectName": "Architecture Documentation Generator",
+  "version": "1.0.0",
+  "description": "A module designed to generate detailed documentation for the architecture structure of the project.",
+  "languageSupport": [
+    "typescript",
+    "python",
+    "java",
+    "javascript",
+    "csharp",
+    "ruby",
+    "go"
+  ],
+  "agents": {
+    "enabled": true,
+    "defaultAgent": "file-structure-agent",
+    "availableAgents": [
+      "file-structure-agent",
+      "dependency-analysis-agent",
+      "pattern-detection-agent",
+      "documentation-synthesis-agent",
+      "code-quality-agent"
+    ]
+  },
+  "orchestrator": {
+    "enabled": true,
+    "defaultWorkflow": "full-analysis-workflow",
+    "availableWorkflows": [
+      "full-analysis-workflow",
+      "incremental-analysis-workflow",
+      "custom-workflow"
+    ]
+  },
+  "outputFormats": [
+    "markdown",
+    "json",
+    "html",
+    "confluence"
+  ],
+  "llm": {
+    "provider": "openai",
+    "apiKey": "YOUR_API_KEY_HERE",
+    "temperature": 0.5,
+    "maxTokens": 2048
+  },
+  "cache": {
+    "enabled": true,
+    "type": "memory"
+  },
+  "logging": {
+    "level": "info",
+    "logFile": "architecture-doc-generator.log"
+  }
+}
