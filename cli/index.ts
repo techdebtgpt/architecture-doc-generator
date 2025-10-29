@@ -1,13 +1,48 @@
 #!/usr/bin/env node
 
-// Load environment variables from .env file
+// Load ArchDoc configuration
+// Looks for .archdoc.config.json in: .arch-docs/ folder first, then root folder
 import * as dotenv from 'dotenv';
+import * as path from 'path';
+import * as fs from 'fs';
+
+const cwd = process.cwd();
+const CONFIG_FILE = '.archdoc.config.json';
+
+// Try .arch-docs/.archdoc.config.json first
+let configPath = path.join(cwd, '.arch-docs', CONFIG_FILE);
+if (!fs.existsSync(configPath)) {
+  // Fallback to root .archdoc.config.json
+  configPath = path.join(cwd, CONFIG_FILE);
+}
+
+if (fs.existsSync(configPath)) {
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    // Set environment variables from config file
+    if (config.apiKeys) {
+      if (config.apiKeys.anthropic) process.env.ANTHROPIC_API_KEY = config.apiKeys.anthropic;
+      if (config.apiKeys.openai) process.env.OPENAI_API_KEY = config.apiKeys.openai;
+      if (config.apiKeys.google) process.env.GOOGLE_API_KEY = config.apiKeys.google;
+    }
+    if (config.tracing) {
+      if (config.tracing.enabled) process.env.LANGCHAIN_TRACING_V2 = 'true';
+      if (config.tracing.apiKey) process.env.LANGCHAIN_API_KEY = config.tracing.apiKey;
+      if (config.tracing.project) process.env.LANGCHAIN_PROJECT = config.tracing.project;
+    }
+  } catch (err) {
+    // Ignore parse errors, fall through to env vars
+  }
+}
+
+// Fallback to environment variables (for CI/CD or explicit overrides)
 dotenv.config();
 
 import { Command } from 'commander';
 import { generateDocumentation } from './commands/generate.command';
 import { analyzeProject } from './commands/analyze.command';
 import { exportDocumentation } from './commands/export.command';
+import { registerConfigCommand } from './commands/config.command';
 
 const program = new Command();
 
@@ -83,6 +118,9 @@ program
   .option('-o, --output <path>', 'Output path')
   .option('--template <path>', 'Custom template file')
   .action(exportDocumentation);
+
+// Config command
+registerConfigCommand(program);
 
 // Parse CLI arguments
 program.parse();

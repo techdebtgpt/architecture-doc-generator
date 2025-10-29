@@ -14,6 +14,36 @@ import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agen
 import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
 
+/**
+ * Check if API keys are configured
+ */
+async function checkConfiguration(): Promise<boolean> {
+  const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const hasGoogleKey = !!process.env.GOOGLE_API_KEY;
+
+  if (!hasAnthropicKey && !hasOpenAIKey && !hasGoogleKey) {
+    console.log(chalk.red('\n❌ No LLM API keys configured!\n'));
+    console.log(chalk.yellow('You need at least one API key to use ArchDoc:'));
+    console.log(chalk.gray('  • Anthropic Claude (recommended): https://console.anthropic.com/'));
+    console.log(chalk.gray('  • OpenAI GPT-4: https://platform.openai.com/'));
+    console.log(chalk.gray('  • Google Gemini: https://ai.google.dev/\n'));
+
+    console.log(chalk.cyan('Quick setup:'));
+    console.log(chalk.white('  1. Run: ') + chalk.green('archdoc config --init'));
+    console.log(chalk.white('  2. Follow the interactive setup\n'));
+
+    console.log(chalk.cyan('Manual setup:'));
+    console.log(chalk.white('  1. Copy .archdoc.config.example.json to .archdoc.config.json'));
+    console.log(chalk.white('  2. Add your API key(s) to .archdoc.config.json'));
+    console.log(chalk.white('  3. Run analyze again\n'));
+
+    return false;
+  }
+
+  return true;
+}
+
 interface AnalyzeOptions {
   prompt?: string;
   output?: string;
@@ -53,6 +83,12 @@ export async function analyzeProject(
   projectPath?: string,
   options: AnalyzeOptions = {},
 ): Promise<void> {
+  // Check configuration before spinning up
+  const isConfigured = await checkConfiguration();
+  if (!isConfigured) {
+    process.exit(1);
+  }
+
   const spinner = ora('Initializing project analysis...').start();
 
   try {

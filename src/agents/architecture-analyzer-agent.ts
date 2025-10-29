@@ -166,8 +166,7 @@ Provide **comprehensive architectural analysis** with actionable insights.`;
       }
       const shown = files.slice(0, limit);
       return (
-        shown.map((f) => `  - ${f}`).join('\n') +
-        `\n  ... and ${files.length - limit} more files`
+        shown.map((f) => `  - ${f}`).join('\n') + `\n  ... and ${files.length - limit} more files`
       );
     };
 

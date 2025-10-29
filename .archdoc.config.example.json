@@ -1,0 +1,60 @@
+{
+  "apiKeys": {
+    "anthropic": "sk-ant-your-key-here",
+    "openai": "",
+    "google": ""
+  },
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.2,
+    "maxTokens": 4096
+  },
+  "scan": {
+    "maxFiles": 1000,
+    "maxFileSize": 1048576,
+    "respectGitignore": true,
+    "excludePatterns": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/.git/**",
+      "**/*.min.js",
+      "**/*.map"
+    ],
+    "includeHidden": false,
+    "followSymlinks": false
+  },
+  "agents": {
+    "enabled": [
+      "file-structure",
+      "dependency-analyzer",
+      "pattern-detector",
+      "flow-visualization",
+      "schema-generator",
+      "architecture-analyzer"
+    ],
+    "parallel": true,
+    "timeout": 300000
+  },
+  "refinement": {
+    "enabled": true,
+    "maxIterations": 5,
+    "clarityThreshold": 80,
+    "minImprovement": 10
+  },
+  "output": {
+    "directory": ".arch-docs",
+    "format": "markdown",
+    "clean": true,
+    "splitFiles": true,
+    "includeTOC": true,
+    "includeMetadata": true
+  },
+  "tracing": {
+    "enabled": false,
+    "apiKey": "",
+    "project": "archdoc-analysis",
+    "endpoint": "https://api.smith.langchain.com"
+  }
+}

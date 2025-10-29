@@ -53,25 +53,57 @@ npm link
 
 ## Quick Start
 
-### 1. Set Up API Keys
+### 1. Interactive Setup (Easiest)
 
-Create a `.env` file in your project root or set environment variables:
+Run the interactive configuration wizard:
 
 ```bash
-# Choose ONE provider (Anthropic recommended)
-export ANTHROPIC_API_KEY=sk-ant-your-key-here
-# OR
-export OPENAI_API_KEY=sk-your-key-here
-# OR
-export GOOGLE_API_KEY=your-key-here
-
-# Optional: Enable LangSmith tracing
-export LANGCHAIN_TRACING_V2=true
-export LANGCHAIN_API_KEY=lsv2_pt_your-key-here
-export LANGCHAIN_PROJECT=my-project
+archdoc config --init
 ```
 
-### 2. Generate Documentation
+This will:
+- Create `.archdoc.config.json` with default settings
+- Create `.archdoc.config.example.json` template
+- Guide you through API key setup
+- Configure optional LangSmith tracing
+
+### 2. Manual Setup
+
+Copy the example environment file and add your API keys:
+
+```bash
+# Copy template
+cp .archdoc.config.example.json .env
+
+# Edit .env and add at least ONE API key
+nano .arch-docs/.archdoc.config.json
+```
+
+**Required**: At least one LLM provider API key:
+
+```bash
+# Anthropic Claude (recommended) - https://console.anthropic.com/
+"anthropic": "sk-ant-your-key-here
+
+# OR OpenAI GPT-4 - https://platform.openai.com/
+OPENAI_API_KEY=sk-your-key-here
+
+# OR Google Gemini - https://ai.google.dev/
+GOOGLE_API_KEY=your-key-here
+```
+
+**Optional**: LangSmith tracing for debugging (like in tech-debt-api):
+
+```bash
+# Enable LangSmith tracing
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=lsv2_pt_your-key-here
+LANGCHAIN_PROJECT=archdoc-analysis
+LANGCHAIN_ENDPOINT=https://api.smith.langchain.com
+LANGCHAIN_CALLBACKS_BACKGROUND=true
+```
+
+### 3. Generate Documentation
 
 ```bash
 # Analyze current directory
@@ -82,9 +114,12 @@ archdoc analyze /path/to/project
 
 # With custom output
 archdoc analyze . --output ./docs
+
+# Quick analysis (faster, less detailed)
+archdoc analyze --depth quick
 ```
 
-### 3. View Generated Documentation
+### 4. View Generated Documentation
 
 Documentation is generated in the output directory (default: `.arch-docs`):
 
@@ -95,6 +130,103 @@ cat .arch-docs/index.md
 # Or open in your editor
 code .arch-docs/
 ```
+
+## Configuration Management
+
+### Config Command
+
+Manage configuration easily with the `config` command:
+
+```bash
+# Interactive setup
+archdoc config --init
+
+# View all settings
+archdoc config --list
+
+# Get specific value
+archdoc config --get llm.model
+
+# Set value
+archdoc config --set llm.temperature=0.5
+
+# Reset to defaults
+archdoc config --reset
+```
+
+### Configuration Priority
+
+Configuration is loaded in this order (later overrides earlier):
+
+1. **Default values** (built-in)
+2. **`.archdoc.config.json`** (project settings, safe to commit)
+3. **Environment variables** (`.env` file, API keys - **never commit**)
+4. **CLI flags** (highest priority)
+
+**Example priority chain**:
+```bash
+# Config file has model: "claude-3-5-sonnet"
+# .env has LLM_MODEL="gpt-4-turbo"
+# CLI has --model "gemini-2.0-flash"
+# → Result: Uses "gemini-2.0-flash" (CLI wins)
+```
+
+### Configuration Files
+
+#### `.archdoc.config.json` (Project Settings - Safe to Commit)
+
+Contains project-specific settings **without secrets**:
+
+```json
+{
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "temperature": 0.2,
+    "maxTokens": 4096
+  },
+  "scan": {
+    "maxFiles": 1000,
+    "excludePatterns": ["**/node_modules/**", "**/dist/**"]
+  },
+  "agents": {
+    "enabled": ["file-structure", "dependency-analyzer", "pattern-detector"],
+    "parallel": true
+  },
+  "refinement": {
+    "enabled": true,
+    "maxIterations": 5,
+    "clarityThreshold": 80
+  },
+  "output": {
+    "directory": ".arch-docs",
+    "format": "markdown"
+  },
+  "tracing": {
+    "enabled": false,
+    "provider": "langsmith",
+    "project": "archdoc-analysis"
+  }
+}
+```
+
+#### `.env` (Secrets - Never Commit)
+
+Contains API keys and sensitive data:
+
+```bash
+# LLM Provider Keys (at least one required)
+"anthropic": "sk-ant-...
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
+
+# LangSmith Tracing (optional)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=lsv2_pt_...
+LANGCHAIN_PROJECT=my-project
+```
+
+**Important**: Add `.env` to `.gitignore`!
 
 ## CLI Reference
 
@@ -202,7 +334,7 @@ archdoc export <input> --format <format> --output <file>
 #### Required (One of)
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...        # Anthropic Claude
+"anthropic": "sk-ant-...        # Anthropic Claude
 OPENAI_API_KEY=sk-...               # OpenAI GPT
 GOOGLE_API_KEY=...                  # Google Gemini
 ```
@@ -572,6 +704,61 @@ Update `.gitignore` or use `excludePatterns` in config:
     "excludePatterns": [
       "**/node_modules/**",
       "**/dist/**",
+      "**/*.test.ts",
+      "**/coverage/**"
+    ]
+  }
+}
+```
+
+### 7. Enable LangSmith Tracing for Debugging
+
+LangSmith provides visibility into LLM calls, token usage, and execution traces (similar to tech-debt-api):
+
+```bash
+# In .env file
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=lsv2_pt_your-key-here
+LANGCHAIN_PROJECT=archdoc-analysis
+LANGCHAIN_CALLBACKS_BACKGROUND=true
+
+# Or in .archdoc.config.json
+{
+  "tracing": {
+    "enabled": true,
+    "provider": "langsmith",
+    "project": "archdoc-analysis"
+  }
+}
+```
+
+**Benefits**:
+- Debug agent execution flow
+- Monitor token usage and costs
+- Optimize prompts and models
+- Track performance metrics
+- Share traces with team
+
+**Get API key**: https://smith.langchain.com/
+
+**Example trace hierarchy** (with `LANGCHAIN_TRACING_V2=true`):
+```
+DocumentationGeneration-Complete
+├── ScanProjectStructure
+├── Agent-file-structure
+│   ├── PrepareData
+│   ├── BuildPrompt
+│   └── LLMAnalysis
+├── Agent-dependency-analyzer
+└── AggregateResults
+```
+
+```json
+{
+  "scan": {
+    "excludePatterns": [
+      "**/node_modules/**",
+      "**/dist/**",
       "**/build/**",
       "**/coverage/**",
       "**/.git/**",
@@ -653,10 +840,10 @@ archdoc analyze . --output ./docs/$(date +%Y-%m-%d)
 **Solution:**
 ```bash
 # Set API key
-export ANTHROPIC_API_KEY=sk-ant-your-key-here
+export "anthropic": "sk-ant-your-key-here
 
 # Or create .env file
-echo "ANTHROPIC_API_KEY=sk-ant-your-key-here" > .env
+echo ""anthropic": "sk-ant-your-key-here" > .env
 ```
 
 ### Error: "Cannot read properties of undefined (reading 'maxIterations')"

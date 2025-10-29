@@ -76,34 +76,27 @@ pnpm add -g @archdoc/generator- 📊 **Comprehensive Analysis** - Structure, dep
 
 - 📝 **Markdown Output** - Clean, version-controllable documentation
 
-### Environment Setup
+### Interactive Setup (Recommended)
 
-- 🔄 **Iterative Refinement** - Self-improving analysis with quality checksThe **Architecture Documentation Generator** uses Large Language Models (LLMs) to automatically create comprehensive, human-readable documentation for software projects. Unlike traditional documentation tools that rely on parsing specific programming languages, this tool uses AI to understand your codebase semantically and generate intelligent insights.- **🤖 AI-Powered Analysis**: Uses advanced LLMs (Claude, GPT-4, Gemini) to understand your codebase
+Run the interactive configuration wizard:
 
-Create a `.env` file with your API keys:
+```bash
+archdoc config --init
+```
 
-- 🎨 **Customizable** - Prompt-based agent selection and configuration
+This will:
+1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
+2. Ask for your API key
+3. Create `.arch-docs/.archdoc.config.json` with your configuration
+4. Validate your setup
 
-```env
+### Manual Setup (Alternative)
 
-# Required: Choose one LLM provider- 📈 **LangSmith Tracing** - Full observability of AI workflows- **🌐 Language Agnostic**: Works with any programming language - no AST parsers needed
+Copy the example config and edit it:
 
-ANTHROPIC_API_KEY=sk-ant-...        # Recommended: Claude 3.5
-
-OPENAI_API_KEY=sk-...               # Alternative: GPT-4
-
-GOOGLE_API_KEY=...                  # Alternative: Gemini
-
-## 🚀 Quick Start### Key Features- **🎯 Agentic Architecture**: Specialized agents for different analysis tasks
-
-# Optional: LangSmith tracing
-
-LANGCHAIN_TRACING_V2=true
-
-LANGCHAIN_API_KEY=lsv2_pt_...
-
-LANGCHAIN_PROJECT=my-project### Installation- **📊 Multiple Output Formats**: Markdown, JSON, HTML, Confluence
-
+```bash
+cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
+# Edit .arch-docs/.archdoc.config.json and add your API key
 ```
 
 

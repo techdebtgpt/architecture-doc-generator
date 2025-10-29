@@ -50,20 +50,37 @@ cd architecture-doc-generator
 npm install
 ```
 
-3. **Setup Environment**
+3. **Setup Configuration**
 
-Create `.env` file:
+Create configuration file:
 
 ```bash
-# LLM Provider (choose one)
-ANTHROPIC_API_KEY=sk-ant-your-key
-# OPENAI_API_KEY=sk-your-key
-# GOOGLE_API_KEY=your-key
+# Copy example config
+cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
 
-# LangSmith (optional but recommended)
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=lsv2_pt_your-key
-LANGCHAIN_PROJECT=archdoc-dev
+# Edit and add your API key
+nano .arch-docs/.archdoc.config.json
+```
+
+Add your API key for at least one LLM provider:
+
+```json
+{
+  "apiKeys": {
+    "anthropic": "sk-ant-your-key",
+    "openai": "",
+    "google": ""
+  },
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022"
+  },
+  "tracing": {
+    "enabled": true,
+    "apiKey": "lsv2_pt_your-key",
+    "project": "archdoc-dev"
+  }
+}
 ```
 
 4. **Build Project**

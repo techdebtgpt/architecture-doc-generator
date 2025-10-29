@@ -70,6 +70,15 @@ web_modules/
 .env.*
 !.env.example
 
+# ArchDoc configuration files (contains API keys)
+.archdoc.config.json
+.arch-docs/.archdoc.config.json
+!.archdoc.config.example.json
+
+# Internal migration docs (not for commit)
+MIGRATION_SUMMARY.md
+.gitignore.archdoc
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

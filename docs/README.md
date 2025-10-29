@@ -34,6 +34,7 @@ This directory contains comprehensive documentation for using, integrating, and 
 |----------|-------------|----------|
 | [README.md](../README.md) | Project overview, features, quick start | Everyone |
 | [USER_GUIDE.md](./USER_GUIDE.md) | CLI reference, configuration, examples | End Users |
+| [CONFIGURATION_GUIDE.md](./CONFIGURATION_GUIDE.md) | Complete configuration reference | End Users, DevOps |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical design, patterns, internals | Developers |
 | [INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md) | CI/CD, programmatic usage | DevOps, Developers |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Development setup, creating agents | Contributors |
