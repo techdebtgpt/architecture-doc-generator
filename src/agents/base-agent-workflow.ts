@@ -240,8 +240,8 @@ export abstract class BaseAgentWorkflow {
       const nodeNames = Object.keys(state);
       if (nodeNames.length > 0) {
         const lastNodeName = nodeNames[nodeNames.length - 1];
-        // @ts-expect-error - Dynamic node names from StateGraph
-        finalState = state[lastNodeName] || finalState;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        finalState = (state as any)[lastNodeName] || finalState;
 
         // Extract token counts if present
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
