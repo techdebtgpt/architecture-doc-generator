@@ -770,8 +770,8 @@ for await (const chunk of stream) {
 ### 1. API Key Management
 
 - Never commit API keys
-- Use environment variables
-- Support `.env` files
+- Store in `.archdoc.config.json` (gitignored)
+- Support environment variables for CI/CD
 - Validate keys before use
 
 ### 2. File System Access

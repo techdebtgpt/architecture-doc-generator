@@ -69,13 +69,13 @@ This will:
 
 ### 2. Manual Setup
 
-Copy the example environment file and add your API keys:
+Copy the example config file and add your API keys:
 
 ```bash
 # Copy template
-cp .archdoc.config.example.json .env
+cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
 
-# Edit .env and add at least ONE API key
+# Edit and add at least ONE API key
 nano .arch-docs/.archdoc.config.json
 ```
 
@@ -159,14 +159,14 @@ archdoc config --reset
 Configuration is loaded in this order (later overrides earlier):
 
 1. **Default values** (built-in)
-2. **`.archdoc.config.json`** (project settings, safe to commit)
-3. **Environment variables** (`.env` file, API keys - **never commit**)
+2. **`.archdoc.config.json`** (project settings + API keys - **never commit**)
+3. **Environment variables** (CI/CD overrides)
 4. **CLI flags** (highest priority)
 
 **Example priority chain**:
 ```bash
 # Config file has model: "claude-3-5-sonnet"
-# .env has LLM_MODEL="gpt-4-turbo"
+# Environment variable: LLM_MODEL="gpt-4-turbo"
 # CLI has --model "gemini-2.0-flash"
 # → Result: Uses "gemini-2.0-flash" (CLI wins)
 ```
@@ -210,23 +210,7 @@ Contains project-specific settings **without secrets**:
 }
 ```
 
-#### `.env` (Secrets - Never Commit)
-
-Contains API keys and sensitive data:
-
-```bash
-# LLM Provider Keys (at least one required)
-"anthropic": "sk-ant-...
-OPENAI_API_KEY=sk-...
-GOOGLE_API_KEY=...
-
-# LangSmith Tracing (optional)
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=lsv2_pt_...
-LANGCHAIN_PROJECT=my-project
-```
-
-**Important**: Add `.env` to `.gitignore`!
+**Security Note**: `.archdoc.config.json` contains API keys and is automatically gitignored. Never commit it to version control!
 
 ## CLI Reference
 
@@ -839,11 +823,11 @@ archdoc analyze . --output ./docs/$(date +%Y-%m-%d)
 
 **Solution:**
 ```bash
-# Set API key
-export "anthropic": "sk-ant-your-key-here
+# Run interactive setup
+archdoc config --init
 
-# Or create .env file
-echo ""anthropic": "sk-ant-your-key-here" > .env
+# Or manually edit config
+nano .arch-docs/.archdoc.config.json
 ```
 
 ### Error: "Cannot read properties of undefined (reading 'maxIterations')"
