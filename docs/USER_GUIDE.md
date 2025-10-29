@@ -214,6 +214,119 @@ Contains project-specific settings **without secrets**:
 
 ## CLI Reference
 
+ArchDoc provides a command-line interface with the following commands:
+
+| Command | Purpose | Mandatory Config |
+|---------|---------|------------------|
+| `archdoc config --init` | Interactive configuration setup | ❌ None |
+| `archdoc config --list` | View current configuration | ✅ Config file must exist |
+| `archdoc config --get <key>` | Get specific config value | ✅ Config file must exist |
+| `archdoc config --set <key=value>` | Update config value | ✅ Config file must exist |
+| `archdoc analyze` | Generate documentation | ✅ API key required (in config or env) |
+| `archdoc generate` | Alias for `analyze` | ✅ API key required |
+| `archdoc export` | Export to other formats | ❌ Future feature |
+
+**Quick Start**:
+```bash
+# 1. Setup (first time only)
+archdoc config --init
+
+# 2. Analyze your project
+archdoc analyze
+
+# 3. View documentation
+cat .arch-docs/index.md
+```
+
+---
+
+### `archdoc config`
+
+Manage ArchDoc configuration interactively or programmatically.
+
+```bash
+archdoc config [options]
+```
+
+#### Options
+
+- `--init` - **Interactive setup wizard** (recommended for first-time setup)
+- `--location <type>` - Config location: `output` (.arch-docs/) or `root` (project root) - default: `output`
+- `--list` - List all configuration values (API keys masked for security)
+- `--get <key>` - Get specific configuration value (e.g., `llm.model`)
+- `--set <key=value>` - Set configuration value (e.g., `llm.temperature=0.5`)
+- `--reset` - Reset configuration to default values
+
+#### Examples
+
+```bash
+# Interactive setup (easiest way to get started)
+archdoc config --init
+
+# Create config in project root instead of .arch-docs/
+archdoc config --init --location root
+
+# View all settings (API keys are masked)
+archdoc config --list
+
+# Get specific values
+archdoc config --get llm.provider
+archdoc config --get llm.model
+archdoc config --get agents.enabled
+
+# Update settings
+archdoc config --set llm.provider=openai
+archdoc config --set llm.model=gpt-4-turbo
+archdoc config --set llm.temperature=0.5
+archdoc config --set refinement.enabled=false
+
+# Reset to defaults
+archdoc config --reset
+```
+
+#### Configuration Keys
+
+**LLM Settings**:
+- `apiKeys.anthropic` - Anthropic API key
+- `apiKeys.openai` - OpenAI API key
+- `apiKeys.google` - Google API key
+- `llm.provider` - Provider: `anthropic`, `openai`, `google`
+- `llm.model` - Model name
+- `llm.temperature` - Temperature 0-1
+- `llm.maxTokens` - Max output tokens
+
+**Agent Settings**:
+- `agents.enabled` - Array of enabled agent names
+- `agents.parallel` - Run agents in parallel (true/false)
+- `agents.timeout` - Timeout in milliseconds
+
+**Refinement Settings**:
+- `refinement.enabled` - Enable iterative refinement (true/false)
+- `refinement.maxIterations` - Max iterations per agent
+- `refinement.clarityThreshold` - Clarity threshold (0-100)
+- `refinement.minImprovement` - Minimum improvement % to continue
+
+**Output Settings**:
+- `output.directory` - Output directory path
+- `output.format` - Output format (`markdown`)
+- `output.clean` - Clean before generation (true/false)
+- `output.splitFiles` - Generate multi-file structure (true/false)
+
+**Tracing Settings**:
+- `tracing.enabled` - Enable LangSmith tracing (true/false)
+- `tracing.apiKey` - LangSmith API key
+- `tracing.project` - LangSmith project name
+
+#### Notes
+
+- **First-time setup**: Use `archdoc config --init` for guided interactive setup
+- **Config location**: Default is `.arch-docs/.archdoc.config.json` (automatically gitignored)
+- **Security**: API keys are automatically masked in `--list` output
+- **Validation**: Config values are validated when set
+- **Priority**: Config file < Environment variables < CLI flags
+
+---
+
 ### `archdoc analyze`
 
 Generate architecture documentation for a project.
