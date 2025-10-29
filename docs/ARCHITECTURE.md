@@ -92,14 +92,14 @@ The orchestrator is the central coordinator that:
 class DocumentationOrchestrator {
   async generateDocumentation(
     projectPath: string,
-    options: OrchestratorOptions
-  ): Promise<DocumentationOutput>
-  
+    options: OrchestratorOptions,
+  ): Promise<DocumentationOutput>;
+
   async executeAgents(
     context: AgentContext,
     agentsToRun: string[],
-    options: OrchestratorOptions
-  ): Promise<Map<string, AgentResult>>
+    options: OrchestratorOptions,
+  ): Promise<Map<string, AgentResult>>;
 }
 ```
 
@@ -120,10 +120,10 @@ Manages agent lifecycle and discovery:
 
 ```typescript
 class AgentRegistry {
-  register(agent: Agent): void
-  getAgent(name: string): Agent | undefined
-  getAllAgents(): Agent[]
-  getAgentsByCapability(capability: string): Agent[]
+  register(agent: Agent): void;
+  getAgent(name: string): Agent | undefined;
+  getAllAgents(): Agent[];
+  getAgentsByCapability(capability: string): Agent[];
 }
 ```
 
@@ -142,7 +142,7 @@ Fast, efficient project scanning:
 
 ```typescript
 class FileSystemScanner {
-  async scan(options: ScanOptions): Promise<ScanResult>
+  async scan(options: ScanOptions): Promise<ScanResult>;
 }
 ```
 
@@ -158,13 +158,13 @@ class FileSystemScanner {
 
 ```typescript
 interface ScanResult {
-  files: string[];              // All file paths
+  files: string[]; // All file paths
   totalFiles: number;
   totalDirectories: number;
   totalSize: number;
   languageDistribution: Map<string, number>;
-  entryPoints: string[];        // main.ts, index.js, etc.
-  configFiles: string[];        // package.json, tsconfig.json, etc.
+  entryPoints: string[]; // main.ts, index.js, etc.
+  configFiles: string[]; // package.json, tsconfig.json, etc.
 }
 ```
 
@@ -176,25 +176,25 @@ Unified interface for multiple LLM providers:
 
 ```typescript
 class LLMService {
-  static getInstance(): LLMService
-  
-  getChatModel(config?: ModelConfig): BaseChatModel
-  
-  async countTokens(text: string): Promise<number>
-  
-  getTokenUsage(model: BaseChatModel, result: LLMResult): TokenUsage
-  
-  static configureLangSmith(): void
+  static getInstance(): LLMService;
+
+  getChatModel(config?: ModelConfig): BaseChatModel;
+
+  async countTokens(text: string): Promise<number>;
+
+  getTokenUsage(model: BaseChatModel, result: LLMResult): TokenUsage;
+
+  static configureLangSmith(): void;
 }
 ```
 
 **Supported Providers:**
 
-| Provider | Models | Best For |
-|----------|--------|----------|
+| Provider      | Models                           | Best For                      |
+| ------------- | -------------------------------- | ----------------------------- |
 | **Anthropic** | claude-3-5-sonnet, claude-3-opus | Deep code analysis, reasoning |
-| **OpenAI** | gpt-4-turbo, gpt-4 | Balanced performance |
-| **Google** | gemini-1.5-pro, gemini-1.5-flash | Fast, cost-effective |
+| **OpenAI**    | gpt-4-turbo, gpt-4               | Balanced performance          |
+| **Google**    | gemini-1.5-pro, gemini-1.5-flash | Fast, cost-effective          |
 
 ### 5. Formatter System
 
@@ -204,11 +204,11 @@ Multiple output format support:
 
 ```typescript
 interface IFormatter {
-  format(output: DocumentationOutput, options: FormatOptions): Promise<void>
+  format(output: DocumentationOutput, options: FormatOptions): Promise<void>;
 }
 
 class MultiFileMarkdownFormatter implements IFormatter {
-  async format(output: DocumentationOutput, options: FormatOptions): Promise<void>
+  async format(output: DocumentationOutput, options: FormatOptions): Promise<void>;
 }
 ```
 
@@ -257,6 +257,7 @@ interface AgentCapabilities {
 **Purpose:** Analyze project organization and structure
 
 **Output:**
+
 - Directory tree
 - Key directories and their purposes
 - Entry points
@@ -294,6 +295,7 @@ export class FileStructureAgent implements Agent {
 **Purpose:** Analyze project dependencies
 
 **Output:**
+
 - External dependencies
 - Internal module dependencies
 - Dependency graph
@@ -305,6 +307,7 @@ export class FileStructureAgent implements Agent {
 **Purpose:** Identify design patterns and practices
 
 **Output:**
+
 - Design patterns (Singleton, Factory, etc.)
 - Architectural patterns (MVC, Hexagonal, etc.)
 - Anti-patterns
@@ -316,6 +319,7 @@ export class FileStructureAgent implements Agent {
 **Purpose:** Map data and control flows
 
 **Output:**
+
 - Data flow diagrams
 - Control flow sequences
 - API call flows
@@ -326,6 +330,7 @@ export class FileStructureAgent implements Agent {
 **Purpose:** Extract data models and types
 
 **Output:**
+
 - Type definitions
 - Interface schemas
 - Data models
@@ -336,6 +341,7 @@ export class FileStructureAgent implements Agent {
 **Purpose:** High-level architectural analysis
 
 **Output:**
+
 - Component architecture
 - Layer organization
 - Communication patterns
@@ -348,17 +354,15 @@ Agents can run in two modes:
 **1. Parallel Execution** (default)
 
 ```typescript
-const agentPromises = agentsToRun.map(name => {
+const agentPromises = agentsToRun.map((name) => {
   const agent = this.agentRegistry.getAgent(name);
-  const agentRunnable = RunnableLambda.from(
-    async (ctx: AgentContext, config?: RunnableConfig) => {
-      return await agent.execute(ctx, { 
-        ...options.agentOptions,
-        runnableConfig: config 
-      });
-    }
-  ).withConfig({ runName: `Agent-${name}` });
-  
+  const agentRunnable = RunnableLambda.from(async (ctx: AgentContext, config?: RunnableConfig) => {
+    return await agent.execute(ctx, {
+      ...options.agentOptions,
+      runnableConfig: config,
+    });
+  }).withConfig({ runName: `Agent-${name}` });
+
   return agentRunnable.invoke(context, options.agentOptions?.runnableConfig);
 });
 
@@ -425,10 +429,10 @@ private buildAnalysisChain(context: AgentContext, options?: AgentExecutionOption
 ```typescript
 async execute(context: AgentContext, options?: AgentExecutionOptions): Promise<AgentResult> {
   const chain = this.buildAnalysisChain(context, options);
-  
+
   // Pass config for unified tracing
   const result = await chain.invoke(input, options?.runnableConfig);
-  
+
   return {
     agentName: this.getMetadata().name,
     status: 'success',
@@ -462,9 +466,9 @@ The system can iteratively refine agent output until quality thresholds are met:
 ```typescript
 interface IterativeRefinementOptions {
   enabled: boolean;
-  maxIterations: number;           // Default: 5
-  clarityThreshold: number;        // Default: 80 (%)
-  minImprovement: number;          // Default: 10 (%)
+  maxIterations: number; // Default: 5
+  clarityThreshold: number; // Default: 80 (%)
+  minImprovement: number; // Default: 10 (%)
 }
 ```
 
@@ -483,7 +487,7 @@ async refineAnalysis(
   while (iteration < options.maxIterations) {
     // 1. Evaluate clarity
     const clarityScore = await this.evaluateClarity(currentResult);
-    
+
     if (clarityScore >= options.clarityThreshold) {
       break; // Quality threshold met
     }
@@ -521,19 +525,19 @@ private async evaluateClarity(result: AgentResult): Promise<number> {
   const prompt = `
     Evaluate the clarity of this analysis on a scale of 0-100:
     ${result.markdown}
-    
+
     Consider:
     - Completeness
     - Accuracy
     - Clarity
     - Usefulness
-    
+
     Return only a number 0-100.
   `;
 
   const model = this.llmService.getChatModel({ temperature: 0 });
   const response = await model.invoke([new HumanMessage(prompt)]);
-  
+
   return parseInt(response.content);
 }
 ```
@@ -641,7 +645,7 @@ The `AgentRegistry` uses the registry pattern for dynamic agent management:
 ```typescript
 class AgentRegistry {
   private agents = new Map<string, Agent>();
-  
+
   register(agent: Agent): void {
     const metadata = agent.getMetadata();
     this.agents.set(metadata.name, agent);
@@ -658,8 +662,12 @@ interface Agent {
   execute(context: AgentContext): Promise<AgentResult>;
 }
 
-class FileStructureAgent implements Agent { /* ... */ }
-class DependencyAgent implements Agent { /* ... */ }
+class FileStructureAgent implements Agent {
+  /* ... */
+}
+class DependencyAgent implements Agent {
+  /* ... */
+}
 ```
 
 ### 3. Builder Pattern
@@ -668,11 +676,11 @@ Formatters use builder pattern for flexible output:
 
 ```typescript
 class MultiFileMarkdownFormatter {
-  private generateIndex(output: DocumentationOutput): string
-  private generateMetadata(output: DocumentationOutput): string
-  private generateFileStructure(output: DocumentationOutput): string
-  
-  async format(output: DocumentationOutput, options: FormatOptions): Promise<void>
+  private generateIndex(output: DocumentationOutput): string;
+  private generateMetadata(output: DocumentationOutput): string;
+  private generateFileStructure(output: DocumentationOutput): string;
+
+  async format(output: DocumentationOutput, options: FormatOptions): Promise<void>;
 }
 ```
 
@@ -683,7 +691,7 @@ LLM Service uses singleton for shared configuration:
 ```typescript
 class LLMService {
   private static instance: LLMService;
-  
+
   static getInstance(): LLMService {
     if (!LLMService.instance) {
       LLMService.instance = new LLMService();
@@ -705,7 +713,7 @@ abstract class BaseAgentWorkflow {
     const formatted = await this.formatResult(analyzed);
     return formatted;
   }
-  
+
   protected abstract prepareData(context: AgentContext): Promise<any>;
   protected abstract analyze(data: any): Promise<any>;
   protected abstract formatResult(result: any): Promise<AgentResult>;
@@ -719,9 +727,7 @@ abstract class BaseAgentWorkflow {
 Agents with no dependencies run concurrently:
 
 ```typescript
-const agentPromises = independentAgents.map(agent => 
-  agent.execute(context, options)
-);
+const agentPromises = independentAgents.map((agent) => agent.execute(context, options));
 const results = await Promise.all(agentPromises);
 ```
 
@@ -734,11 +740,11 @@ Intelligent context truncation to stay within limits:
 ```typescript
 private async truncateContext(context: string, maxTokens: number): Promise<string> {
   const tokens = await this.llmService.countTokens(context);
-  
+
   if (tokens <= maxTokens) {
     return context;
   }
-  
+
   // Truncate with smart summarization
   const ratio = maxTokens / tokens;
   return context.slice(0, Math.floor(context.length * ratio));
@@ -799,25 +805,25 @@ for await (const chunk of stream) {
 
 ### Core Dependencies
 
-| Package | Purpose | Version |
-|---------|---------|---------|
-| `langchain` | LLM orchestration | ^0.3.0 |
-| `@langchain/anthropic` | Claude integration | ^0.3.0 |
-| `@langchain/openai` | GPT integration | ^0.3.0 |
-| `@langchain/google-genai` | Gemini integration | ^0.1.0 |
-| `commander` | CLI framework | ^12.0.0 |
-| `zod` | Schema validation | ^3.22.0 |
-| `fast-glob` | File scanning | ^3.3.2 |
-| `js-tiktoken` | Token counting | ^1.0.12 |
+| Package                   | Purpose            | Version |
+| ------------------------- | ------------------ | ------- |
+| `langchain`               | LLM orchestration  | ^0.3.0  |
+| `@langchain/anthropic`    | Claude integration | ^0.3.0  |
+| `@langchain/openai`       | GPT integration    | ^0.3.0  |
+| `@langchain/google-genai` | Gemini integration | ^0.1.0  |
+| `commander`               | CLI framework      | ^12.0.0 |
+| `zod`                     | Schema validation  | ^3.22.0 |
+| `fast-glob`               | File scanning      | ^3.3.2  |
+| `js-tiktoken`             | Token counting     | ^1.0.12 |
 
 ### Development Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `typescript` | Language |
-| `jest` | Testing |
-| `eslint` | Linting |
-| `prettier` | Formatting |
+| Package      | Purpose    |
+| ------------ | ---------- |
+| `typescript` | Language   |
+| `jest`       | Testing    |
+| `eslint`     | Linting    |
+| `prettier`   | Formatting |
 
 ## Future Enhancements
 
@@ -850,8 +856,8 @@ Load custom agents dynamically:
 
 ```typescript
 class PluginManager {
-  async loadPlugin(path: string): Promise<Agent>
-  registerPlugin(plugin: AgentPlugin): void
+  async loadPlugin(path: string): Promise<Agent>;
+  registerPlugin(plugin: AgentPlugin): void;
 }
 ```
 

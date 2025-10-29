@@ -1,10 +1,6 @@
 # Architecture Documentation Generator# Architecture Documentation Generator# Architecture Documentation Generator# 🏗️ ArchDoc Generator
 
-
-
 > AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
-
-
 
 [![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
 
@@ -44,15 +40,9 @@ Architecture Documentation Generator is an intelligent tool that analyzes your c
 
 - 📈 **LangSmith Tracing** - Full observability of AI workflowsArchitecture Documentation Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, and data flows.
 
-
-
 ## 🚀 Quick Start[![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 
-
-
 ### Installation### Key Features
-
-
 
 ```bash
 
@@ -85,6 +75,7 @@ archdoc config --init
 ```
 
 This will:
+
 1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
 2. Ask for your API key
 3. Create `.arch-docs/.archdoc.config.json` with your configuration
@@ -99,11 +90,9 @@ cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
 # Edit .arch-docs/.archdoc.config.json and add your API key
 ```
 
-
-
 ### Basic Usage
 
-```bash- **🌍 Language Agnostic** - Works with TypeScript, JavaScript, Python, Java, Go, Rust, C++, and more- **⚡ Intelligent Caching**: Reduces API costs with smart caching
+```````bash- **🌍 Language Agnostic** - Works with TypeScript, JavaScript, Python, Java, Go, Rust, C++, and more- **⚡ Intelligent Caching**: Reduces API costs with smart caching
 
 ```bash
 
@@ -185,21 +174,21 @@ docs/
 
 └── recommendations.md          # Improvement suggestions### Installation  - [CLI Usage](#cli-usage)
 
-```
+```````
 
 # Optional: LangSmith tracing
 
 ## 🤖 Available Agents
 
-LANGCHAIN_TRACING_V2=true  - [Programmatic Usage](#programmatic-usage)
+LANGCHAIN_TRACING_V2=true - [Programmatic Usage](#programmatic-usage)
 
 Each agent specializes in a specific analysis task:
 
-LANGCHAIN_API_KEY=lsv2_pt_...
+LANGCHAIN*API_KEY=lsv2_pt*...
 
 | Agent | Purpose | Output |
 
-|-------|---------|--------|LANGCHAIN_PROJECT=my-project```bash  - [VS Code Extension](#vs-code-extension)
+|-------|---------|--------|LANGCHAIN_PROJECT=my-project```bash - [VS Code Extension](#vs-code-extension)
 
 | **File Structure** | Project organization, entry points | Directory tree, key files |
 
@@ -213,15 +202,9 @@ LANGCHAIN_API_KEY=lsv2_pt_...
 
 | **Architecture Analyzer** | High-level design | Component diagrams, layers |### Basic Usage
 
-
-
 ## 💡 Usage Examples```- [Agents](#agents)
 
-
-
 ### Example 1: Full Project Documentation```bash
-
-
 
 ```bash# Analyze current directory- [Custom Agents](#custom-agents)
 
@@ -245,11 +228,7 @@ archdoc analyze --prompt "analyze dependencies and design patterns"
 
 ```
 
-
-
 ### Example 3: Quick Scan# Focused analysis with prompt```bash- [Contributing](#contributing)
-
-
 
 ```basharchdoc analyze --prompt "analyze dependencies and patterns"
 
@@ -263,9 +242,9 @@ archdoc analyze --depth quick --output ./quick-docs# Choose your preferred LLM p
 
 ### Example 4: CI/CD Integration
 
-archdoc analyze --output ./docsexport ANTHROPIC_API_KEY="sk-ant-your-key"   # Recommended
+archdoc analyze --output ./docsexport ANTHROPIC_API_KEY="sk-ant-your-key" # Recommended
 
-```yaml
+```````yaml
 
 # GitHub Actions example
 
@@ -309,27 +288,25 @@ jobs:
 
           publish_dir: ./docs- **[API Reference](./docs/API.md)** - Programmatic usage
 
-```
+```````
 
 - **[Contributing](./CONTRIBUTING.md)** - Development guidenpm install -g @archdoc/generator
 
 ## 🔧 Programmatic Usage
 
-
-
 Use the library in your Node.js applications:
 
 ## 🎨 What Gets Generated### Generate Documentation```
 
-```typescript
+```````typescript
 
-import { 
+import {
 
-  DocumentationOrchestrator, 
+  DocumentationOrchestrator,
 
   AgentRegistry,The tool generates a multi-file documentation structure:
 
-  FileSystemScanner 
+  FileSystemScanner
 
 } from '@archdoc/generator';
 
@@ -369,13 +346,13 @@ const docs = await orchestrator.generateDocumentation('/path/to/project', {├�
 
 console.log('Generated:', docs.summary);├── schemas.md                  # Data structures and interfaces```
 
-```
+```````
 
-├── architecture.md             # High-level architecture
+├── architecture.md # High-level architecture
 
 See **[API Reference](./docs/API.md)** for complete programmatic documentation.
 
-└── recommendations.md          # Improvement suggestionsThat's it! Your documentation is now available in `./docs/architecture.md`
+└── recommendations.md # Improvement suggestionsThat's it! Your documentation is now available in `./docs/architecture.md`
 
 ## 🏗️ Architecture Highlights
 
@@ -389,9 +366,9 @@ See **[API Reference](./docs/API.md)** for complete programmatic documentation.
 
 ┌─────────────────────────────────────────────┐## 🤖 Available Agents
 
-│      Documentation Orchestrator             │
+│ Documentation Orchestrator │
 
-│  (Coordinates agents, manages workflow)     │## What It Generates
+│ (Coordinates agents, manages workflow) │## What It Generates
 
 └─────────────────────────────────────────────┘
 
@@ -409,15 +386,15 @@ See **[API Reference](./docs/API.md)** for complete programmatic documentation.
 
     │                    │              │              │|-------|---------|--------|### 📋 Project Overviewgit clone https://github.com/ritech/architecture-doc-generator.git
 
-┌───▼────┐  ┌──────▼──────┐  ┌────▼─────┐  ┌────▼─────┐
+┌───▼────┐ ┌──────▼──────┐ ┌────▼─────┐ ┌────▼─────┐
 
-│ File   │  │ Dependency  │  │ Pattern  │  │   Flow   │| **File Structure** | Project organization, entry points | Directory tree, key files |
+│ File │ │ Dependency │ │ Pattern │ │ Flow │| **File Structure** | Project organization, entry points | Directory tree, key files |
 
-│Structure│  │  Analyzer   │  │ Detector │  │   Viz    │
+│Structure│ │ Analyzer │ │ Detector │ │ Viz │
 
-└────────┘  └─────────────┘  └──────────┘  └──────────┘| **Dependency Analyzer** | External deps, internal imports | Dependency graph, version info |- Project description and purposecd architecture-doc-generator
+└────────┘ └─────────────┘ └──────────┘ └──────────┘| **Dependency Analyzer** | External deps, internal imports | Dependency graph, version info |- Project description and purposecd architecture-doc-generator
 
-```
+````
 
 | **Pattern Detector** | Design patterns, conventions | Pattern usage, best practices |
 
@@ -449,13 +426,11 @@ const chain = RunnableSequence.from([| **Architecture Analyzer** | High-level de
 
 const result = await chain.invoke(input, runnableConfig);### Example 1: Full Project Documentation
 
-```
-
-
+````
 
 ### Iterative Refinement
 
-```bash### 🏗️ Architecture Documentation## ⚡ Quick Start
+````bash### 🏗️ Architecture Documentation## ⚡ Quick Start
 
 Self-improving analysis with clarity scoring:
 
@@ -537,9 +512,9 @@ Options:# Fast analysis for quick insights
 
   --verbose                   Show detailed progress- Configuration and setup files
 
-```
+````
 
-```yaml
+````yaml
 
 ### Environment Variables
 
@@ -639,35 +614,29 @@ Quickly understand undocumented legacy codebases.- Best practices and recommenda
 
 archdoc analyze /path/to/legacy --depth deep --verbose
 
-``````
-
-
+````
 
 ## 📈 LangSmith TracingUse the library in your Node.js applications:
 
-
-
 Enable full observability of AI workflows:### ✅ Code Quality Assessment
 
-
-
-```bash```typescript
+`bash`typescript
 
 export LANGCHAIN_TRACING_V2=true
 
-export LANGCHAIN_API_KEY=lsv2_pt_...import { - Maintainability metrics3. **View your documentation**:
+export LANGCHAIN*API_KEY=lsv2_pt*...import { - Maintainability metrics3. **View your documentation**:
 
 export LANGCHAIN_PROJECT=my-project
 
-  DocumentationOrchestrator, 
+DocumentationOrchestrator,
 
 archdoc analyze . --verbose
 
-```  AgentRegistry,- Complexity analysis
+```AgentRegistry,- Complexity analysis
 
 
 
-**Trace Hierarchy:**  FileSystemScanner 
+**Trace Hierarchy:**  FileSystemScanner
 
 ```
 
@@ -679,17 +648,17 @@ DocumentationGeneration-Complete} from '@archdoc/generator';- Technical debt est
 
 ├── ExecuteAgents
 
-│   ├── Agent-file-structure (8.5s, 8.6K tokens)// Setup registry with agents- Security considerations
+│ ├── Agent-file-structure (8.5s, 8.6K tokens)// Setup registry with agents- Security considerations
 
-│   ├── Agent-dependency-analyzer (7.2s, 7.1K tokens)
+│ ├── Agent-dependency-analyzer (7.2s, 7.1K tokens)
 
-│   ├── Agent-pattern-detector (10.1s, 11.1K tokens)const registry = new AgentRegistry();
+│ ├── Agent-pattern-detector (10.1s, 11.1K tokens)const registry = new AgentRegistry();
 
-│   └── Agent-flow-visualization (9.5s, 8.9K tokens)
+│ └── Agent-flow-visualization (9.5s, 8.9K tokens)
 
 └── AggregateResultsconst scanner = new FileSystemScanner();- Test coverage insights## 📖 Usage
 
-```
+````
 
 const orchestrator = new DocumentationOrchestrator(registry, scanner);
 
@@ -988,7 +957,7 @@ Generate comprehensive docs to help new team members understand the codebase qui
 
 archdoc analyze . --output ./onboarding-docs --depth deep    "model": "claude-3-5-sonnet-20241022",// Generate documentation
 
-```
+````
 
     "temperature": 0.2,const result = await generator.generate('./my-project');
 
@@ -998,7 +967,7 @@ archdoc analyze . --output ./onboarding-docs --depth deep    "model": "claude-3-
 
 Create documentation for architecture review meetings.
 
-  },console.log('Documentation generated:', result.outputPath);
+},console.log('Documentation generated:', result.outputPath);
 
 ```bash
 
@@ -1024,21 +993,21 @@ Identify patterns and areas needing improvement.
 
       "**/dist/**",
 
-```bash
+````bash
 
 archdoc analyze --prompt "identify technical debt and improvement opportunities"      "**/build/**"```typescript
 
-```
+````
 
     ]import { ArchDocGenerator } from '@archdoc/generator';
 
 ### 5. Legacy Code Understanding
 
-  },
+},
 
 Quickly understand undocumented legacy codebases.
 
-  "agents": {const generator = new ArchDocGenerator();
+"agents": {const generator = new ArchDocGenerator();
 
 ```bash
 
@@ -1070,11 +1039,11 @@ archdoc analyze . --verbose    "parallel": true  onAgentComplete: (result) => {
 
 ```
 
-  },    console.log(`✓ ${result.agentName} completed`);
+}, console.log(`✓ ${result.agentName} completed`);
 
 **Trace Hierarchy:**
 
-```  "output": {  },
+```````"output": {  },
 
 DocumentationGeneration-Complete
 
@@ -1280,13 +1249,11 @@ archdoc generate ./my-django-app \    "ttl": 3600
 
   --model gpt-4-turbo}
 
-``````
-
-
+```````
 
 ### React Frontend### Environment Variables
 
-```bash
+````bash
 
 archdoc generate ./my-react-app \```bash
 
@@ -1308,7 +1275,7 @@ archdoc generate ./monorepo \ANTHROPIC_API_KEY=your_key
 
   --parallelGOOGLE_API_KEY=your_key
 
-```
+````
 
 # LangSmith Tracing (optional)
 
@@ -1318,9 +1285,7 @@ LANGCHAIN_API_KEY=your_key
 
 ### Create Custom AgentLANGCHAIN_PROJECT=my-project
 
-
-
-```typescript# Cache
+````typescript# Cache
 
 import { Agent, AgentContext, AgentResult } from '@archdoc/generator';ARCHDOC_CACHE_ENABLED=true
 
@@ -1404,27 +1369,23 @@ export class CustomLLMProvider implements ILLMProvider {   - Detects architectur
 
 }   - **Priority**: LOW (runs last)
 
-```
+````
 
 5. **Code Quality Agent**
 
-## Documentation   - Analyzes code quality metrics
+## Documentation - Analyzes code quality metrics
 
-   - Identifies technical debt
+- Identifies technical debt
 
-- **[User Guide](./USER_GUIDE.md)** - Complete usage guide with examples   - Suggests improvements
+- **[User Guide](./USER_GUIDE.md)** - Complete usage guide with examples - Suggests improvements
 
-- **[Architecture](./ARCHITECTURE.md)** - System design and internals   - **Priority**: OPTIONAL
+- **[Architecture](./ARCHITECTURE.md)** - System design and internals - **Priority**: OPTIONAL
 
 - **[Contributing](./CONTRIBUTING.md)** - Development guidelines
 
 - **[API Reference](./dist/src/index.d.ts)** - TypeScript definitions### Agent Capabilities
 
-
-
 ## Use CasesEach agent has specific capabilities:
-
-
 
 ### Software Teams- **Parallel Execution**: Can run concurrently with other agents
 
@@ -1452,87 +1413,83 @@ import { Agent, AgentContext, AgentResult, AgentPriority } from '@archdoc/genera
 
 - **Compliance** - Document system architecture for auditsexport class MyCustomAgent implements Agent {
 
-- **Legacy Systems** - Understand undocumented code  name = 'my-custom-agent';
+- **Legacy Systems** - Understand undocumented code name = 'my-custom-agent';
 
-- **Migration Planning** - Analyze before refactoring  description = 'Analyzes specific project aspects';
+- **Migration Planning** - Analyze before refactoring description = 'Analyzes specific project aspects';
 
-- **Portfolio Management** - Track architecture across projects  priority = AgentPriority.MEDIUM;
+- **Portfolio Management** - Track architecture across projects priority = AgentPriority.MEDIUM;
 
-  
-
-## Performance  capabilities = {
+## Performance capabilities = {
 
     supportsParallel: true,
 
-- **Fast Scanning** - Analyzes thousands of files in seconds    requiresFileContents: true,
+- **Fast Scanning** - Analyzes thousands of files in seconds requiresFileContents: true,
 
-- **Token Efficient** - Intelligent context management    dependencies: ['file-structure'],
+- **Token Efficient** - Intelligent context management dependencies: ['file-structure'],
 
-- **Parallel Execution** - Run independent agents concurrently    supportsIncremental: true,
+- **Parallel Execution** - Run independent agents concurrently supportsIncremental: true,
 
-- **Caching** - Avoid redundant LLM calls    estimatedTokens: 5000,
+- **Caching** - Avoid redundant LLM calls estimatedTokens: 5000,
 
-    supportedLanguages: ['typescript', 'javascript'],
+  supportedLanguages: ['typescript', 'javascript'],
 
-**Typical Performance:**  };
+**Typical Performance:** };
 
 - Small project (< 100 files): ~30 seconds
 
-- Medium project (100-1000 files): ~2-5 minutes  async execute(context: AgentContext): Promise<AgentResult> {
+- Medium project (100-1000 files): ~2-5 minutes async execute(context: AgentContext): Promise<AgentResult> {
 
-- Large project (1000+ files): ~5-15 minutes    const { files, fileContents, projectMetadata } = context;
+- Large project (1000+ files): ~5-15 minutes const { files, fileContents, projectMetadata } = context;
 
-    
-
-*Times vary based on LLM provider and enabled agents.*    // Your custom analysis logic here
+_Times vary based on LLM provider and enabled agents._ // Your custom analysis logic here
 
     const analysis = await this.analyzeProject(files, fileContents);
 
-## Comparison with Traditional Tools    
+## Comparison with Traditional Tools
 
     return {
 
-| Feature | Traditional Tools | Architecture Doc Generator |      agentName: this.name,
+| Feature | Traditional Tools | Architecture Doc Generator | agentName: this.name,
 
-|---------|------------------|---------------------------|      status: 'success',
+|---------|------------------|---------------------------| status: 'success',
 
-| **Language Support** | Per-language parsers | Any language |      data: analysis,
+| **Language Support** | Per-language parsers | Any language | data: analysis,
 
-| **Setup** | Complex configuration | Zero config |      summary: 'Analysis completed successfully',
+| **Setup** | Complex configuration | Zero config | summary: 'Analysis completed successfully',
 
-| **Understanding** | Syntax-based | Semantic (AI) |      markdown: this.generateMarkdown(analysis),
+| **Understanding** | Syntax-based | Semantic (AI) | markdown: this.generateMarkdown(analysis),
 
-| **Documentation** | Templates | Natural language |      confidence: 0.9,
+| **Documentation** | Templates | Natural language | confidence: 0.9,
 
-| **Patterns** | Rule-based | Intelligent detection |      tokenUsage: { inputTokens: 1000, outputTokens: 500, totalTokens: 1500 },
+| **Patterns** | Rule-based | Intelligent detection | tokenUsage: { inputTokens: 1000, outputTokens: 500, totalTokens: 1500 },
 
-| **Maintenance** | Parser updates | Self-adapting |      executionTime: 2000,
+| **Maintenance** | Parser updates | Self-adapting | executionTime: 2000,
 
       errors: [],
 
-## Roadmap      warnings: [],
+## Roadmap warnings: [],
 
       metadata: {},
 
-### Current (v0.1.0)    };
+### Current (v0.1.0) };
 
-- ✅ File system scanning  }
+- ✅ File system scanning }
 
-- ✅ File structure analysis agent  
+- ✅ File structure analysis agent
 
-- ✅ Multi-LLM support (Claude, GPT-4, Gemini)  private async analyzeProject(files: string[], contents: Map<string, string>) {
+- ✅ Multi-LLM support (Claude, GPT-4, Gemini) private async analyzeProject(files: string[], contents: Map<string, string>) {
 
-- ✅ Markdown output    // Implementation
+- ✅ Markdown output // Implementation
 
-- ✅ CLI interface  }
+- ✅ CLI interface }
 
-- ✅ Programmatic API  
+- ✅ Programmatic API
 
   private generateMarkdown(analysis: any): string {
 
-### Coming Soon (v0.2.0)    // Generate markdown documentation
+### Coming Soon (v0.2.0) // Generate markdown documentation
 
-- 🔜 Dependency analysis agent  }
+- 🔜 Dependency analysis agent }
 
 - 🔜 Pattern detection agent}
 
@@ -1584,7 +1541,7 @@ MIT License - see [LICENSE](./LICENSE) file for details.
 
 ## Contributing
 
-```bash
+````bash
 
 Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for:archdoc generate ./project --format json
 
@@ -1612,7 +1569,7 @@ Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for:
 
 ## Acknowledgments}
 
-```
+````
 
 Built with:
 
@@ -1638,7 +1595,7 @@ If you use this tool in your research or project, please cite:- Search functiona
 
 - Printable layout
 
-```bibtex
+````bibtex
 
 @software{architecture_doc_generator,### Confluence
 
@@ -1683,7 +1640,7 @@ export LANGCHAIN_API_KEY="lsv2_pt_your_key_here"
 export LANGCHAIN_PROJECT="your-project-name"
 
 archdoc analyze ./project --verbose
-```
+````
 
 ### What You Get
 
@@ -1717,16 +1674,19 @@ DocumentationGeneration-Complete (Root Trace)
 ### Benefits
 
 **For Debugging:**
+
 - Identify slow agents instantly
 - Track token usage per operation
 - See refinement iteration improvements
 
 **For Cost Management:**
+
 - Monitor API costs in real-time
 - Optimize expensive agents
 - Budget token usage per agent
 
 **For Performance:**
+
 - Find bottlenecks in workflow
 - Compare agent execution times
 - Optimize parallel execution opportunities

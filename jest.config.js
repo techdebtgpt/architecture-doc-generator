@@ -11,7 +11,7 @@ module.exports = {
   ],
   coverageDirectory: './coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  coverageThresholds: {
+  coverageThreshold: {
     global: {
       branches: 70,
       functions: 70,
@@ -34,11 +34,14 @@ module.exports = {
     '^@types/(.*)$': '<rootDir>/src/types/$1',
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  globals: {
-    'ts-jest': {
-      tsconfig: {
-        esModuleInterop: true,
+  transform: {
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        tsconfig: {
+          esModuleInterop: true,
+        },
       },
-    },
+    ],
   },
 };

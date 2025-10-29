@@ -2,7 +2,6 @@
 
 // Load ArchDoc configuration
 // Looks for .archdoc.config.json in: .arch-docs/ folder first, then root folder
-import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -30,13 +29,13 @@ if (fs.existsSync(configPath)) {
       if (config.tracing.apiKey) process.env.LANGCHAIN_API_KEY = config.tracing.apiKey;
       if (config.tracing.project) process.env.LANGCHAIN_PROJECT = config.tracing.project;
     }
-  } catch (err) {
-    // Ignore parse errors, fall through to env vars
+  } catch (_err) {
+    // Ignore parse errors, config will use defaults or explicit env vars
   }
 }
 
-// Fallback to environment variables (for CI/CD or explicit overrides)
-dotenv.config();
+// Note: Environment variables can still be set explicitly (for CI/CD)
+// They take precedence over .archdoc.config.json values
 
 import { Command } from 'commander';
 import { generateDocumentation } from './commands/generate.command';

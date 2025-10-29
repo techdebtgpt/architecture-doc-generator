@@ -3,25 +3,7 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableLambda, RunnableSequence } from '@langchain/core/runnables';
 import { AgentMetadata } from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
-
-/**
- * Logger utility for AgentSelector
- */
-class SelectorLogger {
-  constructor(private context: string) {}
-
-  debug(message: string): void {
-    console.log(`[${this.context}] ${message}`);
-  }
-
-  error(message: string): void {
-    console.error(`[${this.context}] ERROR: ${message}`);
-  }
-
-  warn(message: string): void {
-    console.warn(`[${this.context}] WARNING: ${message}`);
-  }
-}
+import { Logger } from '../utils/logger';
 
 /**
  * AgentSelector analyzes natural language prompts to intelligently select
@@ -38,7 +20,7 @@ class SelectorLogger {
  * selector.selectAgents(prompt, registry) // → ['flow-visualization', 'schema-generator']
  */
 export class AgentSelector {
-  private readonly logger = new SelectorLogger('AgentSelector'); /**
+  private readonly logger = new Logger('AgentSelector'); /**
    * Selects agents based on natural language prompt
    *
    * @param prompt Natural language instruction (e.g., "analyze security and dependencies")
@@ -62,12 +44,11 @@ export class AgentSelector {
       this.logger.debug(`Selected agents: ${selectedAgents.join(', ')}`);
 
       return selectedAgents;
-    } catch (error) {
+    } catch (_error) {
       this.logger.error(
-        `Agent selection failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Agent selection failed: ${_error instanceof Error ? (_error as Error).message : 'Unknown error'}`,
       );
-      // Fallback: return all agents if selection fails
-      return availableAgents.map((a) => a.name);
+      return [];
     }
   }
 

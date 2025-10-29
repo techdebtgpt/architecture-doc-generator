@@ -186,15 +186,15 @@ export async function analyzeProject(
       agentsToRun = selectedAgents.length > 0 ? selectedAgents : availableAgents;
 
       if (options.verbose) {
-        console.log(chalk.blue(`\nPrompt: "${options.prompt}"`));
-        console.log(chalk.blue(`Selected: ${agentsToRun.join(', ')}`));
+        console.log(`🎯 Prompt: "${options.prompt}"`);
+        console.log(`Selected: ${agentsToRun.join(', ')}`);
       }
 
       spinner.succeed(`Selected ${agentsToRun.length} agents based on prompt`);
     } else {
       // Default: comprehensive analysis with all agents
       if (options.verbose) {
-        console.log(chalk.blue('\nRunning comprehensive analysis (all agents)'));
+        console.log('🔍 Running comprehensive analysis (all agents)');
       }
     }
 
@@ -213,14 +213,12 @@ export async function analyzeProject(
 
     if (options.verbose) {
       console.log(
-        chalk.blue(
-          `\n📊 Depth mode: ${depthMode} (${depthConfig.maxIterations} iterations, ${depthConfig.clarityThreshold}% clarity threshold)`,
-        ),
+        `📊 Depth mode: ${depthMode} (${depthConfig.maxIterations} iterations, ${depthConfig.clarityThreshold}% clarity threshold)`,
       );
     }
 
     // Generate documentation
-    spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)...`;
+    spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)... \n`;
 
     const documentation = await orchestrator.generateDocumentation(resolvedPath, {
       maxTokens: 100000,
@@ -238,7 +236,7 @@ export async function analyzeProject(
         maxQuestionsPerIteration: depthConfig.maxQuestions,
       },
       onAgentProgress: (current: number, total: number, agentName: string) => {
-        spinner.text = `Running agent ${current}/${total}: ${agentName} (see progress logs below)...`;
+        spinner.text = `Running agent ${current}/${total}: ${agentName} (see progress logs below)... \n`;
       },
     });
 

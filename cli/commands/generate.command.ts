@@ -1,6 +1,5 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import chalk from 'chalk';
 import ora from 'ora';
 import { DocumentationOrchestrator } from '../../src/orchestrator/documentation-orchestrator';
 import { AgentSelector } from '../../src/orchestrator/agent-selector';
@@ -14,6 +13,9 @@ import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { ArchitectureAnalyzerAgent } from '../../src/agents/architecture-analyzer-agent';
 import { MarkdownFormatter } from '../../src/formatters/markdown-formatter';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
+import { Logger } from '../../src/utils/logger';
+
+const logger = new Logger('GenerateCommand');
 
 interface GenerateOptions {
   output: string;
@@ -71,11 +73,11 @@ export async function generateDocumentation(
     );
 
     if (options.verbose) {
-      console.log(chalk.blue('\nProject scan results:'));
-      console.log(`  Files: ${scanResult.totalFiles}`);
-      console.log(`  Directories: ${scanResult.totalDirectories}`);
-      console.log(`  Total size: ${(scanResult.totalSize / 1024 / 1024).toFixed(2)} MB`);
-      console.log(
+      logger.info('\nProject scan results:');
+      logger.info(`  Files: ${scanResult.totalFiles}`);
+      logger.info(`  Directories: ${scanResult.totalDirectories}`);
+      logger.info(`  Total size: ${(scanResult.totalSize / 1024 / 1024).toFixed(2)} MB`);
+      logger.info(
         `  Languages detected: ${Array.from(scanResult.languageDistribution.keys()).join(', ')}`,
       );
     }
@@ -116,8 +118,8 @@ export async function generateDocumentation(
       agentsToRun = selectedAgents.length > 0 ? selectedAgents : availableAgents;
 
       if (options.verbose) {
-        console.log(chalk.blue(`\nPrompt: "${options.prompt}"`));
-        console.log(chalk.blue(`Selected: ${agentsToRun.join(', ')}`));
+        logger.info(`\nPrompt: "${options.prompt}"`);
+        logger.info(`Selected: ${agentsToRun.join(', ')}`);
       }
 
       spinner.succeed(`Selected ${agentsToRun.length} agents based on prompt`);
@@ -128,7 +130,7 @@ export async function generateDocumentation(
       agentsToRun = requestedAgents.filter((agent) => {
         const exists = availableAgents.includes(agent);
         if (!exists) {
-          console.warn(chalk.yellow(`Warning: Agent '${agent}' not found`));
+          logger.warn(`Warning: Agent '${agent}' not found`);
         }
         return exists;
       });
@@ -145,7 +147,7 @@ export async function generateDocumentation(
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
 
     // Generate documentation with LangGraph StateGraph
-    spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)...`;
+    spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)... \n`;
 
     const documentation = await orchestrator.generateDocumentation(resolvedPath, {
       maxTokens: 100000,
@@ -162,7 +164,7 @@ export async function generateDocumentation(
         },
       },
       onAgentProgress: (current: number, total: number, agentName: string) => {
-        spinner.text = `Running agent ${current}/${total}: ${agentName} (see progress logs below)...`;
+        spinner.text = `Running agent ${current}/${total}: ${agentName} (see progress logs below)... \n`;
       },
     });
 
@@ -218,36 +220,35 @@ export async function generateDocumentation(
     }
 
     // Show summary
-    console.log(chalk.green('\n✨ Documentation Generation Complete!'));
-    console.log(chalk.blue('\nSummary:'));
-    console.log(`  Project: ${path.basename(resolvedPath)}`);
-    console.log(`  Files analyzed: ${scanResult.totalFiles}`);
-    console.log(`  Agents executed: ${agentsToRun.length}`);
-    console.log(`  Output format: ${options.multiFile ? 'multi-file' : options.format}`);
-    console.log(`  Output location: ${outputLocation}`);
-    console.log(`  Orchestrator: LangGraph StateGraph`);
+    logger.info('\n✨ Documentation Generation Complete!');
+    logger.info('\nSummary:');
+    logger.info(`  Project: ${path.basename(resolvedPath)}`);
+    logger.info(`  Files analyzed: ${scanResult.totalFiles}`);
+    logger.info(`  Agents executed: ${agentsToRun.length}`);
+    logger.info(`  Output format: ${options.multiFile ? 'multi-file' : options.format}`);
+    logger.info(`  Output location: ${outputLocation}`);
+    logger.info(`  Orchestrator: LangGraph StateGraph`);
 
     if (documentation.metadata?.totalTokensUsed) {
-      console.log(`  Tokens used: ${documentation.metadata.totalTokensUsed.toLocaleString()}`);
+      logger.info(`  Tokens used: ${documentation.metadata.totalTokensUsed.toLocaleString()}`);
     }
 
     if (documentation.metadata?.generationDuration) {
-      console.log(
+      logger.info(
         `  Generation time: ${(documentation.metadata.generationDuration / 1000).toFixed(1)}s`,
       );
     }
 
-    console.log(chalk.cyan('\n📖 Next steps:'));
-    console.log(`  • Review the generated documentation at ${outputLocation}`);
-    console.log(`  • Customize agents with --agents flag if needed`);
-    console.log(`  • Export to other formats using 'archdoc export'`);
-    console.log(`  • Set up CI/CD integration to keep docs updated`);
+    logger.info('\n📖 Next steps:');
+    logger.info(`  • Review the generated documentation at ${outputLocation}`);
+    logger.info(`  • Customize agents with --agents flag if needed`);
+    logger.info(`  • Export to other formats using 'archdoc export'`);
+    logger.info(`  • Set up CI/CD integration to keep docs updated`);
   } catch (error) {
     spinner.fail(`Documentation generation failed: ${(error as Error).message}`);
 
     if (options.verbose) {
-      console.error(chalk.red('\nFull error details:'));
-      console.error(error);
+      logger.error('Full error details', error instanceof Error ? error : '❌');
     }
 
     process.exit(1);

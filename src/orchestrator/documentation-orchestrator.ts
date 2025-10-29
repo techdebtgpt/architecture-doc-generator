@@ -15,19 +15,7 @@ import type {
 import { StateGraph, Annotation, END } from '@langchain/langgraph';
 import { MemorySaver } from '@langchain/langgraph';
 import { LLMService } from '../llm/llm-service';
-
-/**
- * Simple logger for orchestrator
- */
-class OrchestratorLogger {
-  log(message: string): void {
-    console.log(`[Documentation Orchestrator] ${message}`);
-  }
-
-  error(message: string, error?: unknown): void {
-    console.error(`[Documentation Orchestrator ERROR] ${message}`, error);
-  }
-}
+import { Logger } from '../utils/logger';
 
 /**
  * Documentation generation state with LangGraph
@@ -123,7 +111,7 @@ export interface OrchestratorOptions {
  * Manages multi-agent documentation generation with LangGraph state-based workflows
  */
 export class DocumentationOrchestrator {
-  private logger = new OrchestratorLogger();
+  private logger = new Logger('DocumentationOrchestrator');
   private workflow: ReturnType<typeof this.buildWorkflow>;
   private checkpointer = new MemorySaver();
   private llmService = LLMService.getInstance();
@@ -144,10 +132,10 @@ export class DocumentationOrchestrator {
   ): Promise<DocumentationOutput> {
     const startTime = Date.now();
 
-    this.logger.log('Starting documentation generation with LangGraph');
+    this.logger.info('Starting documentation generation with LangGraph');
 
     // Scan project
-    this.logger.log('Scanning project structure...');
+    this.logger.info('Scanning project structure...');
     const scanResult = await this.scanner.scan({
       rootPath: projectPath,
       maxFiles: 10000,
@@ -161,7 +149,7 @@ export class DocumentationOrchestrator {
     const agents = this.agentRegistry.getAllAgents();
     const agentNames = agents.map((a) => a.getMetadata().name);
 
-    this.logger.log(`Found ${agentNames.length} agents: ${agentNames.join(', ')}`);
+    this.logger.info(`Found ${agentNames.length} agents: ${agentNames.join(', ')}`);
 
     // Initial state
     const initialState = {
@@ -201,7 +189,7 @@ export class DocumentationOrchestrator {
     }
 
     const executionTime = Date.now() - startTime;
-    this.logger.log(`Documentation generation completed in ${(executionTime / 1000).toFixed(2)}s`);
+    this.logger.info(`Documentation generation completed in ${(executionTime / 1000).toFixed(2)}s`);
 
     const output = finalState.output as DocumentationOutput;
     return {
@@ -276,10 +264,10 @@ export class DocumentationOrchestrator {
       options.onAgentProgress(currentAgentIndex + 1, totalAgents, agentName);
     }
 
-    this.logger.log(`Executing agent: ${agentName} (${currentAgentIndex + 1}/${totalAgents})`);
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`📋 Agent ${currentAgentIndex + 1}/${totalAgents}: ${agentName}`);
-    console.log('='.repeat(80));
+    this.logger.info(`Executing agent: ${agentName} (${currentAgentIndex + 1}/${totalAgents})`);
+    this.logger.info('='.repeat(80));
+    this.logger.info(`📋 Agent ${currentAgentIndex + 1}/${totalAgents}: ${agentName}`);
+    this.logger.info('='.repeat(80));
 
     // Create agent context
     const context: AgentContext = {
@@ -327,13 +315,14 @@ export class DocumentationOrchestrator {
         modelConfig.costPerMillionOutputTokens,
       );
 
-      console.log(`\n✅ [${agentName}] Agent completed successfully`);
-      console.log(
+      // Use emoji as the log icon, not in the message
+      this.logger.info(`Agent completed successfully`, '✅');
+      this.logger.info(
         `   📊 Summary: ${result.summary.substring(0, 100)}${result.summary.length > 100 ? '...' : ''}`,
       );
-      console.log(`   ⏱️  Execution time: ${(result.executionTime / 1000).toFixed(2)}s`);
-      console.log(`   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
-      console.log(
+      this.logger.info(`   ⏱️  Execution time: ${(result.executionTime / 1000).toFixed(2)}s`);
+      this.logger.info(`   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+      this.logger.info(
         `   💰 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (in: ${result.tokenUsage.inputTokens.toLocaleString()}, out: ${result.tokenUsage.outputTokens.toLocaleString()}) | Cost: $${cost.toFixed(4)}`,
       );
 
@@ -346,20 +335,20 @@ export class DocumentationOrchestrator {
         agentResults: newAgentResults,
         currentAgentIndex: currentAgentIndex + 1, // Move to next agent
       };
-    } catch (error) {
-      this.logger.error(`Agent ${agentName} failed`, error);
+    } catch (_error) {
+      this.logger.error(`Agent ${agentName} failed`, _error);
 
       // Store failed result
       const failedResult: AgentResult = {
         agentName,
         status: 'failed',
         data: {},
-        summary: `Agent failed: ${error instanceof Error ? error.message : String(error)}`,
-        markdown: `# ${agentName} Failed\n\nError: ${error instanceof Error ? error.message : String(error)}`,
+        summary: `Agent failed: ${_error instanceof Error ? (_error as Error).message : String(_error)}`,
+        markdown: `# ${agentName} Failed\n\nError: ${_error instanceof Error ? (_error as Error).message : String(_error)}`,
         confidence: 0,
         tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
         executionTime: 0,
-        errors: [error instanceof Error ? error.message : String(error)],
+        errors: [_error instanceof Error ? (_error as Error).message : String(_error)],
         warnings: [],
         metadata: {},
       };
@@ -384,7 +373,7 @@ export class DocumentationOrchestrator {
   private async aggregateResultsNode(state: typeof DocumentationState.State) {
     const { scanResult, agentResults } = state;
 
-    this.logger.log('Aggregating results from all agents...');
+    this.logger.info('Aggregating results from all agents...');
 
     // Calculate total token usage
     const totalTokenUsage: TokenUsage = {
@@ -506,17 +495,40 @@ export class DocumentationOrchestrator {
     const avgTokensPerAgent =
       agentResults.size > 0 ? Math.round(totalTokenUsage.totalTokens / agentResults.size) : 0;
 
-    console.log('\n' + '='.repeat(80));
-    console.log('📊 DOCUMENTATION GENERATION SUMMARY');
-    console.log('='.repeat(80));
-    console.log(`✅ Agents completed: ${agentResults.size}`);
-    console.log(`⏱️  Total time: ${(totalExecutionTime / 1000 / 60).toFixed(1)}m`);
-    console.log(
+    this.logger.info('\n' + '='.repeat(80));
+    this.logger.info('📊 DOCUMENTATION GENERATION SUMMARY');
+    this.logger.info('='.repeat(80));
+    this.logger.info(`✅ Agents completed: ${agentResults.size}`);
+    this.logger.info(`⏱️  Total time: ${(totalExecutionTime / 1000 / 60).toFixed(1)}m`);
+    this.logger.info(
       `💰 Total tokens: ${totalTokenUsage.totalTokens.toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`,
     );
-    console.log(`💵 Total cost: $${totalCost.toFixed(4)}`);
-    console.log(`📈 Avg tokens per agent: ${avgTokensPerAgent.toLocaleString()}`);
-    console.log('='.repeat(80) + '\n');
+    this.logger.info(`💵 Total cost: $${totalCost.toFixed(4)}`);
+    this.logger.info(`📈 Avg tokens per agent: ${avgTokensPerAgent.toLocaleString()}`);
+    this.logger.info('='.repeat(80));
+
+    // Key Highlights
+    this.logger.info('📌 Key Highlights:');
+
+    const agentHighlights = [
+      { name: 'architecture-analyzer', emoji: '🤖', label: 'Architecture Analysis' },
+      { name: 'file-structure', emoji: '📁', label: 'File Structure' },
+      { name: 'dependency-analyzer', emoji: '📦', label: 'Dependencies' },
+      { name: 'pattern-detector', emoji: '🎨', label: 'Patterns' },
+      { name: 'flow-visualization', emoji: '🔄', label: 'Data Flow' },
+      { name: 'schema-generator', emoji: '🗄️', label: 'Schema' },
+    ];
+
+    for (const { name, emoji, label } of agentHighlights) {
+      const result = agentResults.get(name);
+      if (result && result.confidence) {
+        const confidencePercent = (result.confidence * 100).toFixed(1);
+        const summary = result.summary ? ` - ${result.summary.substring(0, 80)}...` : '';
+        this.logger.info(`${emoji} ${label}: ${confidencePercent}% clarity score${summary}`);
+      }
+    }
+
+    this.logger.info('='.repeat(80) + '\n');
 
     return {
       ...state,

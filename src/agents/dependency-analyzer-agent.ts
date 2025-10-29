@@ -203,7 +203,7 @@ Please analyze dependency health, security, and provide recommendations.`;
 
       dependencies.total = dependencies.production.length + dependencies.development.length;
       dependencies.scripts = pkg.scripts ? Object.keys(pkg.scripts) : [];
-    } catch (error) {
+    } catch (_error) {
       // Package.json not found or invalid, continue checking other formats
     }
 
@@ -220,7 +220,7 @@ Please analyze dependency health, security, and provide recommendations.`;
         return { name: name.trim(), version: version?.trim() || 'latest' };
       });
       dependencies.total = dependencies.production.length;
-    } catch (error) {
+    } catch (_error) {
       // requirements.txt not found, continue
     }
 
@@ -242,14 +242,14 @@ Please analyze dependency health, security, and provide recommendations.`;
         metrics: {},
         warnings: ['Failed to parse LLM response as JSON'],
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         summary: 'Error parsing analysis result',
         insights: [],
         vulnerabilities: [],
         recommendations: [],
         metrics: {},
-        warnings: [`Parse error: ${(error as Error).message}`],
+        warnings: [`Parse error: ${(_error as Error).message}`],
       };
     }
   }

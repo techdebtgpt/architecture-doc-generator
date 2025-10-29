@@ -20,11 +20,7 @@ npm install @archdoc/generator
 ## Quick Start
 
 ```typescript
-import { 
-  DocumentationOrchestrator, 
-  AgentRegistry,
-  FileSystemScanner 
-} from '@archdoc/generator';
+import { DocumentationOrchestrator, AgentRegistry, FileSystemScanner } from '@archdoc/generator';
 
 // Setup
 const scanner = new FileSystemScanner();
@@ -82,13 +78,13 @@ const output = await orchestrator.generateDocumentation('./src', {
     enabled: true,
     maxIterations: 5,
     clarityThreshold: 80,
-    minImprovement: 10
+    minImprovement: 10,
   },
   agentOptions: {
     runnableConfig: {
-      runName: 'MyAnalysis'
-    }
-  }
+      runName: 'MyAnalysis',
+    },
+  },
 });
 ```
 
@@ -101,7 +97,7 @@ Manages agent lifecycle and discovery.
 #### Constructor
 
 ```typescript
-constructor()
+constructor();
 ```
 
 #### Methods
@@ -156,7 +152,7 @@ Scans project file system.
 #### Constructor
 
 ```typescript
-constructor()
+constructor();
 ```
 
 #### Methods
@@ -187,7 +183,7 @@ const result = await scanner.scan({
   respectGitignore: true,
   includeHidden: false,
   followSymlinks: false,
-  excludePatterns: ['node_modules', 'dist']
+  excludePatterns: ['node_modules', 'dist'],
 });
 
 console.log(`Found ${result.totalFiles} files`);
@@ -232,7 +228,7 @@ const llmService = LLMService.getInstance();
 
 const model = llmService.getChatModel({
   temperature: 0.2,
-  maxTokens: 4096
+  maxTokens: 4096,
 });
 ```
 
@@ -274,7 +270,7 @@ Format and save documentation.
 
 ```typescript
 async format(
-  output: DocumentationOutput, 
+  output: DocumentationOutput,
   options: FormatOptions
 ): Promise<void>
 ```
@@ -294,7 +290,7 @@ const formatter = new MultiFileMarkdownFormatter();
 await formatter.format(output, {
   outputDir: './docs',
   includeTOC: true,
-  includeMetadata: true
+  includeMetadata: true,
 });
 ```
 
@@ -313,7 +309,7 @@ import {
   PatternDetectorAgent,
   FlowVisualizationAgent,
   SchemaGeneratorAgent,
-  ArchitectureAnalyzerAgent
+  ArchitectureAnalyzerAgent,
 } from '@archdoc/generator';
 ```
 
@@ -322,10 +318,7 @@ import {
 ```typescript
 interface Agent {
   getMetadata(): AgentMetadata;
-  execute(
-    context: AgentContext, 
-    options?: AgentExecutionOptions
-  ): Promise<AgentResult>;
+  execute(context: AgentContext, options?: AgentExecutionOptions): Promise<AgentResult>;
 }
 ```
 
@@ -484,9 +477,9 @@ class CustomAgent implements Agent {
         dependencies: [],
         supportsIncremental: false,
         estimatedTokens: 5000,
-        supportedLanguages: ['typescript']
+        supportedLanguages: ['typescript'],
       },
-      tags: ['custom']
+      tags: ['custom'],
     };
   }
 
@@ -503,7 +496,7 @@ class CustomAgent implements Agent {
       executionTime: 2000,
       errors: [],
       warnings: [],
-      metadata: {}
+      metadata: {},
     };
   }
 }
@@ -516,35 +509,35 @@ registry.register(new CustomAgent());
 ### Custom Workflow
 
 ```typescript
-import { 
+import {
   DocumentationOrchestrator,
   AgentRegistry,
   FileSystemScanner,
-  LLMService
+  LLMService,
 } from '@archdoc/generator';
 
 class CustomWorkflow {
   private orchestrator: DocumentationOrchestrator;
-  
+
   constructor() {
     // Configure LangSmith
     LLMService.configureLangSmith();
-    
+
     // Setup components
     const scanner = new FileSystemScanner();
     const registry = new AgentRegistry();
-    
+
     // Register only specific agents
     registry.register(new FileStructureAgent());
     registry.register(new DependencyAnalyzerAgent());
-    
+
     this.orchestrator = new DocumentationOrchestrator(registry, scanner);
   }
-  
+
   async generateFocusedDocs(projectPath: string) {
     // Custom scanning
     const scanResult = await this.preScan(projectPath);
-    
+
     // Generate with custom options
     const output = await this.orchestrator.generateDocumentation(projectPath, {
       maxTokens: 150000,
@@ -553,23 +546,23 @@ class CustomWorkflow {
         enabled: true,
         maxIterations: 10,
         clarityThreshold: 90,
-        minImprovement: 5
+        minImprovement: 5,
       },
       onAgentProgress: (current, total, name) => {
         console.log(`Progress: ${current}/${total} - ${name}`);
-      }
+      },
     });
-    
+
     // Custom formatting
     await this.customFormat(output);
-    
+
     return output;
   }
-  
+
   private async preScan(path: string) {
     // Custom logic
   }
-  
+
   private async customFormat(output: DocumentationOutput) {
     // Custom formatting logic
   }
@@ -581,14 +574,14 @@ class CustomWorkflow {
 ```typescript
 async function generateWithProgress(projectPath: string) {
   const orchestrator = createOrchestrator();
-  
+
   const output = await orchestrator.generateDocumentation(projectPath, {
     onAgentProgress: (current, total, agentName) => {
       const percentage = Math.round((current / total) * 100);
       console.log(`[${percentage}%] ${agentName} (${current}/${total})`);
-    }
+    },
   });
-  
+
   return output;
 }
 ```
@@ -598,18 +591,18 @@ async function generateWithProgress(projectPath: string) {
 ```typescript
 try {
   const output = await orchestrator.generateDocumentation('./project');
-  
+
   // Check for agent failures
   for (const [name, result] of output.agentResults) {
     if (result.status === 'error') {
       console.error(`Agent ${name} failed:`, result.errors);
     }
-    
+
     if (result.warnings.length > 0) {
       console.warn(`Agent ${name} warnings:`, result.warnings);
     }
   }
-  
+
   console.log('Success!');
 } catch (error) {
   console.error('Documentation generation failed:', error);
@@ -621,19 +614,15 @@ try {
 ### Example 1: Basic Usage
 
 ```typescript
-import { 
-  DocumentationOrchestrator, 
-  AgentRegistry,
-  FileSystemScanner 
-} from '@archdoc/generator';
+import { DocumentationOrchestrator, AgentRegistry, FileSystemScanner } from '@archdoc/generator';
 
 async function main() {
   const scanner = new FileSystemScanner();
   const registry = new AgentRegistry();
   const orchestrator = new DocumentationOrchestrator(registry, scanner);
-  
+
   const output = await orchestrator.generateDocumentation('./my-project');
-  
+
   console.log('Generated documentation for:', output.projectName);
   console.log('Total tokens used:', output.totalTokens);
   console.log('Estimated cost: $', output.totalCost.toFixed(2));
@@ -654,25 +643,21 @@ const output = await orchestrator.generateDocumentation('./project', {
     enabled: true,
     maxIterations: 7,
     clarityThreshold: 85,
-    minImprovement: 5
+    minImprovement: 5,
   },
   agentOptions: {
     runnableConfig: {
       runName: 'CustomAnalysis',
-      metadata: { project: 'my-project' }
-    }
-  }
+      metadata: { project: 'my-project' },
+    },
+  },
 });
 ```
 
 ### Example 3: Specific Agents Only
 
 ```typescript
-import { 
-  AgentRegistry,
-  FileStructureAgent,
-  DependencyAnalyzerAgent 
-} from '@archdoc/generator';
+import { AgentRegistry, FileStructureAgent, DependencyAnalyzerAgent } from '@archdoc/generator';
 
 const registry = new AgentRegistry();
 
@@ -687,10 +672,7 @@ const output = await orchestrator.generateDocumentation('./project');
 ### Example 4: Custom Formatter
 
 ```typescript
-import { 
-  DocumentationOutput,
-  IFormatter 
-} from '@archdoc/generator';
+import { DocumentationOutput, IFormatter } from '@archdoc/generator';
 
 class CustomFormatter implements IFormatter {
   async format(output: DocumentationOutput, options: any): Promise<void> {
@@ -698,7 +680,7 @@ class CustomFormatter implements IFormatter {
     const markdown = this.generateCustomMarkdown(output);
     await fs.writeFile('./custom-docs.md', markdown);
   }
-  
+
   private generateCustomMarkdown(output: DocumentationOutput): string {
     return `# ${output.projectName}\n\n${output.summary}`;
   }
@@ -721,18 +703,18 @@ const orchestrator = createOrchestrator();
 app.post('/generate-docs', async (req, res) => {
   try {
     const { projectPath } = req.body;
-    
+
     const output = await orchestrator.generateDocumentation(projectPath, {
       maxTokens: 100000,
-      parallel: true
+      parallel: true,
     });
-    
+
     res.json({
       success: true,
       projectName: output.projectName,
       summary: output.summary,
       tokens: output.totalTokens,
-      cost: output.totalCost
+      cost: output.totalCost,
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

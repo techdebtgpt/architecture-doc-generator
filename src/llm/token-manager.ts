@@ -27,7 +27,7 @@ export class TokenManager {
       const encoder = this.getEncoder(model);
       const tokens = encoder.encode(text);
       return tokens.length;
-    } catch (error) {
+    } catch (_error) {
       // Fallback to rough estimation if encoding fails
       return this.estimateTokens(text);
     }
@@ -119,7 +119,7 @@ export class TokenManager {
         const tiktokenModel = this.mapToTiktokenModel(model);
         const encoder = encodingForModel(tiktokenModel);
         this.encoders.set(model, encoder);
-      } catch (error) {
+      } catch (_error) {
         // Fallback to gpt-4 encoding
         const encoder = encodingForModel('gpt-4' as TiktokenModel);
         this.encoders.set(model, encoder);

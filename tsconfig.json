@@ -43,5 +43,5 @@
     }
   },
   "include": ["src/**/*", "cli/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+  "exclude": ["node_modules", "dist"]
 }

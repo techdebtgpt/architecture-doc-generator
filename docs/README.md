@@ -30,21 +30,21 @@ This directory contains comprehensive documentation for using, integrating, and 
 
 ### Core Documentation
 
-| Document | Description | Audience |
-|----------|-------------|----------|
-| [README.md](../README.md) | Project overview, features, quick start | Everyone |
-| [USER_GUIDE.md](./USER_GUIDE.md) | CLI reference, configuration, examples | End Users |
-| [CONFIGURATION_GUIDE.md](./CONFIGURATION_GUIDE.md) | Complete configuration reference | End Users, DevOps |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Technical design, patterns, internals | Developers |
-| [INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md) | CI/CD, programmatic usage | DevOps, Developers |
-| [CONTRIBUTING.md](./CONTRIBUTING.md) | Development setup, creating agents | Contributors |
-| [API.md](./API.md) | Programmatic API reference | Developers |
+| Document                                           | Description                             | Audience           |
+| -------------------------------------------------- | --------------------------------------- | ------------------ |
+| [README.md](../README.md)                          | Project overview, features, quick start | Everyone           |
+| [USER_GUIDE.md](./USER_GUIDE.md)                   | CLI reference, configuration, examples  | End Users          |
+| [CONFIGURATION_GUIDE.md](./CONFIGURATION_GUIDE.md) | Complete configuration reference        | End Users, DevOps  |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)               | Technical design, patterns, internals   | Developers         |
+| [INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md)     | CI/CD, programmatic usage               | DevOps, Developers |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)               | Development setup, creating agents      | Contributors       |
+| [API.md](./API.md)                                 | Programmatic API reference              | Developers         |
 
 ### Additional Resources
 
-| Resource | Description |
-|----------|-------------|
-| [LICENSE](../LICENSE) | MIT License |
+| Resource                                                              | Description               |
+| --------------------------------------------------------------------- | ------------------------- |
+| [LICENSE](../LICENSE)                                                 | MIT License               |
 | [.github/copilot-instructions.md](../.github/copilot-instructions.md) | AI assistant instructions |
 
 ## 🎯 Quick Start Example
@@ -153,7 +153,7 @@ All agents use LangChain Expression Language for composable AI workflows:
 const chain = RunnableSequence.from([
   RunnableLambda.from(async (input) => prepareData(input)),
   model.withConfig({ runName: 'Analysis' }),
-  new StringOutputParser()
+  new StringOutputParser(),
 ]);
 ```
 

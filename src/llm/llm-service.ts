@@ -8,6 +8,7 @@ import { OpenAIProvider } from './providers/openai-provider';
 import { GoogleProvider } from './providers/google-provider';
 import { TokenManager } from './token-manager';
 import { LLMProvider, LLMRequestOptions, LLMResponse, TokenUsageDetails } from '../types/llm.types';
+import { Logger } from '../utils/logger';
 
 /**
  * Main LLM service for managing multiple providers
@@ -18,6 +19,7 @@ export class LLMService {
   private tokenManager: TokenManager;
   private defaultProvider: LLMProvider;
   private chatHistories: Map<string, BaseChatMessageHistory> = new Map();
+  private logger = new Logger('LLMService');
 
   private constructor() {
     this.tokenManager = TokenManager.getInstance();
@@ -46,7 +48,7 @@ export class LLMService {
       process.env.LANGCHAIN_CALLBACKS_BACKGROUND =
         process.env.LANGCHAIN_CALLBACKS_BACKGROUND || 'true';
 
-      console.log(`✅ LangSmith tracing enabled - Project: ${process.env.LANGCHAIN_PROJECT}`);
+      this.logger.info(`✅ LangSmith tracing enabled - Project: ${process.env.LANGCHAIN_PROJECT}`);
     }
   }
 
@@ -72,16 +74,13 @@ export class LLMService {
     }
 
     // Detailed debug logging with agent context for provider selection and configuration
-    const logPrefix = agentContext ? `[${agentContext}] - LLMService` : '[LLMService]';
-    // eslint-disable-next-line no-console
-    console.debug(
-      `ℹ️  ${logPrefix} - getChatModel provider=${provider} model=${options.model || '(default)'} temperature=${options.temperature ?? '(default)'} maxTokens=${options.maxTokens ?? '(default)'} `,
+    this.logger.debug(
+      `getChatModel provider=${provider} model=${options.model || '(default)'} temperature=${options.temperature ?? '(default)'} maxTokens=${options.maxTokens ?? '(default)'}`,
     );
 
     if (!llmProvider.isConfigured()) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `${logPrefix} - LLM provider ${provider} is NOT configured. isConfigured() returned false.`,
+      this.logger.error(
+        `LLM provider ${provider} is NOT configured. isConfigured() returned false.`,
       );
       throw new Error(`LLM provider ${provider} is not configured. Please set API key.`);
     }
@@ -97,14 +96,11 @@ export class LLMService {
         agentContext,
       );
 
-      // eslint-disable-next-line no-console
-      console.debug(`ℹ️  ${logPrefix} - created model for provider=${provider}`);
+      this.logger.debug(`Created model for provider=${provider}`);
       return model;
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `${logPrefix} - error creating model for provider=${provider}:`,
-        (err as any)?.message ?? err,
+      this.logger.error(
+        `Error creating model for provider=${provider}: ${(err as Error)?.message ?? err}`,
       );
       throw err;
     }
@@ -162,12 +158,12 @@ export class LLMService {
           cached: false,
           metadata: {},
         };
-      } catch (error) {
-        lastError = error as Error;
+      } catch (_error) {
+        lastError = _error as Error;
 
         // Don't retry on certain errors
-        if (this.isNonRetryableError(error)) {
-          throw error;
+        if (this.isNonRetryableError(_error)) {
+          throw _error;
         }
 
         // Wait before retrying with exponential backoff

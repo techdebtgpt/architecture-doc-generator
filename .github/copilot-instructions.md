@@ -10,17 +10,30 @@ This is an AI-powered architecture documentation generator that analyzes codebas
 
 ### Documentation Files
 
-**IMPORTANT**: Do NOT create markdown documentation files (like `.md` files in `docs/`) to describe actions, fixes, or changes UNLESS explicitly requested by the user.
+**CRITICAL RULE**: Do NOT create markdown documentation files (`.md` files) to summarize changes, fixes, or implementations UNLESS explicitly requested by the user.
 
 **Examples of what NOT to do**:
-- ❌ Creating `EMPTY_FILES_FIX.md` after fixing a bug (unless user asks for documentation)
-- ❌ Creating `LANGSMITH_TRACE_HIERARCHY.md` after implementing tracing (unless user asks)
-- ❌ Creating summary files after each fix or feature
+
+- ❌ Creating `EMPTY_FILES_FIX.md` after fixing a bug
+- ❌ Creating `LANGSMITH_TRACE_HIERARCHY.md` after implementing tracing
+- ❌ Creating `LOGGING_MIGRATION_COMPLETE.md` after migration
+- ❌ Creating `LOGGER_SINGLETON_REFACTOR.md` after refactoring
+- ❌ Creating ANY summary `.md` file after changes/fixes/features
+- ❌ Creating documentation files to "document what was done"
 
 **What to do instead**:
+
 - ✅ Make the code changes
-- ✅ Provide a summary in the chat
-- ✅ Only create documentation files when user explicitly asks: "document this", "create a guide", "add documentation", etc.
+- ✅ Provide a concise summary in the chat (2-3 sentences max)
+- ✅ Show verification results (build/test/lint status)
+- ✅ ONLY create documentation files when user explicitly asks: "document this", "create a guide", "add documentation for X", "write a README about Y"
+
+**Why this matters**:
+
+- Users want changes done, not documented
+- Summaries clutter the repository
+- Chat responses are sufficient for change tracking
+- Documentation should be intentional, not automatic
 
 ### Code Style
 
@@ -62,7 +75,9 @@ export class MyAgent implements Agent {
       version: '1.0.0',
       description: 'Does X, Y, and Z',
       priority: AgentPriority.MEDIUM,
-      capabilities: { /* ... */ },
+      capabilities: {
+        /* ... */
+      },
       tags: ['tag1', 'tag2'],
     };
   }
@@ -72,18 +87,22 @@ export class MyAgent implements Agent {
     options?: AgentExecutionOptions,
   ): Promise<AgentResult> {
     const chain = this.buildAnalysisChain(context, options);
-    
+
     // Pass config for unified LangSmith tracing
     const result = await chain.invoke(input, options?.runnableConfig);
-    
+
     return {
       agentName: this.getMetadata().name,
       status: 'success',
-      data: { /* ... */ },
+      data: {
+        /* ... */
+      },
       summary: '...',
       markdown: this.formatMarkdownReport(analysis),
       confidence: 0.9,
-      tokenUsage: { /* ... */ },
+      tokenUsage: {
+        /* ... */
+      },
       executionTime: Date.now() - startTime,
       errors: [],
       warnings: [],
@@ -115,6 +134,7 @@ export class MyAgent implements Agent {
 ```
 
 **Key Rules**:
+
 1. **NO `.withConfig()` on the agent's `RunnableSequence`** - This creates separate traces
 2. **Pass `options?.runnableConfig` to `.invoke()`** - Enables unified tracing
 3. **Use `.withConfig()` on individual steps** - For granular trace visibility
@@ -143,6 +163,7 @@ const result = await analysisChain.invoke(input, options?.runnableConfig);
 ```
 
 **Expected Trace Hierarchy**:
+
 ```
 DocumentationGeneration-Complete
 ├── ScanProjectStructure
@@ -162,7 +183,7 @@ DocumentationGeneration-Complete
 ```typescript
 // Get chat model
 const model = LLMService.getChatModel({
-  temperature: 0.2,  // 0-0.2 for deterministic, 0.5-0.8 for creative
+  temperature: 0.2, // 0-0.2 for deterministic, 0.5-0.8 for creative
   maxTokens: 4096,
 });
 
@@ -178,11 +199,13 @@ LLMService.configureLangSmith(); // Called automatically in constructor
 Generates documentation files conditionally:
 
 **Always Generated**:
+
 - `index.md` - Table of contents
 - `metadata.md` - Generation metadata
 - Agent-specific files (if agent runs): `file-structure.md`, `dependencies.md`, etc.
 
 **Conditionally Generated** (only if data exists):
+
 - `architecture.md` - Only if `output.architecture.components.length > 0`
 - `code-quality.md` - Only if there are quality issues or scores > 0
 - `recommendations.md` - Only if there are recommendations
@@ -221,7 +244,7 @@ jest.mock('../llm/llm-service', () => ({
 3. ❌ **Don't generate empty markdown files** - Check for data before writing
 4. ❌ **Don't create documentation files without user request** - Keep responses in chat
 5. ❌ **Don't use relative imports** - Use path aliases (configured in tsconfig)
-6. ❌ **Don't hardcode API keys** - Use environment variables
+6. ❌ **Don't hardcode API keys** - Use `.archdoc.config.json` or environment variables
 
 ## Key Files to Reference
 
@@ -238,13 +261,30 @@ jest.mock('../llm/llm-service', () => ({
 # Install dependencies
 npm install
 
+# Setup configuration (first time only)
+node dist/cli/index.js config --init
+# OR manually create .archdoc.config.json from .archdoc.config.example.json
+
 # Build
 npm run build
 
-# Run locally
+# Run locally (uses .archdoc.config.json)
 node dist/cli/index.js analyze /path/to/project
 
-# Run with LangSmith tracing
+# Run with LangSmith tracing (configure in .archdoc.config.json or env vars)
+# Via config file:
+# {
+#   "tracing": {
+#     "enabled": true,
+#     "apiKey": "lsv2_pt_...",
+#     "project": "my-project"
+#   },
+#   "apiKeys": {
+#     "anthropic": "sk-ant-..."
+#   }
+# }
+
+# Or via environment variables (overrides config file):
 LANGCHAIN_TRACING_V2=true \
 LANGCHAIN_API_KEY=lsv2_pt_... \
 LANGCHAIN_PROJECT=my-project \
@@ -271,16 +311,18 @@ When implementing features or fixes:
 ## Example Interactions
 
 **Good** ✅:
+
 ```
 User: "Fix the empty files issue"
 Assistant: I'll modify the formatter to skip empty files...
 [makes code changes]
 [tests]
-"Done! Now generates 11 files instead of 14, skipping empty architecture.md, 
+"Done! Now generates 11 files instead of 14, skipping empty architecture.md,
 code-quality.md, and recommendations.md"
 ```
 
 **Bad** ❌:
+
 ```
 User: "Fix the empty files issue"
 Assistant: I'll fix this and document it...

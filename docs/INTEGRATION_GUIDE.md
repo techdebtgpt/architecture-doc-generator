@@ -43,19 +43,19 @@ on:
 jobs:
   generate-docs:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
+
       - name: Install ArchDoc Generator
         run: npm install -g @archdoc/generator
-      
+
       - name: Generate Documentation
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -64,7 +64,7 @@ jobs:
             --output ./docs/architecture \
             --depth normal \
             --verbose
-      
+
       - name: Commit Documentation
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -86,23 +86,23 @@ on:
 jobs:
   docs:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
+
       - name: Install ArchDoc
         run: npm install -g @archdoc/generator
-      
+
       - name: Generate Docs
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: archdoc analyze . --output ./docs --depth normal
-      
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -122,18 +122,18 @@ on:
 jobs:
   preview:
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
+
       - name: Install ArchDoc
         run: npm install -g @archdoc/generator
-      
+
       - name: Generate Quick Docs
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -142,13 +142,13 @@ jobs:
             --output ./pr-docs \
             --depth quick \
             --no-refinement
-      
+
       - name: Upload Documentation
         uses: actions/upload-artifact@v3
         with:
           name: architecture-docs
           path: ./pr-docs
-      
+
       - name: Comment PR
         uses: actions/github-script@v6
         with:
@@ -215,18 +215,18 @@ Create `Jenkinsfile`:
 ```groovy
 pipeline {
   agent any
-  
+
   environment {
     ANTHROPIC_API_KEY = credentials('anthropic-api-key')
   }
-  
+
   stages {
     stage('Setup') {
       steps {
         sh 'npm install -g @archdoc/generator'
       }
     }
-    
+
     stage('Generate Documentation') {
       steps {
         sh '''
@@ -237,13 +237,13 @@ pipeline {
         '''
       }
     }
-    
+
     stage('Archive') {
       steps {
         archiveArtifacts artifacts: 'docs/architecture/**', fingerprint: true
       }
     }
-    
+
     stage('Publish') {
       when {
         branch 'main'
@@ -273,11 +273,11 @@ jobs:
       - image: cimg/node:18.0
     steps:
       - checkout
-      
+
       - run:
           name: Install ArchDoc
           command: npm install -g @archdoc/generator
-      
+
       - run:
           name: Generate Documentation
           command: |
@@ -286,11 +286,11 @@ jobs:
               --depth normal
           environment:
             ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
-      
+
       - store_artifacts:
           path: ./docs/architecture
           destination: architecture-docs
-      
+
       - persist_to_workspace:
           root: .
           paths:
@@ -327,11 +327,11 @@ steps:
     inputs:
       versionSpec: '18.x'
     displayName: 'Install Node.js'
-  
+
   - script: |
       npm install -g @archdoc/generator
     displayName: 'Install ArchDoc Generator'
-  
+
   - script: |
       archdoc analyze . \
         --output $(Build.ArtifactStagingDirectory)/docs \
@@ -340,7 +340,7 @@ steps:
     displayName: 'Generate Documentation'
     env:
       ANTHROPIC_API_KEY: $(ANTHROPIC_API_KEY)
-  
+
   - task: PublishBuildArtifacts@1
     inputs:
       pathToPublish: '$(Build.ArtifactStagingDirectory)/docs'
@@ -420,29 +420,29 @@ npm run docs:ci
 ### Basic Example
 
 ```typescript
-import { 
-  DocumentationOrchestrator, 
+import {
+  DocumentationOrchestrator,
   AgentRegistry,
   FileSystemScanner,
   FileStructureAgent,
   DependencyAnalyzerAgent,
   PatternDetectorAgent,
-  MultiFileMarkdownFormatter
+  MultiFileMarkdownFormatter,
 } from '@archdoc/generator';
 
 async function generateDocs() {
   // Setup
   const scanner = new FileSystemScanner();
   const registry = new AgentRegistry();
-  
+
   // Register agents
   registry.register(new FileStructureAgent());
   registry.register(new DependencyAnalyzerAgent());
   registry.register(new PatternDetectorAgent());
-  
+
   // Create orchestrator
   const orchestrator = new DocumentationOrchestrator(registry, scanner);
-  
+
   // Generate documentation
   const output = await orchestrator.generateDocumentation('./src', {
     maxTokens: 100000,
@@ -451,19 +451,19 @@ async function generateDocs() {
       enabled: true,
       maxIterations: 5,
       clarityThreshold: 80,
-      minImprovement: 10
+      minImprovement: 10,
     },
     agentOptions: {
       runnableConfig: {
-        runName: 'MyProjectAnalysis'
-      }
-    }
+        runName: 'MyProjectAnalysis',
+      },
+    },
   });
-  
+
   // Format and save
   const formatter = new MultiFileMarkdownFormatter();
   await formatter.format(output, { outputDir: './docs' });
-  
+
   console.log('Documentation generated!');
   console.log('Total tokens:', output.totalTokens);
   console.log('Total cost: $', output.totalCost.toFixed(2));
@@ -475,31 +475,31 @@ generateDocs().catch(console.error);
 ### Advanced: Custom Workflow
 
 ```typescript
-import { 
+import {
   DocumentationOrchestrator,
   AgentRegistry,
   FileSystemScanner,
   LLMService,
   type AgentContext,
-  type DocumentationOutput
+  type DocumentationOutput,
 } from '@archdoc/generator';
 
 class CustomDocGenerator {
   private orchestrator: DocumentationOrchestrator;
-  
+
   constructor() {
     const scanner = new FileSystemScanner();
     const registry = new AgentRegistry();
     this.orchestrator = new DocumentationOrchestrator(registry, scanner);
-    
+
     // Configure LangSmith
     LLMService.configureLangSmith();
   }
-  
+
   async generate(projectPath: string): Promise<DocumentationOutput> {
     // Custom pre-processing
     const scanResult = await this.preScan(projectPath);
-    
+
     // Generate with custom options
     const output = await this.orchestrator.generateDocumentation(projectPath, {
       maxTokens: 150000,
@@ -508,25 +508,25 @@ class CustomDocGenerator {
         enabled: true,
         maxIterations: 7,
         clarityThreshold: 85,
-        minImprovement: 5
+        minImprovement: 5,
       },
       onAgentProgress: (current, total, agentName) => {
         console.log(`[${current}/${total}] ${agentName}...`);
-      }
+      },
     });
-    
+
     // Custom post-processing
     await this.postProcess(output);
-    
+
     return output;
   }
-  
+
   private async preScan(path: string) {
     console.log('Pre-scanning project...');
     // Custom scanning logic
     return {};
   }
-  
+
   private async postProcess(output: DocumentationOutput) {
     console.log('Post-processing documentation...');
     // Custom formatting, validation, etc.
@@ -552,32 +552,32 @@ const orchestrator = new DocumentationOrchestrator(registry, scanner);
 app.post('/api/generate-docs', async (req, res) => {
   try {
     const { projectPath, depth = 'normal' } = req.body;
-    
+
     const depthConfigs = {
       quick: { maxIterations: 2, clarityThreshold: 70 },
       normal: { maxIterations: 5, clarityThreshold: 80 },
-      deep: { maxIterations: 10, clarityThreshold: 90 }
+      deep: { maxIterations: 10, clarityThreshold: 90 },
     };
-    
+
     const output = await orchestrator.generateDocumentation(projectPath, {
       maxTokens: 100000,
       parallel: true,
       iterativeRefinement: {
         enabled: true,
-        ...depthConfigs[depth]
-      }
+        ...depthConfigs[depth],
+      },
     });
-    
+
     res.json({
       success: true,
       summary: output.summary,
       tokens: output.totalTokens,
-      cost: output.totalCost
+      cost: output.totalCost,
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
@@ -716,21 +716,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Generate Docs
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           npm install -g @archdoc/generator
           archdoc analyze . --output ./pr-docs --depth quick
-      
+
       - name: Check for Changes
         id: check
         run: |
           if [ -n "$(git status --porcelain docs/)" ]; then
             echo "docs_changed=true" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Comment if Outdated
         if: steps.check.outputs.docs_changed == 'true'
         uses: actions/github-script@v6
@@ -752,22 +752,22 @@ name: Weekly Documentation Update
 
 on:
   schedule:
-    - cron: '0 0 * * 0'  # Every Sunday at midnight
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 0 * * 0' # Every Sunday at midnight
+  workflow_dispatch: # Manual trigger
 
 jobs:
   update-docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Generate Documentation
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           npm install -g @archdoc/generator
           archdoc analyze . --output ./docs --depth deep
-      
+
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
@@ -792,14 +792,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Generate Release Docs
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           npm install -g @archdoc/generator
           archdoc analyze . --output ./docs-${{ github.event.release.tag_name }} --depth deep
-      
+
       - name: Upload to Release
         uses: actions/upload-release-asset@v1
         env:
@@ -846,20 +846,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
+
       - name: Install Dependencies
         run: npm install
-      
+
       - name: Generate Documentation
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: npm run docs:full
-      
+
       - name: Commit Documentation
         run: |
           git config --local user.email "action@github.com"

@@ -70,12 +70,7 @@ archdoc analyze
   },
   "scan": {
     "maxFiles": 1000,
-    "excludePatterns": [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-      "**/.git/**"
-    ]
+    "excludePatterns": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/.git/**"]
   },
   "agents": [
     "file-structure",
@@ -196,11 +191,7 @@ archdoc config --set llm.provider openai
 
 ```json
 {
-  "agents": [
-    "file-structure",
-    "dependency-analyzer",
-    "pattern-detector"
-  ]
+  "agents": ["file-structure", "dependency-analyzer", "pattern-detector"]
 }
 ```
 
@@ -209,8 +200,8 @@ archdoc config --set llm.provider openai
 ```json
 {
   "refinement": {
-    "maxIterations": 10,        // More iterations = better quality
-    "clarityThreshold": 90      // Higher threshold = more refinement
+    "maxIterations": 10, // More iterations = better quality
+    "clarityThreshold": 90 // Higher threshold = more refinement
   }
 }
 ```
@@ -233,13 +224,13 @@ run: archdoc analyze . --output ./docs
 
 ## LLM Provider Options
 
-| Provider | Model | Best For |
-|----------|-------|----------|
+| Provider      | Model                        | Best For                                    |
+| ------------- | ---------------------------- | ------------------------------------------- |
 | **Anthropic** | `claude-3-5-sonnet-20241022` | Deep reasoning, code analysis (recommended) |
-| **Anthropic** | `claude-sonnet-4-20250514` | Latest model, improved performance |
-| **OpenAI** | `gpt-4-turbo` | Balanced performance |
-| **OpenAI** | `gpt-4o` | Latest OpenAI model |
-| **Google** | `gemini-1.5-pro` | Fast processing, cost efficiency |
+| **Anthropic** | `claude-sonnet-4-20250514`   | Latest model, improved performance          |
+| **OpenAI**    | `gpt-4-turbo`                | Balanced performance                        |
+| **OpenAI**    | `gpt-4o`                     | Latest OpenAI model                         |
+| **Google**    | `gemini-1.5-pro`             | Fast processing, cost efficiency            |
 
 ## Common Issues
 

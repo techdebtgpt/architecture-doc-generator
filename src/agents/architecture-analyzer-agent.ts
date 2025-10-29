@@ -303,7 +303,7 @@ Based on this structure, identify the architectural style, major components, lay
           warnings: parsed.warnings || [],
         };
       }
-    } catch (error) {
+    } catch (_error) {
       // Fallback to basic analysis
     }
 

@@ -334,14 +334,14 @@ Please analyze this structure and provide insights about organization, patterns,
         recommendations: [],
         warnings: ['Failed to parse LLM response as JSON'],
       };
-    } catch (error) {
+    } catch (_error) {
       return {
         summary: 'Error parsing analysis result',
         structure: {},
         patterns: { architectural: [], organizational: [] },
         conventions: { naming: [], grouping: [] },
         recommendations: [],
-        warnings: [`Parse error: ${(error as Error).message}`],
+        warnings: [`Parse error: ${(_error as Error).message}`],
       };
     }
   }

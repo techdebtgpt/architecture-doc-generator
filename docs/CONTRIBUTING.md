@@ -260,7 +260,13 @@ interface Agent {
 Create `src/agents/my-custom-agent.ts`:
 
 ```typescript
-import { Agent, AgentContext, AgentResult, AgentMetadata, AgentPriority } from '../types/agent.types';
+import {
+  Agent,
+  AgentContext,
+  AgentResult,
+  AgentMetadata,
+  AgentPriority,
+} from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
 import { RunnableSequence, RunnableLambda } from '@langchain/core/runnables';
 import { StringOutputParser } from '@langchain/core/output_parsers';
@@ -510,7 +516,7 @@ describe('FileStructureAgent', () => {
   describe('getMetadata', () => {
     it('should return correct metadata', () => {
       const metadata = agent.getMetadata();
-      
+
       expect(metadata.name).toBe('file-structure');
       expect(metadata.priority).toBeDefined();
       expect(metadata.capabilities.supportsParallel).toBe(true);
@@ -521,7 +527,7 @@ describe('FileStructureAgent', () => {
     it('should analyze file structure', async () => {
       const context = createMockContext();
       const result = await agent.execute(context);
-      
+
       expect(result.status).toBe('success');
       expect(result.markdown).toContain('# File Structure');
     });
@@ -529,7 +535,7 @@ describe('FileStructureAgent', () => {
     it('should handle errors gracefully', async () => {
       const context = createInvalidContext();
       const result = await agent.execute(context);
-      
+
       expect(result.status).toBe('error');
       expect(result.errors.length).toBeGreaterThan(0);
     });
@@ -546,13 +552,13 @@ describe('Full Documentation Workflow', () => {
   it('should generate complete documentation', async () => {
     const orchestrator = createOrchestrator();
     const projectPath = './test-fixtures/sample-project';
-    
+
     const output = await orchestrator.generateDocumentation(projectPath, {
       maxTokens: 10000,
       parallel: false,
-      iterativeRefinement: { enabled: false }
+      iterativeRefinement: { enabled: false },
     });
-    
+
     expect(output.projectName).toBe('sample-project');
     expect(output.agentResults.size).toBeGreaterThan(0);
     expect(output.summary).toBeDefined();
@@ -568,11 +574,11 @@ jest.mock('../../src/llm/llm-service', () => ({
     getInstance: jest.fn(() => ({
       getChatModel: jest.fn(() => ({
         invoke: jest.fn().mockResolvedValue({
-          content: 'Mock analysis result'
-        })
-      }))
-    }))
-  }
+          content: 'Mock analysis result',
+        }),
+      })),
+    })),
+  },
 }));
 ```
 
@@ -622,14 +628,14 @@ export class MyAgent implements Agent {
 }
 
 // ❌ Bad
-export class MyAgent implements Agent{
-    private llmService:LLMService;
-    constructor(){
-        this.llmService=LLMService.getInstance()
-    }
-    public async execute(context:AgentContext):Promise<AgentResult>{
-        // Implementation
-    }
+export class MyAgent implements Agent {
+  private llmService: LLMService;
+  constructor() {
+    this.llmService = LLMService.getInstance();
+  }
+  public async execute(context: AgentContext): Promise<AgentResult> {
+    // Implementation
+  }
 }
 ```
 
@@ -655,14 +661,14 @@ import { LLMService } from '../llm/llm-service';
 
 ### Comments and Documentation
 
-```typescript
+````typescript
 /**
  * Analyzes file structure and organization of a project.
- * 
+ *
  * @remarks
  * This agent examines the directory tree, identifies key files,
  * and provides insights into project organization.
- * 
+ *
  * @example
  * ```typescript
  * const agent = new FileStructureAgent();
@@ -672,7 +678,7 @@ import { LLMService } from '../llm/llm-service';
 export class FileStructureAgent implements Agent {
   /**
    * Executes the file structure analysis.
-   * 
+   *
    * @param context - The agent execution context
    * @param options - Optional execution options
    * @returns Analysis result with markdown documentation
@@ -684,7 +690,7 @@ export class FileStructureAgent implements Agent {
     // Implementation
   }
 }
-```
+````
 
 ### Linting
 
@@ -725,20 +731,24 @@ Use the template:
 
 ```markdown
 ## Description
+
 Brief description of changes
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Documentation update
 
 ## Testing
+
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] Manual testing completed
 
 ## Checklist
+
 - [ ] Code follows style guidelines
 - [ ] Self-review completed
 - [ ] Documentation updated
@@ -746,6 +756,7 @@ Brief description of changes
 - [ ] No new warnings
 
 ## Related Issues
+
 Closes #123
 ```
 
@@ -833,6 +844,7 @@ Add release notes and artifacts
 ### Recognition
 
 Contributors are recognized in:
+
 - README.md contributors section
 - Release notes
 

@@ -238,7 +238,7 @@ Create Mermaid diagrams for the most important flows in this system.`;
 
       // Try to parse as direct JSON
       return JSON.parse(result);
-    } catch (error) {
+    } catch (_error) {
       // Fallback: return a basic structure
       return {
         flows: [],

@@ -2,6 +2,7 @@ import { StateGraph, Annotation, END } from '@langchain/langgraph';
 import { MemorySaver } from '@langchain/langgraph';
 import type { AgentContext, AgentResult } from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
+import { Logger } from '../utils/logger';
 
 /**
  * Agent internal state for self-refinement workflow
@@ -105,11 +106,13 @@ export interface AgentWorkflowConfig {
  */
 export abstract class BaseAgentWorkflow {
   protected llmService: LLMService;
+  protected logger: Logger;
   protected workflow: ReturnType<typeof this.buildWorkflow>;
   protected checkpointer = new MemorySaver();
 
   constructor() {
     this.llmService = LLMService.getInstance();
+    this.logger = new Logger(this.constructor.name);
     this.workflow = this.buildWorkflow();
   }
 
@@ -173,8 +176,9 @@ export abstract class BaseAgentWorkflow {
       evaluationTimeout: 15000,
     };
 
-    console.log(
-      `[${this.getAgentName()}] ⚙️  Configuration: maxIterations=${maxIterations}, clarityThreshold=${clarityThreshold}, questionsPerIteration=3`,
+    this.logger.info(
+      `Configuration: maxIterations=${maxIterations}, clarityThreshold=${clarityThreshold}, questionsPerIteration=3`,
+      '⚙️',
     );
 
     return this.executeWorkflow(
@@ -359,7 +363,7 @@ export abstract class BaseAgentWorkflow {
     const { context } = state;
     const agentName = this.getAgentName();
 
-    console.log(`\n🤖 [${agentName}] Starting initial analysis...`);
+    this.logger.info(`Starting initial analysis...`, '🤖');
 
     const systemPrompt = await this.buildSystemPrompt(context);
     const humanPrompt = await this.buildHumanPrompt(context);
@@ -376,8 +380,9 @@ export abstract class BaseAgentWorkflow {
       typeof humanPrompt === 'string' ? humanPrompt : JSON.stringify(humanPrompt);
     const inputTokens = await this.llmService.countTokens(systemPromptText + humanPromptText);
 
-    console.log(
-      `📊 [${agentName}] Input: ${inputTokens.toLocaleString()} tokens | Budget: ${context.tokenBudget.toLocaleString()} tokens | Max output: ${modelOptions.maxTokens.toLocaleString()} tokens`,
+    this.logger.info(
+      `Input: ${inputTokens.toLocaleString()} tokens | Budget: ${context.tokenBudget.toLocaleString()} tokens | Max output: ${modelOptions.maxTokens.toLocaleString()} tokens`,
+      '📊',
     );
 
     const model = this.llmService.getChatModel(modelOptions, agentName);
@@ -411,12 +416,14 @@ export abstract class BaseAgentWorkflow {
     const outputCost = (actualOutputTokens / 1_000_000) * 15;
     const totalCost = inputCost + outputCost;
 
-    console.log(
-      `[${agentName}] 💰 Tokens: ${actualInputTokens.toLocaleString()} input / ${actualOutputTokens.toLocaleString()} output = ${totalTokens.toLocaleString()} total | Cost: $${totalCost.toFixed(4)} | Remaining budget: ${(context.tokenBudget - totalTokens).toLocaleString()}`,
+    this.logger.info(
+      `Tokens: ${actualInputTokens.toLocaleString()} input / ${actualOutputTokens.toLocaleString()} output = ${totalTokens.toLocaleString()} total | Cost: $${totalCost.toFixed(4)} | Remaining budget: ${(context.tokenBudget - totalTokens).toLocaleString()}`,
+      '💰',
     );
 
-    console.log(
-      `✅ [${agentName}] Initial analysis complete (${analysisText.length.toLocaleString()} chars)`,
+    this.logger.info(
+      `Initial analysis complete (${analysisText.length.toLocaleString()} chars)`,
+      '✅',
     );
 
     return {
@@ -441,7 +448,7 @@ export abstract class BaseAgentWorkflow {
     } = state;
     const agentName = this.getAgentName();
 
-    console.log(`\n🔍 [${agentName}] Iteration ${iteration}: Evaluating clarity...`);
+    this.logger.info(`Iteration ${iteration}: Evaluating clarity...`, '🔍');
 
     const modelOptions = {
       temperature: 0.2,
@@ -483,7 +490,7 @@ MISSING_INFORMATION:
 - None - all aspects covered`;
 
     const inputTokens = await this.llmService.countTokens(evaluationPrompt);
-    console.log(`📊 [${agentName}] Evaluation input: ${inputTokens.toLocaleString()} tokens`);
+    this.logger.info(`Evaluation input: ${inputTokens.toLocaleString()} tokens`, '📊');
 
     // Track token usage with callback
     let actualInputTokens = inputTokens;
@@ -546,20 +553,23 @@ MISSING_INFORMATION:
     const gapsResolved = previousGapCount > 0 ? previousGapCount - currentGapCount : 0;
     const gapReductionRate = previousGapCount > 0 ? (gapsResolved / previousGapCount) * 100 : 0;
 
-    console.log(
-      `[${agentName}] 📊 Overall Clarity=${overallScore.toFixed(1)} (📊 Completeness=${completeness}, 💎 Clarity=${clarity}, 🔍 Depth=${depth}, ✅ Accuracy=${accuracy})`,
+    this.logger.info(
+      `Overall Clarity=${overallScore.toFixed(1)} (Completeness=${completeness}, Clarity=${clarity}, Depth=${depth}, Accuracy=${accuracy})`,
+      '📊',
     );
 
     if (gapsResolved > 0) {
-      console.log(
-        `✅ [${agentName}] Resolved ${gapsResolved} gap(s), ${currentGapCount} remaining (${gapReductionRate.toFixed(1)}% reduction)`,
+      this.logger.info(
+        `Resolved ${gapsResolved} gap(s), ${currentGapCount} remaining (${gapReductionRate.toFixed(1)}% reduction)`,
+        '✅',
       );
     } else if (iteration > 1 && gapsResolved < 0) {
-      console.log(
-        `⚠️  [${agentName}] ${Math.abs(gapsResolved)} new gap(s) identified, ${currentGapCount} total`,
+      this.logger.warn(
+        `${Math.abs(gapsResolved)} new gap(s) identified, ${currentGapCount} total`,
+        '⚠️',
       );
     } else if (currentGapCount > 0) {
-      console.log(`⚠️  [${agentName}] ${currentGapCount} gap(s) identified`);
+      this.logger.warn(`${currentGapCount} gap(s) identified`, '⚠️');
     }
 
     return {
@@ -654,7 +664,7 @@ MISSING_INFORMATION:
     const { currentAnalysis, missingInformation, context, iteration } = state;
     const agentName = this.getAgentName();
 
-    console.log(`❓ [${agentName}] Iteration ${iteration}: Generating refinement questions...`);
+    this.logger.info(`Iteration ${iteration}: Generating refinement questions...`, '❓');
 
     // Get max questions from config
     const maxQuestions =
@@ -673,8 +683,9 @@ MISSING_INFORMATION:
     const prioritizedGaps = this.prioritizeGaps(missingInformation);
     const topGaps = prioritizedGaps.slice(0, Math.min(5, maxQuestions * 2));
 
-    console.log(
-      `[${agentName}] 🎯 Prioritized ${topGaps.length} gap(s) from ${missingInformation.length} total`,
+    this.logger.info(
+      `Prioritized ${topGaps.length} gap(s) from ${missingInformation.length} total`,
+      '🔧',
     );
 
     const questionPrompt = `You are helping improve an analysis by generating targeted questions to fill specific gaps.
@@ -733,8 +744,9 @@ Example good questions:
       .map((line) => line.replace(/^\d+\.\s*/, '').trim())
       .slice(0, maxQuestions);
 
-    console.log(
-      `[${agentName}] 📝 Generated ${questions.length} question(s) targeting ${topGaps.length} gap(s)`,
+    this.logger.info(
+      `Generated ${questions.length} question(s) targeting ${topGaps.length} gap(s)`,
+      '🎯',
     );
 
     return {
@@ -799,8 +811,9 @@ Example good questions:
   private async refineAnalysisNode(state: typeof AgentWorkflowState.State) {
     const { currentAnalysis, selfQuestions, missingInformation, context, iteration } = state;
 
-    console.log(
-      `🔧 [${this.getAgentName()}] Iteration ${iteration}: Refining analysis (${selfQuestions.length} questions, ${missingInformation.length} gaps)...`,
+    this.logger.info(
+      `Iteration ${iteration}: Refining analysis (${selfQuestions.length} questions, ${missingInformation.length} gaps)...`,
+      '🔧',
     );
 
     const systemPrompt = await this.buildSystemPrompt(context);
@@ -833,7 +846,7 @@ Instructions:
 
 Goal: Produce an ENHANCED version that keeps all previous good content AND addresses the ${selfQuestions.length} question(s) and top ${Math.min(5, missingInformation.length)} gap(s).
 
-IMPORTANT: If a gap cannot be addressed from static code analysis (e.g., runtime behavior, deployment details), 
+IMPORTANT: If a gap cannot be addressed from static code analysis (e.g., runtime behavior, deployment details),
 explicitly state "Not determinable from static analysis" rather than leaving it unaddressed.`;
 
     const model = this.llmService.getChatModel(
@@ -867,8 +880,9 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     const refinedAnalysis = typeof result === 'string' ? result : result.content?.toString() || '';
 
     const targetedGaps = Math.min(5, missingInformation.length);
-    console.log(
-      `✨ [${this.getAgentName()}] Refinement complete - targeted ${selfQuestions.length} question(s) and ${targetedGaps} gap(s)`,
+    this.logger.info(
+      `Refinement complete - targeted ${selfQuestions.length} question(s) and ${targetedGaps} gap(s)`,
+      '📝',
     );
 
     return {
@@ -889,8 +903,9 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
   private async finalizeOutputNode(state: typeof AgentWorkflowState.State) {
     const { iteration, clarityScore } = state;
 
-    console.log(
-      `✨ [${this.getAgentName()}] Finalized after ${iteration} iteration(s) with clarity score: ${clarityScore.toFixed(1)}`,
+    this.logger.info(
+      `Finalized after ${iteration} iteration(s) with clarity score: ${clarityScore.toFixed(1)}`,
+      '✨',
     );
 
     return {
@@ -911,15 +926,12 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     const clarityThreshold = config.configurable?.clarityThreshold || 80;
 
     const hasMissingInfo = state.missingInformation && state.missingInformation.length > 0;
-    const agentName = this.getAgentName();
 
     // Check if we've reached max iterations
     if (state.iteration >= maxIterations) {
-      console.log(`⏹️  [${agentName}] Stopping: Max iterations (${maxIterations}) reached`);
+      this.logger.warn(`Stopping: Max iterations (${maxIterations}) reached`, '⏹️');
       if (hasMissingInfo) {
-        console.log(
-          `ℹ️  [${agentName}] ${state.missingInformation.length} gap(s) remain unaddressed`,
-        );
+        this.logger.info(`${state.missingInformation.length} gap(s) remain unaddressed`, '📊');
       }
       return 'finalize';
     }
@@ -931,11 +943,13 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       (state.clarityScore > 75 && state.gapReductionRate < 20 && state.gapReductionRate >= 0);
 
     if (hasLowProgress && hasMissingInfo) {
-      console.log(
-        `⏹️  [${agentName}] Stopping: Low progress (${state.gapReductionRate.toFixed(1)}% gap reduction, threshold ${state.clarityScore > 75 ? '20%' : '15%'})`,
+      this.logger.warn(
+        `Stopping: Low progress (${state.gapReductionRate.toFixed(1)}% gap reduction, threshold ${state.clarityScore > 75 ? '20%' : '15%'})`,
+        '⏹️',
       );
-      console.log(
-        `ℹ️  [${agentName}] ${state.missingInformation.length} gap(s) remain - minimal improvement expected`,
+      this.logger.info(
+        `${state.missingInformation.length} gap(s) remain - minimal improvement expected`,
+        '📊',
       );
       return 'finalize';
     }
@@ -944,23 +958,26 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     const isComplete = state.clarityScore >= clarityThreshold && !hasMissingInfo;
 
     if (isComplete) {
-      console.log(
-        `✅ [${agentName}] Stopping: Clarity threshold (${clarityThreshold}) achieved (${state.clarityScore.toFixed(1)}) and all gaps addressed`,
+      this.logger.info(
+        `Stopping: Clarity threshold (${clarityThreshold}) achieved (${state.clarityScore.toFixed(1)}) and all gaps addressed`,
+        '✅',
       );
       return 'finalize';
     }
 
     // Check if only clarity threshold met but gaps remain
     if (state.clarityScore >= clarityThreshold && hasMissingInfo) {
-      console.log(
-        `🔄 [${agentName}] Continuing: Clarity sufficient (${state.clarityScore.toFixed(1)}) but ${state.missingInformation.length} gap(s) remain`,
+      this.logger.info(
+        `Continuing: Clarity sufficient (${state.clarityScore.toFixed(1)}) but ${state.missingInformation.length} gap(s) remain`,
+        '🔄',
       );
       return 'refine';
     }
 
     // Refine for clarity improvement
-    console.log(
-      `🔄 [${agentName}] Continuing: Clarity ${state.clarityScore.toFixed(1)} < ${clarityThreshold}, iteration ${state.iteration} < ${maxIterations}`,
+    this.logger.info(
+      `Continuing: Clarity ${state.clarityScore.toFixed(1)} < ${clarityThreshold}, iteration ${state.iteration} < ${maxIterations}`,
+      '🔄',
     );
     return 'refine';
   }

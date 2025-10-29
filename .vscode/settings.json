@@ -1,0 +1,42 @@
+{
+  // Formatting
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // TypeScript indentation (match Prettier config)
+  "[typescript]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // JavaScript indentation
+  "[javascript]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // JSON indentation
+  "[json]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // Markdown indentation
+  "[markdown]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  },
+
+  // ESLint
+  "eslint.validate": ["javascript", "typescript"],
+
+  // Files
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true
+}

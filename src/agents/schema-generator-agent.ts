@@ -287,7 +287,7 @@ Extract and document all schema definitions with Mermaid diagrams.`;
 
       // Try to parse as direct JSON
       return JSON.parse(result);
-    } catch (error) {
+    } catch (_error) {
       // Fallback: return a basic structure
       return {
         schemas: [],

@@ -1,6 +1,7 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ILLMProvider } from '../llm-provider.interface';
 import { TokenManager } from '../token-manager';
+import { Logger } from '../../utils/logger';
 
 /**
  * Anthropic Claude provider implementation
@@ -9,6 +10,7 @@ export class AnthropicProvider implements ILLMProvider {
   public readonly name = 'anthropic';
   private readonly apiKey: string;
   private readonly tokenManager: TokenManager;
+  private readonly logger: Logger;
 
   // Model configurations
   private readonly models = {
@@ -41,18 +43,13 @@ export class AnthropicProvider implements ILLMProvider {
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
     this.tokenManager = TokenManager.getInstance();
+    this.logger = new Logger('AnthropicProvider');
+
     try {
       const masked = this.maskKey(this.apiKey);
-      // eslint-disable-next-line no-console
-      console.debug(
-        `[AnthropicProvider] initialized. configured=${this.isConfigured()} maskedKey=${masked}`,
-      );
+      this.logger.debug(`Initialized. configured=${this.isConfigured()} maskedKey=${masked}`);
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.debug(
-        '[AnthropicProvider] initialized. (error masking key)',
-        (e as any)?.message ?? e,
-      );
+      this.logger.debug(`Initialized. (error masking key) ${(e as Error)?.message ?? e}`);
     }
   }
 
@@ -66,19 +63,14 @@ export class AnthropicProvider implements ILLMProvider {
     return !!this.apiKey;
   }
 
-  public getChatModel(config?: any, agentContext?: string): ChatAnthropic {
+  public getChatModel(config?: any, _agentContext?: string): ChatAnthropic {
     const modelName = config?.model || 'claude-sonnet-4-20250514';
     const temperature = config?.temperature ?? 0.2;
     const maxTokens = config?.maxTokens ?? 4096;
 
-    const logPrefix = agentContext
-      ? `[${agentContext}] - AnthropicProvider`
-      : '[AnthropicProvider]';
-
     try {
-      // eslint-disable-next-line no-console
-      console.debug(
-        `ℹ️  ${logPrefix} - creating ChatAnthropic model=${modelName} temperature=${temperature} maxTokens=${maxTokens}`,
+      this.logger.debug(
+        `Creating ChatAnthropic model=${modelName} temperature=${temperature} maxTokens=${maxTokens}`,
       );
       return new ChatAnthropic({
         apiKey: this.apiKey,
@@ -88,11 +80,7 @@ export class AnthropicProvider implements ILLMProvider {
         topP: config?.topP,
       });
     } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(
-        `${logPrefix} - failed to create ChatAnthropic model`,
-        (err as any)?.message ?? err,
-      );
+      this.logger.error(`Failed to create ChatAnthropic model: ${(err as Error)?.message ?? err}`);
       throw err;
     }
   }

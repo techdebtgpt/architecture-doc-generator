@@ -3,6 +3,7 @@ import { StringOutputParser } from '@langchain/core/output_parsers';
 import { RunnableLambda, RunnableSequence } from '@langchain/core/runnables';
 import type { AgentResult, AgentMetadata, AgentContext } from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
+import { Logger } from '../utils/logger';
 
 /**
  * Represents an unclear section in agent output
@@ -44,9 +45,11 @@ export interface RefinementIteration {
  */
 export class ClarityEvaluator {
   private llmService: LLMService;
+  private logger: Logger;
 
   constructor() {
     this.llmService = LLMService.getInstance();
+    this.logger = new Logger('ClarityEvaluator');
   }
 
   /**
@@ -78,8 +81,8 @@ export class ClarityEvaluator {
       const evaluation = this.parseEvaluationResult(resultText);
 
       return evaluation;
-    } catch (error) {
-      console.warn('[ClarityEvaluator] Failed to evaluate clarity:', error);
+    } catch (_error) {
+      this.logger.warn(`Failed to evaluate clarity: ${(_error as Error)?.message ?? _error}`);
 
       // Return conservative evaluation on failure
       return {
@@ -285,9 +288,11 @@ Focus on identifying:
         confidence: parsed.confidence || 0.7,
         recommendations: parsed.recommendations || [],
       };
-    } catch (error) {
-      console.warn('[ClarityEvaluator] Failed to parse evaluation result:', error);
-      console.warn('[ClarityEvaluator] Raw result:', resultText);
+    } catch (_error) {
+      this.logger.warn(
+        `Failed to parse evaluation result: ${(_error as Error)?.message ?? _error}`,
+      );
+      this.logger.warn(`Raw result: ${resultText}`);
 
       // Return default evaluation
       return {

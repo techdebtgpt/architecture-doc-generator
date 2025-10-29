@@ -20,8 +20,24 @@ module.exports = {
     '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
-    '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-explicit-any': 'off', // Disabled - project uses any types for dynamic LLM outputs
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      },
+    ],
+    'no-console': ['error', { allow: ['warn', 'error'] }], // Forbid console.log in src/, use Logger class instead
     'prettier/prettier': 'error',
   },
+  overrides: [
+    {
+      files: ['cli/**/*.ts'],
+      rules: {
+        'no-console': 'off', // CLI commands use console.log for user-facing output (with chalk for colors)
+      },
+    },
+  ],
 };

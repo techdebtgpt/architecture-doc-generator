@@ -62,6 +62,7 @@ archdoc config --init
 ```
 
 This will:
+
 - Create `.archdoc.config.json` with default settings
 - Create `.archdoc.config.example.json` template
 - Guide you through API key setup
@@ -164,6 +165,7 @@ Configuration is loaded in this order (later overrides earlier):
 4. **CLI flags** (highest priority)
 
 **Example priority chain**:
+
 ```bash
 # Config file has model: "claude-3-5-sonnet"
 # Environment variable: LLM_MODEL="gpt-4-turbo"
@@ -216,17 +218,18 @@ Contains project-specific settings **without secrets**:
 
 ArchDoc provides a command-line interface with the following commands:
 
-| Command | Purpose | Mandatory Config |
-|---------|---------|------------------|
-| `archdoc config --init` | Interactive configuration setup | ❌ None |
-| `archdoc config --list` | View current configuration | ✅ Config file must exist |
-| `archdoc config --get <key>` | Get specific config value | ✅ Config file must exist |
-| `archdoc config --set <key=value>` | Update config value | ✅ Config file must exist |
-| `archdoc analyze` | Generate documentation | ✅ API key required (in config or env) |
-| `archdoc generate` | Alias for `analyze` | ✅ API key required |
-| `archdoc export` | Export to other formats | ❌ Future feature |
+| Command                            | Purpose                         | Mandatory Config                       |
+| ---------------------------------- | ------------------------------- | -------------------------------------- |
+| `archdoc config --init`            | Interactive configuration setup | ❌ None                                |
+| `archdoc config --list`            | View current configuration      | ✅ Config file must exist              |
+| `archdoc config --get <key>`       | Get specific config value       | ✅ Config file must exist              |
+| `archdoc config --set <key=value>` | Update config value             | ✅ Config file must exist              |
+| `archdoc analyze`                  | Generate documentation          | ✅ API key required (in config or env) |
+| `archdoc generate`                 | Alias for `analyze`             | ✅ API key required                    |
+| `archdoc export`                   | Export to other formats         | ❌ Future feature                      |
 
 **Quick Start**:
+
 ```bash
 # 1. Setup (first time only)
 archdoc config --init
@@ -287,6 +290,7 @@ archdoc config --reset
 #### Configuration Keys
 
 **LLM Settings**:
+
 - `apiKeys.anthropic` - Anthropic API key
 - `apiKeys.openai` - OpenAI API key
 - `apiKeys.google` - Google API key
@@ -296,23 +300,27 @@ archdoc config --reset
 - `llm.maxTokens` - Max output tokens
 
 **Agent Settings**:
+
 - `agents.enabled` - Array of enabled agent names
 - `agents.parallel` - Run agents in parallel (true/false)
 - `agents.timeout` - Timeout in milliseconds
 
 **Refinement Settings**:
+
 - `refinement.enabled` - Enable iterative refinement (true/false)
 - `refinement.maxIterations` - Max iterations per agent
 - `refinement.clarityThreshold` - Clarity threshold (0-100)
 - `refinement.minImprovement` - Minimum improvement % to continue
 
 **Output Settings**:
+
 - `output.directory` - Output directory path
 - `output.format` - Output format (`markdown`)
 - `output.clean` - Clean before generation (true/false)
 - `output.splitFiles` - Generate multi-file structure (true/false)
 
 **Tracing Settings**:
+
 - `tracing.enabled` - Enable LangSmith tracing (true/false)
 - `tracing.apiKey` - LangSmith API key
 - `tracing.project` - LangSmith project name
@@ -557,6 +565,7 @@ archdoc analyze . --output ./docs
 ```
 
 **Output:**
+
 ```
 docs/
 ├── index.md                  # Table of contents
@@ -750,16 +759,19 @@ archdoc analyze --prompt "run the dependency analyzer agent"
 ### 4. Project Size Considerations
 
 **Small Projects (<100 files):**
+
 ```bash
 archdoc analyze --depth normal
 ```
 
 **Medium Projects (100-1000 files):**
+
 ```bash
 archdoc analyze --depth normal --max-files 1000
 ```
 
 **Large Projects (>1000 files):**
+
 ```bash
 # Analyze in chunks or use filtering
 archdoc analyze ./src --depth quick --max-files 2000
@@ -798,12 +810,7 @@ Update `.gitignore` or use `excludePatterns` in config:
 ```json
 {
   "scan": {
-    "excludePatterns": [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/*.test.ts",
-      "**/coverage/**"
-    ]
+    "excludePatterns": ["**/node_modules/**", "**/dist/**", "**/*.test.ts", "**/coverage/**"]
   }
 }
 ```
@@ -830,6 +837,7 @@ LANGCHAIN_CALLBACKS_BACKGROUND=true
 ```
 
 **Benefits**:
+
 - Debug agent execution flow
 - Monitor token usage and costs
 - Optimize prompts and models
@@ -839,6 +847,7 @@ LANGCHAIN_CALLBACKS_BACKGROUND=true
 **Get API key**: https://smith.langchain.com/
 
 **Example trace hierarchy** (with `LANGCHAIN_TRACING_V2=true`):
+
 ```
 DocumentationGeneration-Complete
 ├── ScanProjectStructure
@@ -893,6 +902,7 @@ archdoc analyze --verbose
 ```
 
 Output includes:
+
 ```
 Agent file-structure completed
   Input tokens: 2,145
@@ -935,6 +945,7 @@ archdoc analyze . --output ./docs/$(date +%Y-%m-%d)
 **Problem:** No LLM provider API key configured.
 
 **Solution:**
+
 ```bash
 # Run interactive setup
 archdoc config --init
@@ -948,6 +959,7 @@ nano .arch-docs/.archdoc.config.json
 **Problem:** Depth configuration not properly initialized.
 
 **Solution:**
+
 ```bash
 # Use explicit depth
 archdoc analyze --depth normal
@@ -961,6 +973,7 @@ npm update -g @archdoc/generator
 **Problem:** Too many API requests to LLM provider.
 
 **Solution:**
+
 ```bash
 # Use fewer iterations
 archdoc analyze --no-refinement
@@ -977,6 +990,7 @@ archdoc analyze --provider google --model gemini-1.5-flash
 **Problem:** File or context too large for model.
 
 **Solution:**
+
 ```bash
 # Limit file size
 archdoc analyze --max-file-size 524288  # 512KB
@@ -993,6 +1007,7 @@ archdoc analyze --provider anthropic --model claude-3-5-sonnet-20241022
 **Problem:** Analysis taking too long.
 
 **Solution:**
+
 ```bash
 # Use quick depth
 archdoc analyze --depth quick
@@ -1012,6 +1027,7 @@ archdoc analyze --provider google --model gemini-1.5-flash
 **Problem:** Generated documentation lacks detail or accuracy.
 
 **Solution:**
+
 ```bash
 # Increase depth
 archdoc analyze --depth deep
@@ -1031,6 +1047,7 @@ archdoc analyze --prompt "provide detailed analysis of component architecture"
 **Problem:** Some files not being analyzed.
 
 **Solution:**
+
 ```bash
 # Check .gitignore
 cat .gitignore
@@ -1046,6 +1063,7 @@ archdoc analyze --verbose
 **Problem:** Some sections are empty or missing.
 
 **Solution:**
+
 ```bash
 # Run all agents
 archdoc analyze  # (no --agents flag)
@@ -1062,6 +1080,7 @@ archdoc analyze --max-tokens 8192
 ### Q: Which LLM provider should I use?
 
 **A:** We recommend **Anthropic Claude** for best results:
+
 - Claude 3.5 Sonnet: Best balance of quality and cost
 - Claude 3 Opus: Highest quality, more expensive
 - GPT-4 Turbo: Good alternative, familiar to many
@@ -1072,11 +1091,13 @@ archdoc analyze --max-tokens 8192
 **A:** Costs vary by provider and project size:
 
 **Small project (~100 files):**
+
 - Claude 3.5 Sonnet: ~$0.50-$2
 - GPT-4 Turbo: ~$1-$3
 - Gemini 1.5 Flash: ~$0.10-$0.50
 
 **Medium project (~1000 files):**
+
 - Claude 3.5 Sonnet: ~$5-$15
 - GPT-4 Turbo: ~$10-$25
 - Gemini 1.5 Flash: ~$1-$5
@@ -1086,6 +1107,7 @@ archdoc analyze --max-tokens 8192
 ### Q: Can I use it offline?
 
 **A:** No, the tool requires internet access to call LLM APIs. However, you can:
+
 - Generate docs once and commit them
 - Use in CI/CD with API keys
 - Cache generated docs locally
@@ -1093,6 +1115,7 @@ archdoc analyze --max-tokens 8192
 ### Q: Does it work with private codebases?
 
 **A:** Yes, but be aware:
+
 - Code is sent to third-party LLM APIs
 - Review your LLM provider's data policies
 - Consider using self-hosted LLMs (future feature)
@@ -1101,6 +1124,7 @@ archdoc analyze --max-tokens 8192
 ### Q: How do I update documentation?
 
 **A:** Currently:
+
 ```bash
 # Regenerate from scratch
 archdoc analyze . --output ./docs
@@ -1111,6 +1135,7 @@ Future versions will support incremental updates.
 ### Q: Can I customize the output format?
 
 **A:** Currently only Markdown is supported. Future versions will add:
+
 - HTML with interactive features
 - PDF export
 - Confluence format
@@ -1123,11 +1148,13 @@ Future versions will support incremental updates.
 ### Q: Does it support language X?
 
 **A:** Yes! The tool is language-agnostic and works with any text-based programming language:
+
 - TypeScript, JavaScript, Python, Java, Go, Rust, C++, C#, PHP, Ruby, Kotlin, Swift, and more.
 
 ### Q: Can I use it in CI/CD?
 
 **A:** Yes! See [Integration Guide](./INTEGRATION_GUIDE.md) for examples with:
+
 - GitHub Actions
 - GitLab CI
 - Jenkins
@@ -1137,6 +1164,7 @@ Future versions will support incremental updates.
 ### Q: How do I get support?
 
 **A:**
+
 - 📖 [Read the docs](./README.md)
 - 🐛 [Report issues](https://github.com/ritech/architecture-doc-generator/issues)
 - 💬 [Ask questions](https://github.com/ritech/architecture-doc-generator/discussions)

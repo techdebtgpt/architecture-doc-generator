@@ -23,6 +23,7 @@ archdoc config --init
 ```
 
 This interactive wizard will:
+
 1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
 2. Ask for your API key
 3. Create `.arch-docs/.archdoc.config.json` with your configuration
@@ -32,11 +33,13 @@ This interactive wizard will:
 ### Manual Setup
 
 1. **Copy configuration template**:
+
 ```bash
 cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
 ```
 
 2. **Add your API key** (at least one required):
+
 ```json
 {
   "apiKeys": {
@@ -52,6 +55,7 @@ cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
 ```
 
 3. **Run analysis**:
+
 ```bash
 archdoc analyze
 ```
@@ -60,16 +64,17 @@ archdoc analyze
 
 ArchDoc supports four ways to configure behavior:
 
-| Method | Purpose | Priority | Commit to Git? |
-|--------|---------|----------|----------------|
-| **Default values** | Built-in fallbacks | Lowest | N/A |
-| **`.archdoc.config.json`** | Project settings + API keys | Medium | ❌ Never (has secrets) |
-| **Environment variables** | CI/CD overrides | High | N/A |
-| **CLI flags** | Override everything | Highest | N/A |
+| Method                     | Purpose                     | Priority | Commit to Git?         |
+| -------------------------- | --------------------------- | -------- | ---------------------- |
+| **Default values**         | Built-in fallbacks          | Lowest   | N/A                    |
+| **`.archdoc.config.json`** | Project settings + API keys | Medium   | ❌ Never (has secrets) |
+| **Environment variables**  | CI/CD overrides             | High     | N/A                    |
+| **CLI flags**              | Override everything         | Highest  | N/A                    |
 
 ### When to Use Each Method
 
 **Use `.archdoc.config.json` for**:
+
 - API keys (stored in `.arch-docs/` folder, gitignored)
 - Model selection (provider, model name, temperature)
 - Scan settings (excludePatterns, maxFiles)
@@ -78,11 +83,13 @@ ArchDoc supports four ways to configure behavior:
 - Refinement settings (maxIterations, threshold)
 
 **Use environment variables for**:
+
 - CI/CD secrets (GitHub Actions, GitLab CI)
 - Temporary overrides during development
 - LangSmith tracing credentials (optional)
 
 **Use CLI flags for**:
+
 - One-off overrides
 - Testing different configurations
 - CI/CD customization
@@ -97,6 +104,7 @@ Default Values < Config File < Environment Variables < CLI Flags
 ```
 
 **Example**:
+
 ```json
 // .archdoc.config.json
 {
@@ -139,6 +147,7 @@ At least **one** LLM provider API key (in `.archdoc.config.json`):
 ```
 
 **Get API Keys**:
+
 - Anthropic: https://console.anthropic.com/
 - OpenAI: https://platform.openai.com/
 - Google: https://ai.google.dev/
@@ -311,6 +320,7 @@ LangSmith provides visibility into LLM calls, similar to tech-debt-api configura
 1. **Get API key** from https://smith.langchain.com/
 
 2. **Add to `.archdoc.config.json`**:
+
 ```json
 {
   "tracing": {
@@ -322,6 +332,7 @@ LangSmith provides visibility into LLM calls, similar to tech-debt-api configura
 ```
 
 3. **Or use environment variables**:
+
 ```bash
 export LANGCHAIN_TRACING_V2=true
 export LANGCHAIN_API_KEY=lsv2_pt_your-key-here
@@ -329,6 +340,7 @@ export LANGCHAIN_PROJECT=archdoc-analysis
 ```
 
 4. **Run analysis**:
+
 ```bash
 archdoc analyze --verbose
 ```
@@ -392,21 +404,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-      
+
       - name: Install ArchDoc
         run: npm install -g @archdoc/generator
-      
+
       - name: Generate Documentation
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          LANGCHAIN_TRACING_V2: false  # Disable for faster execution
+          LANGCHAIN_TRACING_V2: false # Disable for faster execution
         run: archdoc analyze . --output ./docs --depth quick
-      
+
       - name: Commit docs
         run: |
           git config --local user.email "action@github.com"
@@ -419,6 +431,7 @@ jobs:
 ### Example 3: Team Configuration
 
 **`.archdoc.config.json`** (in `.arch-docs/` folder, gitignored - each team member has their own):
+
 ```json
 {
   "apiKeys": {
@@ -430,18 +443,10 @@ jobs:
     "temperature": 0.2
   },
   "scan": {
-    "excludePatterns": [
-      "**/node_modules/**",
-      "**/test/**",
-      "**/*.spec.ts"
-    ]
+    "excludePatterns": ["**/node_modules/**", "**/test/**", "**/*.spec.ts"]
   },
   "agents": {
-    "enabled": [
-      "file-structure",
-      "dependency-analyzer",
-      "architecture-analyzer"
-    ]
+    "enabled": ["file-structure", "dependency-analyzer", "architecture-analyzer"]
   },
   "output": {
     "directory": "docs/architecture"
@@ -476,19 +481,19 @@ archdoc analyze --depth quick --no-refinement
 {
   "llm": {
     "provider": "google",
-    "model": "gemini-1.5-flash",  // Cheapest option
+    "model": "gemini-1.5-flash", // Cheapest option
     "temperature": 0.2
   },
   "scan": {
-    "maxFiles": 500,               // Limit scope
-    "maxFileSize": 524288          // 512KB max
+    "maxFiles": 500, // Limit scope
+    "maxFileSize": 524288 // 512KB max
   },
   "refinement": {
-    "enabled": false               // Skip refinement
+    "enabled": false // Skip refinement
   },
   "agents": {
     "enabled": [
-      "file-structure",            // Only essential agents
+      "file-structure", // Only essential agents
       "dependency-analyzer"
     ]
   }

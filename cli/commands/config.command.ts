@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
+import { Logger } from '../../src/utils/logger';
+
+const logger = new Logger('ConfigCommand');
 
 interface ConfigOptions {
   set?: string;
@@ -94,7 +97,7 @@ function findConfigPath(): string | null {
 }
 
 async function initializeConfig(options: ConfigOptions): Promise<void> {
-  console.log('🚀 Welcome to ArchDoc Setup!\n');
+  logger.info('🚀 Welcome to ArchDoc Setup!\n');
 
   // Determine config location
   let configPath: string;
@@ -106,10 +109,10 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
       fs.mkdirSync(outputDir, { recursive: true });
     }
     configPath = path.join(outputDir, CONFIG_FILE);
-    console.log(`Creating configuration in: ${DEFAULT_OUTPUT_DIR}/${CONFIG_FILE}`);
+    logger.info(`Creating configuration in: ${DEFAULT_OUTPUT_DIR}/${CONFIG_FILE}`);
   } else {
     configPath = path.join(process.cwd(), CONFIG_FILE);
-    console.log(`Creating configuration in: ${CONFIG_FILE}`);
+    logger.info(`Creating configuration in: ${CONFIG_FILE}`);
   }
 
   // Check if config already exists
@@ -124,7 +127,7 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
     ]);
 
     if (!shouldOverwrite) {
-      console.log('Setup cancelled.');
+      logger.info('Setup cancelled.');
       return;
     }
   }
@@ -133,7 +136,7 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
   const config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 
   // Interactive API key setup - MANDATORY
-  console.log('\n📋 LLM Provider Selection (REQUIRED)\n');
+  logger.info('\n📋 LLM Provider Selection (REQUIRED)\n');
 
   const { provider } = await inquirer.prompt([
     {
@@ -180,7 +183,7 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
   };
 
   const info = providerInfo[provider as keyof typeof providerInfo];
-  console.log(`\nGet your API key at: ${info.url}`);
+  logger.info(`\nGet your API key at: ${info.url}`);
 
   const { apiKey } = await inquirer.prompt([
     {
@@ -202,7 +205,7 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
   config.llm.provider = provider;
   config.llm.model = info.model;
 
-  console.log(`\n✅ Configured to use: ${provider} (${info.model})`);
+  logger.info(`\n✅ Configured to use: ${provider} (${info.model})`);
 
   // LangSmith tracing setup (optional)
   const { enableTracing } = await inquirer.prompt([
@@ -241,7 +244,7 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
 
   // Save configuration
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  console.log(`\n✅ Created ${path.relative(process.cwd(), configPath)}`);
+  logger.info(`\n✅ Created ${path.relative(process.cwd(), configPath)}`);
 
   // Suggest adding to .gitignore if it's in .arch-docs/
   if (location === 'output') {
@@ -264,30 +267,30 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
 
     if (shouldAddGitignore) {
       fs.appendFileSync(gitignorePath, '\n# ArchDoc output and configuration\n.arch-docs/\n');
-      console.log('✅ Added .arch-docs/ to .gitignore');
+      logger.info('✅ Added .arch-docs/ to .gitignore');
     }
   }
 
-  console.log('\n🎉 Setup complete!');
-  console.log('\n📝 Configuration Summary:');
-  console.log(`  • Config file: ${path.relative(process.cwd(), configPath)}`);
-  console.log(`  • LLM Provider: ${config.llm.provider} (${config.llm.model})`);
-  console.log(`  • Tracing: ${config.tracing.enabled ? 'Enabled' : 'Disabled'}`);
-  console.log('\n💡 Tips:');
-  console.log('  • Change provider: archdoc config --set llm.provider=openai');
-  console.log('  • Change model: archdoc config --set llm.model=gpt-4-turbo');
-  console.log('  • Update API key: archdoc config --set apiKeys.anthropic=sk-ant-...');
-  console.log('  • View settings: archdoc config --list');
-  console.log('\nNext steps:');
-  console.log('  1. Run: archdoc analyze');
-  console.log('  2. View docs in: .arch-docs/');
+  logger.info('\n🎉 Setup complete!');
+  logger.info('\n📝 Configuration Summary:');
+  logger.info(`  • Config file: ${path.relative(process.cwd(), configPath)}`);
+  logger.info(`  • LLM Provider: ${config.llm.provider} (${config.llm.model})`);
+  logger.info(`  • Tracing: ${config.tracing.enabled ? 'Enabled' : 'Disabled'}`);
+  logger.info('\n💡 Tips:');
+  logger.info('  • Change provider: archdoc config --set llm.provider=openai');
+  logger.info('  • Change model: archdoc config --set llm.model=gpt-4-turbo');
+  logger.info('  • Update API key: archdoc config --set apiKeys.anthropic=sk-ant-...');
+  logger.info('  • View settings: archdoc config --list');
+  logger.info('\nNext steps:');
+  logger.info('  1. Run: archdoc analyze');
+  logger.info('  2. View docs in: .arch-docs/');
 }
 
 function listConfig(): void {
   const configPath = findConfigPath();
 
   if (!configPath) {
-    console.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
+    logger.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
     process.exit(1);
   }
 
@@ -306,15 +309,15 @@ function listConfig(): void {
     maskedConfig.tracing.apiKey = '***' + maskedConfig.tracing.apiKey.slice(-4);
   }
 
-  console.log(`📋 Configuration (${path.relative(process.cwd(), configPath)}):\n`);
-  console.log(JSON.stringify(maskedConfig, null, 2));
+  logger.info(`📋 Configuration (${path.relative(process.cwd(), configPath)}):\n`);
+  logger.info(JSON.stringify(maskedConfig, null, 2));
 }
 
 function getConfigValue(key: string): void {
   const configPath = findConfigPath();
 
   if (!configPath) {
-    console.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
+    logger.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
     process.exit(1);
   }
 
@@ -326,19 +329,19 @@ function getConfigValue(key: string): void {
     if (value && typeof value === 'object' && k in value) {
       value = value[k] as Record<string, unknown> | string;
     } else {
-      console.error(`❌ Key not found: ${key}`);
+      logger.error(`❌ Key not found: ${key}`);
       process.exit(1);
     }
   }
 
-  console.log(JSON.stringify(value, null, 2));
+  logger.info(JSON.stringify(value, null, 2));
 }
 
 function setConfigValue(keyValue: string): void {
   const configPath = findConfigPath();
 
   if (!configPath) {
-    console.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
+    logger.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
     process.exit(1);
   }
 
@@ -346,7 +349,7 @@ function setConfigValue(keyValue: string): void {
   const valueStr = valueParts.join('=');
 
   if (!key || !valueStr) {
-    console.error('❌ Invalid format. Use: key=value (e.g., llm.temperature=0.5)');
+    logger.error('❌ Invalid format. Use: key=value (e.g., llm.temperature=0.5)');
     process.exit(1);
   }
 
@@ -375,20 +378,20 @@ function setConfigValue(keyValue: string): void {
   current[keys[keys.length - 1]] = value;
 
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  console.log(`✅ Set ${key} = ${JSON.stringify(value)}`);
-  console.log(`   in ${path.relative(process.cwd(), configPath)}`);
+  logger.info(`✅ Set ${key} = ${JSON.stringify(value)}`);
+  logger.info(`   in ${path.relative(process.cwd(), configPath)}`);
 }
 
 function resetConfig(): void {
   const configPath = findConfigPath();
 
   if (!configPath) {
-    console.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
+    logger.error(`❌ ${CONFIG_FILE} not found. Run: archdoc config --init`);
     process.exit(1);
   }
 
   fs.writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2));
-  console.log(`✅ Reset ${path.relative(process.cwd(), configPath)} to defaults`);
+  logger.info(`✅ Reset ${path.relative(process.cwd(), configPath)} to defaults`);
 }
 
 export function registerConfigCommand(program: Command): void {
@@ -418,16 +421,16 @@ export function registerConfigCommand(program: Command): void {
         } else if (options.reset) {
           resetConfig();
         } else {
-          console.log('Usage:');
-          console.log('  archdoc config --init                    # Interactive setup');
-          console.log('  archdoc config --init --location root    # Create in project root');
-          console.log('  archdoc config --list                    # Show all settings');
-          console.log('  archdoc config --get llm.model           # Get specific value');
-          console.log('  archdoc config --set llm.temperature=0.5 # Set value');
-          console.log('  archdoc config --reset                   # Reset to defaults');
+          logger.info('Usage:');
+          logger.info('  archdoc config --init                    # Interactive setup');
+          logger.info('  archdoc config --init --location root    # Create in project root');
+          logger.info('  archdoc config --list                    # Show all settings');
+          logger.info('  archdoc config --get llm.model           # Get specific value');
+          logger.info('  archdoc config --set llm.temperature=0.5 # Set value');
+          logger.info('  archdoc config --reset                   # Reset to defaults');
         }
       } catch (error) {
-        console.error('❌ Error:', error instanceof Error ? error.message : error);
+        logger.error('❌ Error:', error instanceof Error ? error.message : error);
         process.exit(1);
       }
     });
