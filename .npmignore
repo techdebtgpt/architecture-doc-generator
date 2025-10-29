@@ -1,15 +1,42 @@
-dist
-coverage
-*.log
-.env
-.env.local
-tests
-examples
-docs
-.github
+# Source files (not needed in published package)
+src/
+cli/
+tests/
+examples/
+
+# Build configuration
 tsconfig.json
+tsconfig.build.json
 jest.config.js
 .eslintrc.js
 .prettierrc
+
+# Development files
+coverage/
+*.log
+.env
+.env.local
+.env.*
+.archdoc.config.json
+.arch-docs/
+
+# GitHub specific
+.github/
+.gitattributes
+.gitignore
+
+# Documentation (except README)
+docs/
 *.md
 !README.md
+!LICENSE
+
+# Lock files
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db

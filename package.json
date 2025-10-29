@@ -17,10 +17,14 @@
     "lint": "eslint \"{src,cli,tests}/**/*.ts\"",
     "lint:fix": "eslint \"{src,cli,tests}/**/*.ts\" --fix",
     "format": "prettier --write \"**/*.{ts,json,md}\"",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && npm run lint && npm test",
+    "prepack": "npm run build",
+    "postpack": "echo 'Package created successfully'",
     "cli:dev": "ts-node src/cli/index.ts",
     "example:basic": "ts-node examples/basic-usage.ts",
-    "example:custom": "ts-node examples/custom-agent.ts"
+    "example:custom": "ts-node examples/custom-agent.ts",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "documentation",
@@ -106,7 +110,9 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE",
-    "docs"
-  ]
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
