@@ -382,17 +382,28 @@ export abstract class BaseAgentWorkflow {
 
     const model = this.llmService.getChatModel(modelOptions, agentName);
 
+    // Track token usage with callback (tech-debt-api pattern)
+    let actualInputTokens = inputTokens;
+    let actualOutputTokens = 0;
+
+    model.callbacks = [
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handleLLMEnd: (output: any) => {
+          // prettier-ignore
+          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
+          actualInputTokens = usage.input_tokens || usage.prompt_tokens || inputTokens;
+          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+        },
+      },
+    ];
+
     const result = await model.invoke([systemPrompt, humanPrompt], {
       runName: `${agentName}-InitialAnalysis`,
     });
 
     const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
 
-    // Extract actual token usage from LLM response metadata
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const usage = (result as any).usage_metadata || (result as any).response_metadata?.usage || {};
-    const actualInputTokens = usage.input_tokens || usage.prompt_tokens || inputTokens;
-    const actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
     const totalTokens = actualInputTokens + actualOutputTokens;
 
     // Calculate cost (Anthropic Claude Sonnet 4: $3/1M input, $15/1M output)
@@ -474,6 +485,22 @@ MISSING_INFORMATION:
     const inputTokens = await this.llmService.countTokens(evaluationPrompt);
     console.log(`📊 [${agentName}] Evaluation input: ${inputTokens.toLocaleString()} tokens`);
 
+    // Track token usage with callback
+    let actualInputTokens = inputTokens;
+    let actualOutputTokens = 0;
+
+    model.callbacks = [
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handleLLMEnd: (output: any) => {
+          // prettier-ignore
+          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
+          actualInputTokens = usage.input_tokens || usage.prompt_tokens || inputTokens;
+          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+        },
+      },
+    ];
+
     const result = await model.invoke([evaluationPrompt], {
       runName: `${agentName}-EvaluateClarity`,
     });
@@ -542,6 +569,8 @@ MISSING_INFORMATION:
       previousGapCount: currentGapCount,
       gapReductionRate,
       allSeenGaps: updatedSeenGaps,
+      totalInputTokens: actualInputTokens,
+      totalOutputTokens: actualOutputTokens,
     };
   }
 
@@ -675,6 +704,22 @@ Example good questions:
 - "What caching strategies are implemented in the service layer?" (addresses caching gap)
 - "How are database queries organized and what ORM patterns are used?" (addresses schema gap)`;
 
+    // Track token usage with callback
+    let actualInputTokens = 0;
+    let actualOutputTokens = 0;
+
+    model.callbacks = [
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handleLLMEnd: (output: any) => {
+          // prettier-ignore
+          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
+          actualInputTokens = usage.input_tokens || usage.prompt_tokens || 0;
+          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+        },
+      },
+    ];
+
     const result = await model.invoke([questionPrompt], {
       runName: `${agentName}-GenerateQuestions`,
     });
@@ -695,6 +740,8 @@ Example good questions:
     return {
       ...state,
       selfQuestions: questions,
+      totalInputTokens: actualInputTokens,
+      totalOutputTokens: actualOutputTokens,
     };
   }
 
@@ -797,6 +844,22 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       this.getAgentName(),
     );
 
+    // Track token usage with callback
+    let actualInputTokens = 0;
+    let actualOutputTokens = 0;
+
+    model.callbacks = [
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handleLLMEnd: (output: any) => {
+          // prettier-ignore
+          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
+          actualInputTokens = usage.input_tokens || usage.prompt_tokens || 0;
+          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+        },
+      },
+    ];
+
     const result = await model.invoke([systemPrompt, humanPrompt, refinementPrompt], {
       runName: `${this.getAgentName()}-Refinement-${iteration}`,
     });
@@ -815,6 +878,8 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       refinementNotes: [
         `Iteration ${iteration}: Addressed ${selfQuestions.length} questions targeting ${targetedGaps} gap(s)`,
       ],
+      totalInputTokens: actualInputTokens,
+      totalOutputTokens: actualOutputTokens,
     };
   }
 

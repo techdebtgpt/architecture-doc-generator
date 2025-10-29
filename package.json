@@ -24,17 +24,32 @@
   },
   "keywords": [
     "documentation",
+    "documentation-generator",
     "architecture",
+    "architecture-documentation",
     "langchain",
     "ai",
     "llm",
+    "claude",
+    "gpt-4",
+    "gemini",
     "code-analysis",
     "agentic",
+    "multi-agent",
     "multi-language",
+    "language-agnostic",
     "typescript",
+    "javascript",
     "python",
     "java",
-    "documentation-generator"
+    "go",
+    "rust",
+    "technical-documentation",
+    "automated-documentation",
+    "code-documentation",
+    "developer-tools",
+    "ci-cd",
+    "devops"
   ],
   "author": "Ritech Team",
   "license": "MIT",
@@ -91,6 +106,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "docs"
   ]
 }
