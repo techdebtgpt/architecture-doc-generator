@@ -16,9 +16,9 @@ const checks = [];
 
 // Check 1: package.json exists and is valid
 try {
-  const pkg = require('./package.json');
+  const pkg = require('../package.json');
   checks.push({ name: 'package.json exists', passed: true });
-  
+
   // Check required fields
   const requiredFields = ['name', 'version', 'description', 'main', 'license'];
   for (const field of requiredFields) {
@@ -29,28 +29,36 @@ try {
       checks.push({ name: `package.json has ${field}`, passed: true });
     }
   }
-  
+
   // Check bin field
   if (pkg.bin && pkg.bin.archdoc) {
-    const binPath = path.join(__dirname, pkg.bin.archdoc);
+    const binPath = path.join(__dirname, '..', pkg.bin.archdoc);
     if (fs.existsSync(binPath)) {
       checks.push({ name: 'Binary file exists', passed: true });
     } else {
-      checks.push({ name: 'Binary file exists', passed: false, error: `${pkg.bin.archdoc} not found` });
+      checks.push({
+        name: 'Binary file exists',
+        passed: false,
+        error: `${pkg.bin.archdoc} not found`,
+      });
       hasErrors = true;
     }
   }
-  
+
   // Check files array
   if (pkg.files && pkg.files.length > 0) {
     checks.push({ name: 'Files array configured', passed: true });
     for (const file of pkg.files) {
       if (file === 'dist') {
-        const distExists = fs.existsSync(path.join(__dirname, 'dist'));
+        const distExists = fs.existsSync(path.join(__dirname, '..', 'dist'));
         if (distExists) {
           checks.push({ name: 'dist/ directory exists', passed: true });
         } else {
-          checks.push({ name: 'dist/ directory exists', passed: false, error: 'Run npm run build first' });
+          checks.push({
+            name: 'dist/ directory exists',
+            passed: false,
+            error: 'Run npm run build first',
+          });
           hasErrors = true;
         }
       }
@@ -62,7 +70,7 @@ try {
 }
 
 // Check 2: README.md exists
-if (fs.existsSync(path.join(__dirname, 'README.md'))) {
+if (fs.existsSync(path.join(__dirname, '..', 'README.md'))) {
   checks.push({ name: 'README.md exists', passed: true });
 } else {
   checks.push({ name: 'README.md exists', passed: false, error: 'README.md not found' });
@@ -70,7 +78,7 @@ if (fs.existsSync(path.join(__dirname, 'README.md'))) {
 }
 
 // Check 3: LICENSE exists
-if (fs.existsSync(path.join(__dirname, 'LICENSE'))) {
+if (fs.existsSync(path.join(__dirname, '..', 'LICENSE'))) {
   checks.push({ name: 'LICENSE exists', passed: true });
 } else {
   checks.push({ name: 'LICENSE exists', passed: false, error: 'LICENSE file not found' });
@@ -83,13 +91,21 @@ try {
   if (gitStatus.trim() === '') {
     checks.push({ name: 'Git working directory clean', passed: true });
   } else {
-    checks.push({ name: 'Git working directory clean', passed: false, error: 'Uncommitted changes' });
+    checks.push({
+      name: 'Git working directory clean',
+      passed: false,
+      error: 'Uncommitted changes',
+    });
     console.log('\n⚠️  Uncommitted changes:');
     console.log(gitStatus);
     hasErrors = true;
   }
 } catch (error) {
-  checks.push({ name: 'Git working directory clean', passed: false, error: 'Not a git repository' });
+  checks.push({
+    name: 'Git working directory clean',
+    passed: false,
+    error: 'Not a git repository',
+  });
 }
 
 // Check 5: npm login
@@ -138,7 +154,7 @@ console.log('='.repeat(60) + '\n');
 
 for (const check of checks) {
   const icon = check.passed ? '✅' : '❌';
-  const message = check.passed 
+  const message = check.passed
     ? `${icon} ${check.name}${check.info ? ` (${check.info})` : ''}`
     : `${icon} ${check.name}: ${check.error}`;
   console.log(message);

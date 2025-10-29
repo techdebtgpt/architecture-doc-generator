@@ -3,6 +3,7 @@
 ## Prerequisites
 
 ### 1. npm Account Setup
+
 ```bash
 # Create an npm account if you don't have one
 # Visit: https://www.npmjs.com/signup
@@ -16,6 +17,7 @@ npm whoami
 ```
 
 ### 2. Organization Setup (for @archdoc scope)
+
 ```bash
 # Check if you have access to @archdoc organization
 npm access list packages
@@ -95,6 +97,7 @@ npm publish --access public
 ## Post-Publishing
 
 ### 1. Verify Installation
+
 ```bash
 # Test in a new directory
 cd /tmp
@@ -106,6 +109,7 @@ npx archdoc config --init
 ```
 
 ### 2. Create GitHub Release
+
 ```bash
 # Tag is already created by npm version
 # Go to: https://github.com/ritech/architecture-doc-generator/releases/new
@@ -115,6 +119,7 @@ npx archdoc config --init
 ```
 
 ### 3. Update Documentation
+
 - Update installation instructions in README.md
 - Add npm badge: `[![npm version](https://badge.fury.io/js/%40archdoc%2Fgenerator.svg)](https://www.npmjs.com/package/@archdoc/generator)`
 - Update examples with latest version
@@ -124,17 +129,21 @@ npx archdoc config --init
 Since your GitHub repo is private, you have two options:
 
 ### Option A: Make GitHub Repo Public
+
 ```bash
 # On GitHub:
 # Settings → Danger Zone → Change repository visibility → Make public
 ```
 
 ### Option B: Keep Private, Publish to npm Only
+
 The npm package can be public even if GitHub repo is private. Users can:
+
 - Install from npm: `npm install @archdoc/generator`
 - Cannot clone or see source code on GitHub (unless granted access)
 
 **Note**: The repository URL in package.json should point to a public repo or be accessible to your users. If keeping GitHub private, consider:
+
 1. Removing repository field from package.json
 2. Or pointing to public documentation site
 3. Or creating a public mirror repo
@@ -142,6 +151,7 @@ The npm package can be public even if GitHub repo is private. Users can:
 ## Troubleshooting
 
 ### Error: 403 Forbidden
+
 ```bash
 # You don't have permission to publish
 # Solution: Verify npm login and organization access
@@ -150,6 +160,7 @@ npm access list packages
 ```
 
 ### Error: Package already exists
+
 ```bash
 # Package name is taken
 # Solution: Change package name in package.json
@@ -157,6 +168,7 @@ npm access list packages
 ```
 
 ### Error: Need to provide one-time password
+
 ```bash
 # 2FA is enabled on your npm account
 # Solution: Add --otp flag
@@ -164,6 +176,7 @@ npm publish --access public --otp=123456
 ```
 
 ### Error: Private packages require a paid subscription
+
 ```bash
 # Scoped packages default to private
 # Solution: Always use --access public flag
@@ -173,11 +186,13 @@ npm publish --access public
 ## Version Management Strategy
 
 ### Semantic Versioning (SemVer)
+
 - **MAJOR** (X.0.0): Breaking changes
 - **MINOR** (0.X.0): New features, backward compatible
 - **PATCH** (0.0.X): Bug fixes, backward compatible
 
 ### Pre-release Versions
+
 ```bash
 # Alpha release: 0.1.0-alpha.0
 npm version prerelease --preid=alpha
