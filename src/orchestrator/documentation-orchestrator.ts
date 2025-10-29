@@ -14,6 +14,7 @@ import type {
 } from '../types/output.types';
 import { StateGraph, Annotation, END } from '@langchain/langgraph';
 import { MemorySaver } from '@langchain/langgraph';
+import { LLMService } from '../llm/llm-service';
 
 /**
  * Simple logger for orchestrator
@@ -114,6 +115,7 @@ export interface OrchestratorOptions {
   parallel?: boolean;
   iterativeRefinement?: IterativeRefinementConfig;
   agentOptions?: AgentExecutionOptions;
+  onAgentProgress?: (current: number, total: number, agentName: string) => void;
 }
 
 /**
@@ -124,6 +126,7 @@ export class DocumentationOrchestrator {
   private logger = new OrchestratorLogger();
   private workflow: ReturnType<typeof this.buildWorkflow>;
   private checkpointer = new MemorySaver();
+  private llmService = LLMService.getInstance();
 
   constructor(
     private readonly agentRegistry: AgentRegistry,
@@ -268,6 +271,11 @@ export class DocumentationOrchestrator {
     const agent = this.agentRegistry.getAllAgents()[currentAgentIndex];
     const totalAgents = agentNames.length;
 
+    // Notify progress callback
+    if (options.onAgentProgress) {
+      options.onAgentProgress(currentAgentIndex + 1, totalAgents, agentName);
+    }
+
     this.logger.log(`Executing agent: ${agentName} (${currentAgentIndex + 1}/${totalAgents})`);
     console.log(`\n${'='.repeat(80)}`);
     console.log(`📋 Agent ${currentAgentIndex + 1}/${totalAgents}: ${agentName}`);
@@ -291,7 +299,8 @@ export class DocumentationOrchestrator {
       },
       previousResults: agentResults,
       config: {},
-      tokenBudget: options.maxTokens || 100000,
+      // Claude Sonnet 4 max: 200K input tokens - 10K safety margin - 8K max output = 182K budget
+      tokenBudget: options.maxTokens || 182000,
       scanResult,
     };
 
@@ -306,6 +315,18 @@ export class DocumentationOrchestrator {
     try {
       const result = await agent.execute(context, agentOptions);
 
+      // Calculate cost for this agent
+      const modelConfig = this.llmService.getModelConfig(
+        this.llmService['defaultProvider'],
+        this.llmService['getDefaultModel'](this.llmService['defaultProvider']),
+      );
+      const cost = this.llmService['tokenManager'].calculateCost(
+        result.tokenUsage.inputTokens,
+        result.tokenUsage.outputTokens,
+        modelConfig.costPerMillionInputTokens,
+        modelConfig.costPerMillionOutputTokens,
+      );
+
       console.log(`\n✅ [${agentName}] Agent completed successfully`);
       console.log(
         `   📊 Summary: ${result.summary.substring(0, 100)}${result.summary.length > 100 ? '...' : ''}`,
@@ -313,7 +334,7 @@ export class DocumentationOrchestrator {
       console.log(`   ⏱️  Execution time: ${(result.executionTime / 1000).toFixed(2)}s`);
       console.log(`   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
       console.log(
-        `   💰 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (in: ${result.tokenUsage.inputTokens.toLocaleString()}, out: ${result.tokenUsage.outputTokens.toLocaleString()})`,
+        `   💰 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (in: ${result.tokenUsage.inputTokens.toLocaleString()}, out: ${result.tokenUsage.outputTokens.toLocaleString()}) | Cost: $${cost.toFixed(4)}`,
       );
 
       // Update state and move to next agent
@@ -467,6 +488,35 @@ export class DocumentationOrchestrator {
         warnings: this.collectWarnings(agentResults),
       },
     };
+
+    // Log final summary with per-agent breakdown
+    const totalExecutionTime = Array.from(agentResults.values()).reduce(
+      (sum, r) => sum + r.executionTime,
+      0,
+    );
+    const totalInputTokens = Array.from(agentResults.values()).reduce(
+      (sum, r) => sum + r.tokenUsage.inputTokens,
+      0,
+    );
+    const totalOutputTokens = Array.from(agentResults.values()).reduce(
+      (sum, r) => sum + r.tokenUsage.outputTokens,
+      0,
+    );
+    const totalCost = (totalInputTokens / 1_000_000) * 3 + (totalOutputTokens / 1_000_000) * 15;
+    const avgTokensPerAgent =
+      agentResults.size > 0 ? Math.round(totalTokenUsage.totalTokens / agentResults.size) : 0;
+
+    console.log('\n' + '='.repeat(80));
+    console.log('📊 DOCUMENTATION GENERATION SUMMARY');
+    console.log('='.repeat(80));
+    console.log(`✅ Agents completed: ${agentResults.size}`);
+    console.log(`⏱️  Total time: ${(totalExecutionTime / 1000 / 60).toFixed(1)}m`);
+    console.log(
+      `💰 Total tokens: ${totalTokenUsage.totalTokens.toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`,
+    );
+    console.log(`💵 Total cost: $${totalCost.toFixed(4)}`);
+    console.log(`📈 Avg tokens per agent: ${avgTokensPerAgent.toLocaleString()}`);
+    console.log('='.repeat(80) + '\n');
 
     return {
       ...state,

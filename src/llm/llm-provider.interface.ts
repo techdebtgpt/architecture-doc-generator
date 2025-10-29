@@ -8,12 +8,15 @@ export interface ILLMProvider {
   readonly name: string;
 
   /** Get chat model instance */
-  getChatModel(config: {
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-    topP?: number;
-  }): BaseChatModel;
+  getChatModel(
+    config: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      topP?: number;
+    },
+    agentContext?: string,
+  ): BaseChatModel;
 
   /** Get available models */
   getAvailableModels(): string[];

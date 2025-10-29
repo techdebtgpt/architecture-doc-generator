@@ -145,7 +145,7 @@ export async function generateDocumentation(
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
 
     // Generate documentation with LangGraph StateGraph
-    spinner.text = `Running ${agentsToRun.length} agents...`;
+    spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)...`;
 
     const documentation = await orchestrator.generateDocumentation(resolvedPath, {
       maxTokens: 100000,
@@ -160,6 +160,9 @@ export async function generateDocumentation(
         runnableConfig: {
           runName: 'DocumentationGeneration-Complete',
         },
+      },
+      onAgentProgress: (current: number, total: number, agentName: string) => {
+        spinner.text = `Running agent ${current}/${total}: ${agentName} (see progress logs below)...`;
       },
     });
 

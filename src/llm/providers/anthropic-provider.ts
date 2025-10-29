@@ -66,15 +66,19 @@ export class AnthropicProvider implements ILLMProvider {
     return !!this.apiKey;
   }
 
-  public getChatModel(config?: any): ChatAnthropic {
+  public getChatModel(config?: any, agentContext?: string): ChatAnthropic {
     const modelName = config?.model || 'claude-sonnet-4-20250514';
     const temperature = config?.temperature ?? 0.2;
     const maxTokens = config?.maxTokens ?? 4096;
 
+    const logPrefix = agentContext
+      ? `[${agentContext}] - AnthropicProvider`
+      : '[AnthropicProvider]';
+
     try {
       // eslint-disable-next-line no-console
       console.debug(
-        `[AnthropicProvider] creating ChatAnthropic model=${modelName} temperature=${temperature} maxTokens=${maxTokens}`,
+        `ℹ️  ${logPrefix} - creating ChatAnthropic model=${modelName} temperature=${temperature} maxTokens=${maxTokens}`,
       );
       return new ChatAnthropic({
         apiKey: this.apiKey,
@@ -86,7 +90,7 @@ export class AnthropicProvider implements ILLMProvider {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(
-        '[AnthropicProvider] failed to create ChatAnthropic model',
+        `${logPrefix} - failed to create ChatAnthropic model`,
         (err as any)?.message ?? err,
       );
       throw err;

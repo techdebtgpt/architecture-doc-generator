@@ -63,7 +63,7 @@ export class LLMService {
   /**
    * Get chat model with configuration
    */
-  public getChatModel(options: LLMRequestOptions = {}): BaseChatModel {
+  public getChatModel(options: LLMRequestOptions = {}, agentContext?: string): BaseChatModel {
     const provider = options.provider || this.defaultProvider;
     const llmProvider = this.providers.get(provider);
 
@@ -71,35 +71,39 @@ export class LLMService {
       throw new Error(`LLM provider ${provider} not found`);
     }
 
-    // Detailed debug logging for provider selection and configuration
+    // Detailed debug logging with agent context for provider selection and configuration
+    const logPrefix = agentContext ? `[${agentContext}] - LLMService` : '[LLMService]';
     // eslint-disable-next-line no-console
     console.debug(
-      `[LLMService] getChatModel provider=${provider} model=${options.model || '(default)'} temperature=${options.temperature ?? '(default)'} maxTokens=${options.maxTokens ?? '(default)'} `,
+      `ℹ️  ${logPrefix} - getChatModel provider=${provider} model=${options.model || '(default)'} temperature=${options.temperature ?? '(default)'} maxTokens=${options.maxTokens ?? '(default)'} `,
     );
 
     if (!llmProvider.isConfigured()) {
       // eslint-disable-next-line no-console
       console.error(
-        `[LLMService] LLM provider ${provider} is NOT configured. isConfigured() returned false.`,
+        `${logPrefix} - LLM provider ${provider} is NOT configured. isConfigured() returned false.`,
       );
       throw new Error(`LLM provider ${provider} is not configured. Please set API key.`);
     }
 
     try {
-      const model = llmProvider.getChatModel({
-        model: options.model,
-        temperature: options.temperature,
-        maxTokens: options.maxTokens,
-        topP: options.topP,
-      });
+      const model = llmProvider.getChatModel(
+        {
+          model: options.model,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
+          topP: options.topP,
+        },
+        agentContext,
+      );
 
       // eslint-disable-next-line no-console
-      console.debug(`[LLMService] created model for provider=${provider}`);
+      console.debug(`ℹ️  ${logPrefix} - created model for provider=${provider}`);
       return model;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(
-        `[LLMService] error creating model for provider=${provider}:`,
+        `${logPrefix} - error creating model for provider=${provider}:`,
         (err as any)?.message ?? err,
       );
       throw err;
@@ -131,9 +135,10 @@ export class LLMService {
   public async invoke(
     messages: BaseMessage[],
     options: LLMRequestOptions = {},
+    agentContext?: string,
   ): Promise<LLMResponse> {
     const startTime = Date.now();
-    const model = this.getChatModel(options);
+    const model = this.getChatModel(options, agentContext);
     const provider = options.provider || this.defaultProvider;
 
     let lastError: Error | null = null;

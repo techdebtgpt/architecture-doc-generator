@@ -74,6 +74,16 @@ export const AgentWorkflowState = Annotation.Root({
     },
     default: () => new Set(),
   }),
+
+  // Track token usage across all LLM calls
+  totalInputTokens: Annotation<number>({
+    reducer: (current, update) => current + update,
+    default: () => 0,
+  }),
+  totalOutputTokens: Annotation<number>({
+    reducer: (current, update) => current + update,
+    default: () => 0,
+  }),
 });
 
 /**
@@ -218,12 +228,26 @@ export abstract class BaseAgentWorkflow {
     };
 
     let finalState = initialState;
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
     for await (const state of await this.workflow.stream(initialState, workflowConfig)) {
+      // Get the last node's state
       const nodeNames = Object.keys(state);
       if (nodeNames.length > 0) {
         const lastNodeName = nodeNames[nodeNames.length - 1];
         // @ts-expect-error - Dynamic node names from StateGraph
         finalState = state[lastNodeName] || finalState;
+
+        // Extract token counts if present
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stateAny = finalState as any;
+        if (stateAny.totalInputTokens !== undefined) {
+          totalInputTokens = stateAny.totalInputTokens;
+        }
+        if (stateAny.totalOutputTokens !== undefined) {
+          totalOutputTokens = stateAny.totalOutputTokens;
+        }
       }
     }
 
@@ -231,7 +255,8 @@ export abstract class BaseAgentWorkflow {
 
     // Parse final analysis into structured data
     const analysisData = await this.parseAnalysis(finalState.finalAnalysis);
-    const markdown = await this.formatMarkdown(analysisData, finalState);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const markdown = await this.formatMarkdown(analysisData, finalState as any);
 
     return {
       agentName: this.getAgentName(),
@@ -241,9 +266,9 @@ export abstract class BaseAgentWorkflow {
       markdown,
       confidence: finalState.clarityScore / 100,
       tokenUsage: {
-        inputTokens: 0, // Will be tracked by LangSmith
-        outputTokens: 0,
-        totalTokens: 0,
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        totalTokens: totalInputTokens + totalOutputTokens,
       },
       executionTime,
       errors: [],
@@ -270,10 +295,13 @@ export abstract class BaseAgentWorkflow {
     const systemPrompt = await this.buildSystemPrompt(context);
     const humanPrompt = await this.buildHumanPrompt(context);
 
-    const model = this.llmService.getChatModel({
-      temperature: 0.3,
-      maxTokens: 16000,
-    });
+    const model = this.llmService.getChatModel(
+      {
+        temperature: 0.3,
+        maxTokens: 16000,
+      },
+      this.getAgentName(),
+    );
 
     const result = await model.invoke([systemPrompt, humanPrompt], {
       ...runnableConfig,
@@ -296,8 +324,11 @@ export abstract class BaseAgentWorkflow {
       previousGapCount: 0,
       gapReductionRate: 0,
       allSeenGaps: new Set<string>(),
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
     };
-    const markdown = await this.formatMarkdown(analysisData, stateForMarkdown);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const markdown = await this.formatMarkdown(analysisData, stateForMarkdown as any);
 
     return {
       agentName: this.getAgentName(),
@@ -346,10 +377,10 @@ export abstract class BaseAgentWorkflow {
     const inputTokens = await this.llmService.countTokens(systemPromptText + humanPromptText);
 
     console.log(
-      `[${agentName}] 📊 Input: ${inputTokens.toLocaleString()} tokens | Budget: ${context.tokenBudget.toLocaleString()} tokens | Max output: ${modelOptions.maxTokens.toLocaleString()} tokens`,
+      `📊 [${agentName}] Input: ${inputTokens.toLocaleString()} tokens | Budget: ${context.tokenBudget.toLocaleString()} tokens | Max output: ${modelOptions.maxTokens.toLocaleString()} tokens`,
     );
 
-    const model = this.llmService.getChatModel(modelOptions);
+    const model = this.llmService.getChatModel(modelOptions, agentName);
 
     const result = await model.invoke([systemPrompt, humanPrompt], {
       runName: `${agentName}-InitialAnalysis`,
@@ -357,12 +388,20 @@ export abstract class BaseAgentWorkflow {
 
     const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
 
-    // Extract token usage from result
-    const outputTokens = await this.llmService.countTokens(analysisText);
-    const totalTokens = inputTokens + outputTokens;
+    // Extract actual token usage from LLM response metadata
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const usage = (result as any).usage_metadata || (result as any).response_metadata?.usage || {};
+    const actualInputTokens = usage.input_tokens || usage.prompt_tokens || inputTokens;
+    const actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+    const totalTokens = actualInputTokens + actualOutputTokens;
+
+    // Calculate cost (Anthropic Claude Sonnet 4: $3/1M input, $15/1M output)
+    const inputCost = (actualInputTokens / 1_000_000) * 3;
+    const outputCost = (actualOutputTokens / 1_000_000) * 15;
+    const totalCost = inputCost + outputCost;
 
     console.log(
-      `[${agentName}] 💰 Tokens used: ${totalTokens.toLocaleString()} (in: ${inputTokens.toLocaleString()}, out: ${outputTokens.toLocaleString()}) | Remaining: ${(context.tokenBudget - totalTokens).toLocaleString()}`,
+      `[${agentName}] 💰 Tokens: ${actualInputTokens.toLocaleString()} input / ${actualOutputTokens.toLocaleString()} output = ${totalTokens.toLocaleString()} total | Cost: $${totalCost.toFixed(4)} | Remaining budget: ${(context.tokenBudget - totalTokens).toLocaleString()}`,
     );
 
     console.log(
@@ -373,6 +412,8 @@ export abstract class BaseAgentWorkflow {
       ...state,
       currentAnalysis: analysisText,
       iteration: 1,
+      totalInputTokens: actualInputTokens,
+      totalOutputTokens: actualOutputTokens,
     };
   }
 
@@ -396,7 +437,7 @@ export abstract class BaseAgentWorkflow {
       maxTokens: 2000,
     };
 
-    const model = this.llmService.getChatModel(modelOptions);
+    const model = this.llmService.getChatModel(modelOptions, agentName);
 
     const previousGapsContext =
       iteration > 1 && previousMissingInfo.length > 0
@@ -431,7 +472,7 @@ MISSING_INFORMATION:
 - None - all aspects covered`;
 
     const inputTokens = await this.llmService.countTokens(evaluationPrompt);
-    console.log(`[${agentName}] 📊 Evaluation input: ${inputTokens.toLocaleString()} tokens`);
+    console.log(`📊 [${agentName}] Evaluation input: ${inputTokens.toLocaleString()} tokens`);
 
     const result = await model.invoke([evaluationPrompt], {
       runName: `${agentName}-EvaluateClarity`,
@@ -450,6 +491,8 @@ MISSING_INFORMATION:
     const depth = depthMatch ? parseInt(depthMatch[1], 10) : 0;
     const accuracy = accuracyMatch ? parseInt(accuracyMatch[1], 10) : 0;
 
+    // Overall clarity score = average of 4 individual metrics
+    // Note: "clarity" appears twice - once as overall score, once as individual metric
     const overallScore = (completeness + clarity + depth + accuracy) / 4;
 
     // Extract missing information
@@ -477,19 +520,19 @@ MISSING_INFORMATION:
     const gapReductionRate = previousGapCount > 0 ? (gapsResolved / previousGapCount) * 100 : 0;
 
     console.log(
-      `[${agentName}] 📊 Clarity=${overallScore.toFixed(1)} (Completeness=${completeness}, Clarity=${clarity}, Depth=${depth}, Accuracy=${accuracy})`,
+      `[${agentName}] 📊 Overall Clarity=${overallScore.toFixed(1)} (📊 Completeness=${completeness}, 💎 Clarity=${clarity}, 🔍 Depth=${depth}, ✅ Accuracy=${accuracy})`,
     );
 
     if (gapsResolved > 0) {
       console.log(
-        `[${agentName}] ✅ Resolved ${gapsResolved} gap(s), ${currentGapCount} remaining (${gapReductionRate.toFixed(1)}% reduction)`,
+        `✅ [${agentName}] Resolved ${gapsResolved} gap(s), ${currentGapCount} remaining (${gapReductionRate.toFixed(1)}% reduction)`,
       );
     } else if (iteration > 1 && gapsResolved < 0) {
       console.log(
-        `[${agentName}] ⚠️  ${Math.abs(gapsResolved)} new gap(s) identified, ${currentGapCount} total`,
+        `⚠️  [${agentName}] ${Math.abs(gapsResolved)} new gap(s) identified, ${currentGapCount} total`,
       );
     } else if (currentGapCount > 0) {
-      console.log(`[${agentName}] ⚠️  ${currentGapCount} gap(s) identified`);
+      console.log(`⚠️  [${agentName}] ${currentGapCount} gap(s) identified`);
     }
 
     return {
@@ -589,10 +632,13 @@ MISSING_INFORMATION:
       (context as AgentContext & { maxQuestionsPerIteration?: number }).maxQuestionsPerIteration ||
       3;
 
-    const model = this.llmService.getChatModel({
-      temperature: 0.4,
-      maxTokens: 1500,
-    });
+    const model = this.llmService.getChatModel(
+      {
+        temperature: 0.4,
+        maxTokens: 1500,
+      },
+      agentName,
+    );
 
     // Smart prioritization: categorize and prioritize gaps
     const prioritizedGaps = this.prioritizeGaps(missingInformation);
@@ -743,10 +789,13 @@ Goal: Produce an ENHANCED version that keeps all previous good content AND addre
 IMPORTANT: If a gap cannot be addressed from static code analysis (e.g., runtime behavior, deployment details), 
 explicitly state "Not determinable from static analysis" rather than leaving it unaddressed.`;
 
-    const model = this.llmService.getChatModel({
-      temperature: 0.3,
-      maxTokens: 16000,
-    });
+    const model = this.llmService.getChatModel(
+      {
+        temperature: 0.3,
+        maxTokens: 16000,
+      },
+      this.getAgentName(),
+    );
 
     const result = await model.invoke([systemPrompt, humanPrompt, refinementPrompt], {
       runName: `${this.getAgentName()}-Refinement-${iteration}`,
@@ -810,15 +859,15 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       return 'finalize';
     }
 
-    // Check for no progress - if gap reduction rate is < 10% for 2+ iterations, stop
-    if (
-      state.iteration >= 2 &&
-      state.gapReductionRate < 10 &&
-      state.gapReductionRate >= 0 &&
-      hasMissingInfo
-    ) {
+    // Check for no progress - if gap reduction rate is < 15% for 2+ iterations, stop
+    // OR if clarity > 75 and gap reduction < 20%, stop early
+    const hasLowProgress =
+      (state.iteration >= 2 && state.gapReductionRate < 15 && state.gapReductionRate >= 0) ||
+      (state.clarityScore > 75 && state.gapReductionRate < 20 && state.gapReductionRate >= 0);
+
+    if (hasLowProgress && hasMissingInfo) {
       console.log(
-        `⏹️  [${agentName}] Stopping: Low progress (${state.gapReductionRate.toFixed(1)}% gap reduction, threshold 10%)`,
+        `⏹️  [${agentName}] Stopping: Low progress (${state.gapReductionRate.toFixed(1)}% gap reduction, threshold ${state.clarityScore > 75 ? '20%' : '15%'})`,
       );
       console.log(
         `ℹ️  [${agentName}] ${state.missingInformation.length} gap(s) remain - minimal improvement expected`,

@@ -220,6 +220,9 @@ export interface AgentExecutionOptions {
 
   /** Runnable config for LangSmith tracing context (passed from parent runnable) */
   runnableConfig?: RunnableConfig;
+
+  /** Maximum questions per refinement iteration (depth mode) */
+  maxQuestionsPerIteration?: number;
 }
 
 /**

@@ -59,6 +59,11 @@ program
   .option('--model <model>', 'LLM model to use')
   .option('--no-clean', 'Do not clean output directory before generation')
   .option(
+    '--depth <mode>',
+    'Analysis depth mode: quick (2 iterations, 70% clarity), normal (5 iterations, 80%), deep (10 iterations, 90%)',
+    'normal',
+  )
+  .option(
     '--refinement',
     'Enable iterative refinement (agents self-question for better results)',
     false,

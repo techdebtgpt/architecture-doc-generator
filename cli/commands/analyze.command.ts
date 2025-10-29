@@ -6,6 +6,7 @@ import { DocumentationOrchestrator } from '../../src/orchestrator/documentation-
 import { AgentSelector } from '../../src/orchestrator/agent-selector';
 import { FileSystemScanner } from '../../src/scanners/file-system-scanner';
 import { AgentRegistry } from '../../src/agents/agent-registry';
+import { ArchitectureAnalyzerAgent } from '../../src/agents/architecture-analyzer-agent';
 import { FileStructureAgent } from '../../src/agents/file-structure-agent';
 import { DependencyAnalyzerAgent } from '../../src/agents/dependency-analyzer-agent';
 import { PatternDetectorAgent } from '../../src/agents/pattern-detector-agent';
@@ -24,6 +25,7 @@ interface AnalyzeOptions {
   refinementThreshold?: number;
   refinementIterations?: number;
   refinementImprovement?: number;
+  depth?: 'quick' | 'normal' | 'deep';
 }
 
 /**
@@ -123,7 +125,8 @@ export async function analyzeProject(
     spinner.start('Registering agents...');
     const agentRegistry = new AgentRegistry();
 
-    // Register all available agents
+    // Register all available agents (order matters - foundational agents first)
+    agentRegistry.register(new ArchitectureAnalyzerAgent()); // High-level architecture first
     agentRegistry.register(new FileStructureAgent());
     agentRegistry.register(new DependencyAnalyzerAgent());
     agentRegistry.register(new PatternDetectorAgent());
@@ -163,22 +166,43 @@ export async function analyzeProject(
     spinner.start('Initializing documentation orchestrator...');
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
 
+    // Determine depth mode configuration
+    const depthMode = options.depth || 'normal';
+    const depthConfigs = {
+      quick: { maxIterations: 2, clarityThreshold: 70, maxQuestions: 2 },
+      normal: { maxIterations: 5, clarityThreshold: 80, maxQuestions: 3 },
+      deep: { maxIterations: 10, clarityThreshold: 90, maxQuestions: 5 },
+    };
+    const depthConfig = depthConfigs[depthMode];
+
+    if (options.verbose) {
+      console.log(
+        chalk.blue(
+          `\n📊 Depth mode: ${depthMode} (${depthConfig.maxIterations} iterations, ${depthConfig.clarityThreshold}% clarity threshold)`,
+        ),
+      );
+    }
+
     // Generate documentation
-    spinner.text = `Running ${agentsToRun.length} agents...`;
+    spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)...`;
 
     const documentation = await orchestrator.generateDocumentation(resolvedPath, {
       maxTokens: 100000,
       parallel: true,
       iterativeRefinement: {
-        enabled: options.refinement || false,
-        maxIterations: options.refinementIterations || 3,
-        clarityThreshold: options.refinementThreshold || 80,
+        enabled: options.refinement !== false, // Default enabled
+        maxIterations: options.refinementIterations || depthConfig.maxIterations,
+        clarityThreshold: options.refinementThreshold || depthConfig.clarityThreshold,
         minImprovement: options.refinementImprovement || 10,
       },
       agentOptions: {
         runnableConfig: {
           runName: 'DocumentationGeneration-Complete',
         },
+        maxQuestionsPerIteration: depthConfig.maxQuestions,
+      },
+      onAgentProgress: (current: number, total: number, agentName: string) => {
+        spinner.text = `Running agent ${current}/${total}: ${agentName} (see progress logs below)...`;
       },
     });
 
