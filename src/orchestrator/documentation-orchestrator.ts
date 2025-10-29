@@ -212,14 +212,14 @@ export class DocumentationOrchestrator {
 
   /**
    * Build the LangGraph workflow
+   * SIMPLIFIED: Agents handle their own refinement internally,
+   * orchestrator just executes them sequentially
    */
   private buildWorkflow() {
     const graph = new StateGraph(DocumentationState);
 
     // Define nodes
     graph.addNode('executeAgent', this.executeAgentNode.bind(this));
-    graph.addNode('evaluateClarity', this.evaluateClarityNode.bind(this));
-    graph.addNode('refineAgent', this.refineAgentNode.bind(this));
     graph.addNode('aggregateResults', this.aggregateResultsNode.bind(this));
 
     // Define edges with proper type casting
@@ -227,21 +227,11 @@ export class DocumentationOrchestrator {
     graph.setEntryPoint(entryPoint);
 
     // Conditional routing after agent execution
-    graph.addConditionalEdges(entryPoint, this.shouldEvaluateClarity.bind(this), {
-      evaluate: 'evaluateClarity' as '__start__',
+    // Each agent refines itself internally, orchestrator just moves to next agent
+    graph.addConditionalEdges(entryPoint, this.shouldContinue.bind(this), {
       nextAgent: 'executeAgent' as '__start__',
       done: 'aggregateResults' as '__start__',
     });
-
-    // Conditional routing after clarity evaluation
-    graph.addConditionalEdges('evaluateClarity' as '__start__', this.shouldRefine.bind(this), {
-      refine: 'refineAgent' as '__start__',
-      nextAgent: 'executeAgent' as '__start__',
-      done: 'aggregateResults' as '__start__',
-    });
-
-    // After refinement, evaluate again
-    graph.addEdge('refineAgent' as '__start__', 'evaluateClarity' as '__start__');
 
     // End after aggregation
     graph.addEdge('aggregateResults' as '__start__', END);
@@ -250,7 +240,22 @@ export class DocumentationOrchestrator {
   }
 
   /**
+   * Determine if we should continue to next agent
+   */
+  private shouldContinue(state: typeof DocumentationState.State): string {
+    const { currentAgentIndex, agentNames } = state;
+
+    // Check if all agents are done
+    if (currentAgentIndex >= agentNames.length) {
+      return 'done';
+    }
+
+    return 'nextAgent';
+  }
+
+  /**
    * Execute current agent node
+   * Each agent handles its own refinement internally via BaseAgentWorkflow
    */
   private async executeAgentNode(state: typeof DocumentationState.State) {
     const { scanResult, projectPath, options, currentAgentIndex, agentNames, agentResults } = state;
@@ -261,8 +266,12 @@ export class DocumentationOrchestrator {
 
     const agentName = agentNames[currentAgentIndex];
     const agent = this.agentRegistry.getAllAgents()[currentAgentIndex];
+    const totalAgents = agentNames.length;
 
-    this.logger.log(`Executing agent: ${agentName}`);
+    this.logger.log(`Executing agent: ${agentName} (${currentAgentIndex + 1}/${totalAgents})`);
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`📋 Agent ${currentAgentIndex + 1}/${totalAgents}: ${agentName}`);
+    console.log('='.repeat(80));
 
     // Create agent context
     const context: AgentContext = {
@@ -297,13 +306,24 @@ export class DocumentationOrchestrator {
     try {
       const result = await agent.execute(context, agentOptions);
 
-      // Update state
+      console.log(`\n✅ [${agentName}] Agent completed successfully`);
+      console.log(
+        `   📊 Summary: ${result.summary.substring(0, 100)}${result.summary.length > 100 ? '...' : ''}`,
+      );
+      console.log(`   ⏱️  Execution time: ${(result.executionTime / 1000).toFixed(2)}s`);
+      console.log(`   🎯 Confidence: ${(result.confidence * 100).toFixed(1)}%`);
+      console.log(
+        `   💰 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (in: ${result.tokenUsage.inputTokens.toLocaleString()}, out: ${result.tokenUsage.outputTokens.toLocaleString()})`,
+      );
+
+      // Update state and move to next agent
       const newAgentResults = new Map(agentResults);
       newAgentResults.set(agentName, result);
 
       return {
         ...state,
         agentResults: newAgentResults,
+        currentAgentIndex: currentAgentIndex + 1, // Move to next agent
       };
     } catch (error) {
       this.logger.error(`Agent ${agentName} failed`, error);
@@ -329,6 +349,7 @@ export class DocumentationOrchestrator {
       return {
         ...state,
         agentResults: newAgentResults,
+        currentAgentIndex: currentAgentIndex + 1, // Move to next agent even if failed
       };
     }
   }
@@ -336,66 +357,6 @@ export class DocumentationOrchestrator {
   /**
    * Evaluate clarity of agent output
    */
-  private async evaluateClarityNode(state: typeof DocumentationState.State) {
-    const { currentAgentIndex, agentNames, agentResults, clarityScores } = state;
-    const agentName = agentNames[currentAgentIndex];
-    const result = agentResults.get(agentName);
-
-    if (!result) {
-      return state;
-    }
-
-    this.logger.log(`Evaluating clarity for agent: ${agentName}`);
-
-    // Simple clarity evaluation based on result completeness
-    let score = 0;
-
-    // Check if result has data
-    if (result.data && Object.keys(result.data).length > 0) score += 30;
-
-    // Check if result has summary
-    if (result.summary && result.summary.length > 50) score += 20;
-
-    // Check if result has markdown
-    if (result.markdown && result.markdown.length > 200) score += 30;
-
-    // Check confidence
-    score += result.confidence * 20;
-
-    this.logger.log(`Agent ${agentName} clarity score: ${score.toFixed(1)}%`);
-
-    const newClarityScores = new Map(clarityScores);
-    newClarityScores.set(agentName, score);
-
-    return {
-      ...state,
-      clarityScores: newClarityScores,
-    };
-  }
-
-  /**
-   * Refine agent output based on clarity evaluation
-   */
-  private async refineAgentNode(state: typeof DocumentationState.State) {
-    const { currentAgentIndex, agentNames, refinementAttempts } = state;
-    const agentName = agentNames[currentAgentIndex];
-
-    const currentAttempts = refinementAttempts.get(agentName) || 0;
-    const newAttempts = currentAttempts + 1;
-
-    this.logger.log(`Refining agent ${agentName} (attempt ${newAttempts})`);
-
-    // Update refinement attempts
-    const newRefinementAttempts = new Map(refinementAttempts);
-    newRefinementAttempts.set(agentName, newAttempts);
-
-    // Re-execute agent (will be done in next executeAgent call with updated context)
-    return {
-      ...state,
-      refinementAttempts: newRefinementAttempts,
-    };
-  }
-
   /**
    * Aggregate all agent results into final output
    */
@@ -516,66 +477,6 @@ export class DocumentationOrchestrator {
   /**
    * Determine if we should evaluate clarity
    */
-  private shouldEvaluateClarity(state: typeof DocumentationState.State): string {
-    const { options, currentAgentIndex, agentNames } = state;
-    const refinementConfig = options.iterativeRefinement;
-
-    // If refinement is disabled, skip evaluation
-    if (!refinementConfig?.enabled) {
-      // Move to next agent or done
-      const nextIndex = currentAgentIndex + 1;
-      if (nextIndex >= agentNames.length) {
-        return 'done';
-      }
-      return 'nextAgent';
-    }
-
-    // Evaluate clarity
-    return 'evaluate';
-  }
-
-  /**
-   * Determine if we should refine the agent output
-   */
-  private shouldRefine(state: typeof DocumentationState.State): string {
-    const { options, currentAgentIndex, agentNames, refinementAttempts, clarityScores } = state;
-
-    const agentName = agentNames[currentAgentIndex];
-    const refinementConfig = options.iterativeRefinement!;
-    const attempts = refinementAttempts.get(agentName) || 0;
-    const score = clarityScores.get(agentName) || 0;
-
-    // Check if we should refine
-    if (score >= refinementConfig.clarityThreshold) {
-      this.logger.log(`Agent ${agentName} passed clarity threshold (${score}%)`);
-      // Move to next agent
-      const nextState = {
-        ...state,
-        currentAgentIndex: currentAgentIndex + 1,
-      };
-      if (nextState.currentAgentIndex >= agentNames.length) {
-        return 'done';
-      }
-      return 'nextAgent';
-    }
-
-    if (attempts >= refinementConfig.maxIterations) {
-      this.logger.log(`Agent ${agentName} reached max refinement attempts (${attempts})`);
-      // Move to next agent
-      const nextState = {
-        ...state,
-        currentAgentIndex: currentAgentIndex + 1,
-      };
-      if (nextState.currentAgentIndex >= agentNames.length) {
-        return 'done';
-      }
-      return 'nextAgent';
-    }
-
-    // Refine
-    return 'refine';
-  }
-
   /**
    * Extract architecture style from agent results
    */

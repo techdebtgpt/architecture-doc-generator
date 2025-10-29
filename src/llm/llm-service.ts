@@ -71,18 +71,39 @@ export class LLMService {
       throw new Error(`LLM provider ${provider} not found`);
     }
 
+    // Detailed debug logging for provider selection and configuration
+    // eslint-disable-next-line no-console
+    console.debug(
+      `[LLMService] getChatModel provider=${provider} model=${options.model || '(default)'} temperature=${options.temperature ?? '(default)'} maxTokens=${options.maxTokens ?? '(default)'} `,
+    );
+
     if (!llmProvider.isConfigured()) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[LLMService] LLM provider ${provider} is NOT configured. isConfigured() returned false.`,
+      );
       throw new Error(`LLM provider ${provider} is not configured. Please set API key.`);
     }
 
-    const model = llmProvider.getChatModel({
-      model: options.model,
-      temperature: options.temperature,
-      maxTokens: options.maxTokens,
-      topP: options.topP,
-    });
+    try {
+      const model = llmProvider.getChatModel({
+        model: options.model,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        topP: options.topP,
+      });
 
-    return model;
+      // eslint-disable-next-line no-console
+      console.debug(`[LLMService] created model for provider=${provider}`);
+      return model;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[LLMService] error creating model for provider=${provider}:`,
+        (err as any)?.message ?? err,
+      );
+      throw err;
+    }
   }
 
   /**

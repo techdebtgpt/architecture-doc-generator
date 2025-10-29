@@ -41,6 +41,25 @@ export class AnthropicProvider implements ILLMProvider {
   constructor(apiKey?: string) {
     this.apiKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
     this.tokenManager = TokenManager.getInstance();
+    try {
+      const masked = this.maskKey(this.apiKey);
+      // eslint-disable-next-line no-console
+      console.debug(
+        `[AnthropicProvider] initialized. configured=${this.isConfigured()} maskedKey=${masked}`,
+      );
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.debug(
+        '[AnthropicProvider] initialized. (error masking key)',
+        (e as any)?.message ?? e,
+      );
+    }
+  }
+
+  private maskKey(key: string): string {
+    if (!key) return 'NOT_SET';
+    if (key.length <= 12) return `${key.slice(0, 4)}...`;
+    return `${key.slice(0, 8)}...${key.slice(-4)}`;
   }
 
   public isConfigured(): boolean {
@@ -49,14 +68,29 @@ export class AnthropicProvider implements ILLMProvider {
 
   public getChatModel(config?: any): ChatAnthropic {
     const modelName = config?.model || 'claude-sonnet-4-20250514';
+    const temperature = config?.temperature ?? 0.2;
+    const maxTokens = config?.maxTokens ?? 4096;
 
-    return new ChatAnthropic({
-      apiKey: this.apiKey,
-      model: modelName,
-      temperature: config?.temperature ?? 0.2,
-      maxTokens: config?.maxTokens ?? 4096,
-      topP: config?.topP,
-    });
+    try {
+      // eslint-disable-next-line no-console
+      console.debug(
+        `[AnthropicProvider] creating ChatAnthropic model=${modelName} temperature=${temperature} maxTokens=${maxTokens}`,
+      );
+      return new ChatAnthropic({
+        apiKey: this.apiKey,
+        model: modelName,
+        temperature,
+        maxTokens,
+        topP: config?.topP,
+      });
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(
+        '[AnthropicProvider] failed to create ChatAnthropic model',
+        (err as any)?.message ?? err,
+      );
+      throw err;
+    }
   }
 
   public getAvailableModels(): string[] {

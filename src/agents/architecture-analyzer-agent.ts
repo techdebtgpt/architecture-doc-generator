@@ -158,16 +158,58 @@ Provide **comprehensive architectural analysis** with actionable insights.`;
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const projectStructure = this.analyzeProjectStructure(context.files);
 
+    // Limit file lists to avoid token overflow for large projects
+    const summarizeFileList = (files: string[], limit = 20): string => {
+      if (files.length === 0) return 'None';
+      if (files.length <= limit) {
+        return files.map((f) => `  - ${f}`).join('\n');
+      }
+      const shown = files.slice(0, limit);
+      return (
+        shown.map((f) => `  - ${f}`).join('\n') +
+        `\n  ... and ${files.length - limit} more files`
+      );
+    };
+
     return `Analyze the architecture of this system:
 
 **Project**: ${context.projectPath}
 **Total Files**: ${context.files.length}
 **Languages**: ${context.languageHints.map((lh) => lh.language).join(', ')}
 
-**Project Structure**:
-${JSON.stringify(projectStructure, null, 2)}
+**Project Structure Summary**:
 
-Identify the architectural style, major components, layers, and create a comprehensive component diagram.`;
+**Modules** (${projectStructure.modules.length}):
+${summarizeFileList(projectStructure.modules, 15)}
+
+**Controllers** (${projectStructure.controllers.length}):
+${summarizeFileList(projectStructure.controllers, 10)}
+
+**Services** (${projectStructure.services.length}):
+${summarizeFileList(projectStructure.services, 15)}
+
+**Repositories** (${projectStructure.repositories.length}):
+${summarizeFileList(projectStructure.repositories, 10)}
+
+**Models/Entities** (${projectStructure.models.length}):
+${summarizeFileList(projectStructure.models, 10)}
+
+**Configuration** (${projectStructure.configs.length}):
+${summarizeFileList(projectStructure.configs, 5)}
+
+**Middleware** (${projectStructure.middleware.length}):
+${summarizeFileList(projectStructure.middleware, 5)}
+
+**Routes/Endpoints** (${projectStructure.routes.length}):
+${summarizeFileList(projectStructure.routes, 10)}
+
+**External Integrations** (${projectStructure.external.length}):
+${summarizeFileList(projectStructure.external, 10)}
+
+**Tests** (${projectStructure.tests.length}):
+${summarizeFileList(projectStructure.tests, 5)}
+
+Based on this structure, identify the architectural style, major components, layers, and create a comprehensive component diagram.`;
   }
 
   protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {

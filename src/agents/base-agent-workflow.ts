@@ -26,7 +26,7 @@ export const AgentWorkflowState = Annotation.Root({
 
   // Self-evaluation
   missingInformation: Annotation<string[]>({
-    reducer: (current, update) => [...current, ...update],
+    reducer: (_, update) => update, // Changed: replace instead of accumulate to avoid duplicates
     default: () => [],
   }),
 
@@ -35,9 +35,20 @@ export const AgentWorkflowState = Annotation.Root({
     default: () => 0,
   }),
 
+  // Gap tracking for reduction rate
+  previousGapCount: Annotation<number>({
+    reducer: (_, update) => update,
+    default: () => 0,
+  }),
+
+  gapReductionRate: Annotation<number>({
+    reducer: (_, update) => update,
+    default: () => 0,
+  }),
+
   // Questions for self-improvement
   selfQuestions: Annotation<string[]>({
-    reducer: (current, update) => [...current, ...update],
+    reducer: (_, update) => update, // Changed: replace instead of accumulate
     default: () => [],
   }),
 
@@ -50,6 +61,18 @@ export const AgentWorkflowState = Annotation.Root({
   refinementNotes: Annotation<string[]>({
     reducer: (current, update) => [...current, ...update],
     default: () => [],
+  }),
+
+  // Track all gaps seen across iterations for deduplication
+  allSeenGaps: Annotation<Set<string>>({
+    reducer: (current, update) => {
+      const newSet = new Set(current);
+      for (const gap of update) {
+        newSet.add(gap);
+      }
+      return newSet;
+    },
+    default: () => new Set(),
   }),
 });
 
@@ -125,16 +148,24 @@ export abstract class BaseAgentWorkflow {
     context: AgentContext,
     options?: import('../types/agent.types').AgentExecutionOptions,
   ): Promise<AgentResult> {
-    // Adaptive configuration - refines as many times as needed
+    // Configuration optimized for gap-filling workflow
+    // Max iterations can be overridden via context config
+    const maxIterations = (context.config?.maxIterations as number) || 5;
+    const clarityThreshold = (context.config?.clarityThreshold as number) || 80;
+
     const config: AgentWorkflowConfig = {
-      maxIterations: 10, // High limit - agent decides when to stop
-      clarityThreshold: 85, // Stop when truly satisfied (high bar)
+      maxIterations,
+      clarityThreshold,
       minImprovement: 3, // Small improvements still valuable
       enableSelfQuestioning: true,
       skipSelfRefinement: false,
-      maxQuestionsPerIteration: 2, // Focused, specific questions
+      maxQuestionsPerIteration: 3, // 3 focused questions per iteration
       evaluationTimeout: 15000,
     };
+
+    console.log(
+      `[${this.getAgentName()}] ⚙️  Configuration: maxIterations=${maxIterations}, clarityThreshold=${clarityThreshold}, questionsPerIteration=3`,
+    );
 
     return this.executeWorkflow(
       context,
@@ -168,6 +199,9 @@ export abstract class BaseAgentWorkflow {
       selfQuestions: [],
       finalAnalysis: '',
       refinementNotes: [],
+      previousGapCount: 0,
+      gapReductionRate: 0,
+      allSeenGaps: new Set<string>(),
     };
 
     // Execute workflow
@@ -259,6 +293,9 @@ export abstract class BaseAgentWorkflow {
       missingInformation: [],
       selfQuestions: [],
       refinementNotes: [],
+      previousGapCount: 0,
+      gapReductionRate: 0,
+      allSeenGaps: new Set<string>(),
     };
     const markdown = await this.formatMarkdown(analysisData, stateForMarkdown);
 
@@ -289,20 +326,48 @@ export abstract class BaseAgentWorkflow {
    */
   private async analyzeInitialNode(state: typeof AgentWorkflowState.State) {
     const { context } = state;
+    const agentName = this.getAgentName();
+
+    console.log(`\n🤖 [${agentName}] Starting initial analysis...`);
 
     const systemPrompt = await this.buildSystemPrompt(context);
     const humanPrompt = await this.buildHumanPrompt(context);
 
-    const model = this.llmService.getChatModel({
+    const modelOptions = {
       temperature: 0.3,
       maxTokens: 16000,
-    });
+    };
+
+    // Calculate input token count
+    const systemPromptText =
+      typeof systemPrompt === 'string' ? systemPrompt : JSON.stringify(systemPrompt);
+    const humanPromptText =
+      typeof humanPrompt === 'string' ? humanPrompt : JSON.stringify(humanPrompt);
+    const inputTokens = await this.llmService.countTokens(systemPromptText + humanPromptText);
+
+    console.log(
+      `[${agentName}] 📊 Input: ${inputTokens.toLocaleString()} tokens | Budget: ${context.tokenBudget.toLocaleString()} tokens | Max output: ${modelOptions.maxTokens.toLocaleString()} tokens`,
+    );
+
+    const model = this.llmService.getChatModel(modelOptions);
 
     const result = await model.invoke([systemPrompt, humanPrompt], {
-      runName: `${this.getAgentName()}-InitialAnalysis`,
+      runName: `${agentName}-InitialAnalysis`,
     });
 
     const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
+
+    // Extract token usage from result
+    const outputTokens = await this.llmService.countTokens(analysisText);
+    const totalTokens = inputTokens + outputTokens;
+
+    console.log(
+      `[${agentName}] 💰 Tokens used: ${totalTokens.toLocaleString()} (in: ${inputTokens.toLocaleString()}, out: ${outputTokens.toLocaleString()}) | Remaining: ${(context.tokenBudget - totalTokens).toLocaleString()}`,
+    );
+
+    console.log(
+      `✅ [${agentName}] Initial analysis complete (${analysisText.length.toLocaleString()} chars)`,
+    );
 
     return {
       ...state,
@@ -315,25 +380,41 @@ export abstract class BaseAgentWorkflow {
    * Evaluate clarity and completeness of analysis
    */
   private async evaluateClarityNode(state: typeof AgentWorkflowState.State) {
-    const { currentAnalysis } = state;
+    const {
+      currentAnalysis,
+      iteration,
+      missingInformation: previousMissingInfo,
+      allSeenGaps,
+      previousGapCount,
+    } = state;
+    const agentName = this.getAgentName();
 
-    const model = this.llmService.getChatModel({
+    console.log(`\n🔍 [${agentName}] Iteration ${iteration}: Evaluating clarity...`);
+
+    const modelOptions = {
       temperature: 0.2,
       maxTokens: 2000,
-    });
+    };
+
+    const model = this.llmService.getChatModel(modelOptions);
+
+    const previousGapsContext =
+      iteration > 1 && previousMissingInfo.length > 0
+        ? `\n\nPrevious iteration identified these gaps (check if they were addressed):\n${previousMissingInfo.map((gap) => `- ${gap}`).join('\n')}`
+        : '';
 
     const evaluationPrompt = `You are evaluating the quality and completeness of an analysis.
 
 Analysis to evaluate:
-${currentAnalysis}
+${currentAnalysis}${previousGapsContext}
 
 Evaluate the analysis on these criteria (0-100 scale for each):
-1. **Completeness**: Does it cover all aspects thoroughly?
+1. **Completeness**: Does it cover all aspects thoroughly? Are previous gaps addressed?
 2. **Clarity**: Is it well-structured and clear?
 3. **Depth**: Does it provide sufficient detail?
 4. **Accuracy**: Is the information accurate based on the context?
 
-Also identify any missing information or gaps.
+Also identify any REMAINING missing information or gaps that are still not covered.
 
 Respond in this exact format:
 COMPLETENESS_SCORE: [0-100]
@@ -343,10 +424,17 @@ ACCURACY_SCORE: [0-100]
 MISSING_INFORMATION:
 - [gap 1]
 - [gap 2]
-...`;
+...
+
+If all gaps have been addressed, write:
+MISSING_INFORMATION:
+- None - all aspects covered`;
+
+    const inputTokens = await this.llmService.countTokens(evaluationPrompt);
+    console.log(`[${agentName}] 📊 Evaluation input: ${inputTokens.toLocaleString()} tokens`);
 
     const result = await model.invoke([evaluationPrompt], {
-      runName: `${this.getAgentName()}-EvaluateClarity`,
+      runName: `${agentName}-EvaluateClarity`,
     });
 
     const evaluationText = typeof result === 'string' ? result : result.content?.toString() || '';
@@ -366,25 +454,135 @@ MISSING_INFORMATION:
 
     // Extract missing information
     const missingInfoMatch = evaluationText.match(/MISSING_INFORMATION:\s*([\s\S]*?)(?:\n\n|$)/);
-    const missingInfo = missingInfoMatch
+    const rawMissingInfo = missingInfoMatch
       ? missingInfoMatch[1]
           .split('\n')
           .filter((line) => line.trim().startsWith('-'))
           .map((line) => line.replace(/^-\s*/, '').trim())
+          .filter((line) => !line.toLowerCase().includes('none') && line.length > 0)
       : [];
+
+    // Deduplicate against all previously seen gaps using fuzzy matching
+    const newMissingInfo = this.deduplicateGaps(rawMissingInfo, allSeenGaps);
+
+    // Update seen gaps set
+    const updatedSeenGaps = new Set(allSeenGaps);
+    for (const gap of newMissingInfo) {
+      updatedSeenGaps.add(this.normalizeGap(gap));
+    }
+
+    // Calculate gap reduction rate
+    const currentGapCount = newMissingInfo.length;
+    const gapsResolved = previousGapCount > 0 ? previousGapCount - currentGapCount : 0;
+    const gapReductionRate = previousGapCount > 0 ? (gapsResolved / previousGapCount) * 100 : 0;
+
+    console.log(
+      `[${agentName}] 📊 Clarity=${overallScore.toFixed(1)} (Completeness=${completeness}, Clarity=${clarity}, Depth=${depth}, Accuracy=${accuracy})`,
+    );
+
+    if (gapsResolved > 0) {
+      console.log(
+        `[${agentName}] ✅ Resolved ${gapsResolved} gap(s), ${currentGapCount} remaining (${gapReductionRate.toFixed(1)}% reduction)`,
+      );
+    } else if (iteration > 1 && gapsResolved < 0) {
+      console.log(
+        `[${agentName}] ⚠️  ${Math.abs(gapsResolved)} new gap(s) identified, ${currentGapCount} total`,
+      );
+    } else if (currentGapCount > 0) {
+      console.log(`[${agentName}] ⚠️  ${currentGapCount} gap(s) identified`);
+    }
 
     return {
       ...state,
       clarityScore: overallScore,
-      missingInformation: missingInfo,
+      missingInformation: newMissingInfo,
+      previousGapCount: currentGapCount,
+      gapReductionRate,
+      allSeenGaps: updatedSeenGaps,
     };
   }
 
   /**
+   * Normalize gap text for fuzzy matching (lowercase, remove punctuation, trim)
+   */
+  private normalizeGap(gap: string): string {
+    return gap
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .trim();
+  }
+
+  /**
+   * Deduplicate gaps using fuzzy matching against previously seen gaps
+   */
+  private deduplicateGaps(newGaps: string[], seenGaps: Set<string>): string[] {
+    const deduplicated: string[] = [];
+
+    for (const gap of newGaps) {
+      const normalized = this.normalizeGap(gap);
+
+      // Check if this gap is substantially similar to any seen gap
+      let isDuplicate = false;
+      for (const seenGap of seenGaps) {
+        if (this.areGapsSimilar(normalized, seenGap)) {
+          isDuplicate = true;
+          break;
+        }
+      }
+
+      if (!isDuplicate) {
+        deduplicated.push(gap);
+      }
+    }
+
+    return deduplicated;
+  }
+
+  /**
+   * Check if two normalized gaps are similar (fuzzy match)
+   * Uses word overlap - if 70%+ words match, consider them similar
+   */
+  private areGapsSimilar(gap1: string, gap2: string): boolean {
+    // Exact match
+    if (gap1 === gap2) {
+      return true;
+    }
+
+    // Split into words
+    const words1 = gap1.split(/\s+/).filter((w) => w.length > 3); // Ignore short words
+    const words2 = gap2.split(/\s+/).filter((w) => w.length > 3);
+
+    if (words1.length === 0 || words2.length === 0) {
+      return false;
+    }
+
+    // Count matching words
+    let matches = 0;
+    for (const word1 of words1) {
+      for (const word2 of words2) {
+        if (word1 === word2 || word1.includes(word2) || word2.includes(word1)) {
+          matches++;
+          break;
+        }
+      }
+    }
+
+    // Calculate overlap percentage
+    const minWords = Math.min(words1.length, words2.length);
+    const overlapPercentage = (matches / minWords) * 100;
+
+    return overlapPercentage >= 70;
+  }
+
+  /**
    * Generate self-questions to improve analysis
+   * Focuses on addressing missing information gaps with smart prioritization
    */
   private async generateQuestionsNode(state: typeof AgentWorkflowState.State) {
-    const { currentAnalysis, missingInformation, context } = state;
+    const { currentAnalysis, missingInformation, context, iteration } = state;
+    const agentName = this.getAgentName();
+
+    console.log(`❓ [${agentName}] Iteration ${iteration}: Generating refinement questions...`);
 
     // Get max questions from config
     const maxQuestions =
@@ -393,30 +591,46 @@ MISSING_INFORMATION:
 
     const model = this.llmService.getChatModel({
       temperature: 0.4,
-      maxTokens: 1500, // Reduced for speed
+      maxTokens: 1500,
     });
 
-    // Limit gaps to top 3 for speed
-    const topGaps = missingInformation.slice(0, 3);
+    // Smart prioritization: categorize and prioritize gaps
+    const prioritizedGaps = this.prioritizeGaps(missingInformation);
+    const topGaps = prioritizedGaps.slice(0, Math.min(5, maxQuestions * 2));
 
-    const questionPrompt = `You are helping improve an analysis by asking clarifying questions.
+    console.log(
+      `[${agentName}] 🎯 Prioritized ${topGaps.length} gap(s) from ${missingInformation.length} total`,
+    );
 
-Current analysis:
-${currentAnalysis.substring(0, 500)}... [truncated for speed]
+    const questionPrompt = `You are helping improve an analysis by generating targeted questions to fill specific gaps.
 
-Top identified gaps:
-${topGaps.map((gap, i) => `${i + 1}. ${gap}`).join('\n')}
+Current analysis excerpt:
+${currentAnalysis.substring(0, 800)}... [excerpt]
 
-Generate ${maxQuestions} specific, actionable questions that would help fill these gaps.
-Make the questions concrete and focused.
+PRIORITY GAPS TO ADDRESS (${topGaps.length} identified, prioritized by importance):
+${topGaps.map((gap, i) => `${i + 1}. ${gap.text} [Priority: ${gap.category}]`).join('\n')}
 
-Format:
-1. [Question]
-2. [Question]
-${maxQuestions > 2 ? '3. [Question]' : ''}`;
+Your task: Generate ${maxQuestions} specific, actionable questions that would help address these priority gaps.
+
+Requirements:
+- Each question should target one or more gaps from the list above
+- Questions should be concrete and answerable with available project information
+- Focus on what CAN be determined from code analysis (structure, patterns, dependencies)
+- Avoid questions about runtime behavior or deployment details that require running the application
+- Prioritize HIGH priority gaps over MEDIUM/LOW
+
+Format your response as:
+1. [Specific question targeting gap(s) X]
+2. [Specific question targeting gap(s) Y]
+${maxQuestions > 2 ? '3. [Specific question targeting gap(s) Z]' : ''}
+
+Example good questions:
+- "What error handling patterns are used in the API endpoints?" (addresses error handling gap)
+- "What caching strategies are implemented in the service layer?" (addresses caching gap)
+- "How are database queries organized and what ORM patterns are used?" (addresses schema gap)`;
 
     const result = await model.invoke([questionPrompt], {
-      runName: `${this.getAgentName()}-GenerateQuestions`,
+      runName: `${agentName}-GenerateQuestions`,
     });
 
     const questionsText = typeof result === 'string' ? result : result.content?.toString() || '';
@@ -426,7 +640,11 @@ ${maxQuestions > 2 ? '3. [Question]' : ''}`;
       .split('\n')
       .filter((line) => /^\d+\./.test(line.trim()))
       .map((line) => line.replace(/^\d+\.\s*/, '').trim())
-      .slice(0, maxQuestions); // Enforce limit
+      .slice(0, maxQuestions);
+
+    console.log(
+      `[${agentName}] 📝 Generated ${questions.length} question(s) targeting ${topGaps.length} gap(s)`,
+    );
 
     return {
       ...state,
@@ -435,32 +653,95 @@ ${maxQuestions > 2 ? '3. [Question]' : ''}`;
   }
 
   /**
+   * Prioritize gaps by category and importance
+   * Returns gaps sorted by priority (HIGH > MEDIUM > LOW)
+   */
+  private prioritizeGaps(gaps: string[]): Array<{ text: string; category: string; score: number }> {
+    const categorized = gaps.map((gap) => {
+      const normalized = gap.toLowerCase();
+
+      // HIGH priority - core architecture and security
+      if (
+        normalized.includes('security') ||
+        normalized.includes('authentication') ||
+        normalized.includes('authorization') ||
+        normalized.includes('database') ||
+        normalized.includes('schema') ||
+        normalized.includes('error handling') ||
+        normalized.includes('data validation')
+      ) {
+        return { text: gap, category: 'HIGH', score: 3 };
+      }
+
+      // MEDIUM priority - implementation details and patterns
+      if (
+        normalized.includes('caching') ||
+        normalized.includes('logging') ||
+        normalized.includes('testing') ||
+        normalized.includes('patterns') ||
+        normalized.includes('configuration') ||
+        normalized.includes('dependency') ||
+        normalized.includes('api')
+      ) {
+        return { text: gap, category: 'MEDIUM', score: 2 };
+      }
+
+      // LOW priority - operational and deployment details
+      return { text: gap, category: 'LOW', score: 1 };
+    });
+
+    // Sort by score (descending) and then alphabetically
+    return categorized.sort((a, b) => {
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+      return a.text.localeCompare(b.text);
+    });
+  }
+
+  /**
    * Refine analysis based on self-questions
-   * Focus on incremental improvements - answer questions, add details, fill gaps
+   * Focus on filling gaps identified in missing information list
    */
   private async refineAnalysisNode(state: typeof AgentWorkflowState.State) {
-    const { currentAnalysis, selfQuestions, context, iteration } = state;
+    const { currentAnalysis, selfQuestions, missingInformation, context, iteration } = state;
+
+    console.log(
+      `🔧 [${this.getAgentName()}] Iteration ${iteration}: Refining analysis (${selfQuestions.length} questions, ${missingInformation.length} gaps)...`,
+    );
 
     const systemPrompt = await this.buildSystemPrompt(context);
     const humanPrompt = await this.buildHumanPrompt(context);
 
-    const refinementPrompt = `You are improving your previous analysis. Focus on INCREMENTAL IMPROVEMENTS.
+    // Build a focused refinement prompt that targets specific gaps
+    const gapsSummary =
+      missingInformation.length > 0
+        ? `\n\nPRIORITY GAPS TO FILL:\n${missingInformation
+            .slice(0, 5)
+            .map((gap, i) => `${i + 1}. ${gap}`)
+            .join('\n')}`
+        : '';
+
+    const refinementPrompt = `You are improving your previous analysis by addressing specific gaps and questions.
 
 Previous analysis:
 ${currentAnalysis}
 
-Questions to address in this iteration:
-${selfQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}
+Questions to answer in this iteration:
+${selfQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}${gapsSummary}
 
 Instructions:
-1. Keep everything good from the previous analysis
-2. Answer each question specifically with concrete details
-3. Add missing information identified in the questions
-4. Make improvements focused and targeted
-5. Don't rewrite everything - just enhance what's there
+1. **Keep everything good** from the previous analysis - don't remove existing content
+2. **Answer each question** with specific, concrete details from the codebase
+3. **Fill the priority gaps** listed above by adding new sections or expanding existing ones
+4. **Be specific** - use actual file names, class names, patterns found in the code
+5. **Focus on what's present** - document what you can determine from the code structure
+6. **Make targeted additions** - add new sections for gaps, enhance existing sections for questions
 
-Provide an ENHANCED version that addresses these ${selfQuestions.length} specific questions.
-Focus on quality over length - small, precise improvements are better than verbose rewrites.`;
+Goal: Produce an ENHANCED version that keeps all previous good content AND addresses the ${selfQuestions.length} question(s) and top ${Math.min(5, missingInformation.length)} gap(s).
+
+IMPORTANT: If a gap cannot be addressed from static code analysis (e.g., runtime behavior, deployment details), 
+explicitly state "Not determinable from static analysis" rather than leaving it unaddressed.`;
 
     const model = this.llmService.getChatModel({
       temperature: 0.3,
@@ -473,12 +754,17 @@ Focus on quality over length - small, precise improvements are better than verbo
 
     const refinedAnalysis = typeof result === 'string' ? result : result.content?.toString() || '';
 
+    const targetedGaps = Math.min(5, missingInformation.length);
+    console.log(
+      `✨ [${this.getAgentName()}] Refinement complete - targeted ${selfQuestions.length} question(s) and ${targetedGaps} gap(s)`,
+    );
+
     return {
       ...state,
       currentAnalysis: refinedAnalysis,
       iteration: iteration + 1,
       refinementNotes: [
-        `Iteration ${iteration}: Addressed ${selfQuestions.length} questions with focused improvements`,
+        `Iteration ${iteration}: Addressed ${selfQuestions.length} questions targeting ${targetedGaps} gap(s)`,
       ],
     };
   }
@@ -487,6 +773,12 @@ Focus on quality over length - small, precise improvements are better than verbo
    * Finalize the output
    */
   private async finalizeOutputNode(state: typeof AgentWorkflowState.State) {
+    const { iteration, clarityScore } = state;
+
+    console.log(
+      `✨ [${this.getAgentName()}] Finalized after ${iteration} iteration(s) with clarity score: ${clarityScore.toFixed(1)}`,
+    );
+
     return {
       ...state,
       finalAnalysis: state.currentAnalysis,
@@ -495,25 +787,67 @@ Focus on quality over length - small, precise improvements are better than verbo
 
   /**
    * Determine if analysis should be refined
+   * Stops when: (clarity threshold reached AND no missing info) OR max iterations reached OR no progress
    */
   private shouldRefine(state: typeof AgentWorkflowState.State): string {
     const config = state as unknown as {
       configurable?: { maxIterations?: number; clarityThreshold?: number };
     };
-    const maxIterations = config.configurable?.maxIterations || 3;
+    const maxIterations = config.configurable?.maxIterations || 5;
     const clarityThreshold = config.configurable?.clarityThreshold || 80;
+
+    const hasMissingInfo = state.missingInformation && state.missingInformation.length > 0;
+    const agentName = this.getAgentName();
 
     // Check if we've reached max iterations
     if (state.iteration >= maxIterations) {
+      console.log(`⏹️  [${agentName}] Stopping: Max iterations (${maxIterations}) reached`);
+      if (hasMissingInfo) {
+        console.log(
+          `ℹ️  [${agentName}] ${state.missingInformation.length} gap(s) remain unaddressed`,
+        );
+      }
       return 'finalize';
     }
 
-    // Check if clarity is sufficient
-    if (state.clarityScore >= clarityThreshold) {
+    // Check for no progress - if gap reduction rate is < 10% for 2+ iterations, stop
+    if (
+      state.iteration >= 2 &&
+      state.gapReductionRate < 10 &&
+      state.gapReductionRate >= 0 &&
+      hasMissingInfo
+    ) {
+      console.log(
+        `⏹️  [${agentName}] Stopping: Low progress (${state.gapReductionRate.toFixed(1)}% gap reduction, threshold 10%)`,
+      );
+      console.log(
+        `ℹ️  [${agentName}] ${state.missingInformation.length} gap(s) remain - minimal improvement expected`,
+      );
       return 'finalize';
     }
 
-    // Refine
+    // Check if clarity is sufficient AND all gaps addressed
+    const isComplete = state.clarityScore >= clarityThreshold && !hasMissingInfo;
+
+    if (isComplete) {
+      console.log(
+        `✅ [${agentName}] Stopping: Clarity threshold (${clarityThreshold}) achieved (${state.clarityScore.toFixed(1)}) and all gaps addressed`,
+      );
+      return 'finalize';
+    }
+
+    // Check if only clarity threshold met but gaps remain
+    if (state.clarityScore >= clarityThreshold && hasMissingInfo) {
+      console.log(
+        `🔄 [${agentName}] Continuing: Clarity sufficient (${state.clarityScore.toFixed(1)}) but ${state.missingInformation.length} gap(s) remain`,
+      );
+      return 'refine';
+    }
+
+    // Refine for clarity improvement
+    console.log(
+      `🔄 [${agentName}] Continuing: Clarity ${state.clarityScore.toFixed(1)} < ${clarityThreshold}, iteration ${state.iteration} < ${maxIterations}`,
+    );
     return 'refine';
   }
 
