@@ -230,12 +230,7 @@ async function generateWithCustomAgent(projectPath: string, outputDir: string) {
   agentRegistry.register(new CustomSecurityAgent());
 
   // Create orchestrator with custom registry
-  const orchestrator = new DocumentationOrchestrator(
-    llmService,
-    scanner,
-    formatter,
-    agentRegistry,
-  );
+  const orchestrator = new DocumentationOrchestrator(llmService, scanner, formatter, agentRegistry);
 
   // Generate documentation using your custom agent
   const result = await orchestrator.generate({
@@ -365,14 +360,9 @@ class CustomWorkflow {
     const scanner = new FileSystemScanner();
     const formatter = new MultiFileMarkdownFormatter();
     const registry = new AgentRegistry();
-    
+
     // Register specific agents for your workflow
-    this.orchestrator = new DocumentationOrchestrator(
-      llmService,
-      scanner,
-      formatter,
-      registry,
-    );
+    this.orchestrator = new DocumentationOrchestrator(llmService, scanner, formatter, registry);
   }
 
   async run(projectPath: string) {
