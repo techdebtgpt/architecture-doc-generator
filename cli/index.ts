@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 // Load ArchDoc configuration
 // Looks for .archdoc.config.json in: root folder first, then .arch-docs/ folder
 import * as path from 'path';
@@ -50,15 +48,20 @@ if (fs.existsSync(configPath)) {
 
 import { Command } from 'commander';
 import { analyzeProject } from './commands/analyze.command';
-import { exportDocumentation } from './commands/export.command';
 import { registerConfigCommand } from './commands/config.command';
+import { exportDocumentation } from './commands/export.command';
+
+// Read version from package.json
+const packageJson = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8'),
+);
 
 const program = new Command();
 
 program
   .name('archdoc')
   .description('AI-powered architecture documentation generator')
-  .version('0.1.0');
+  .version(packageJson.version);
 
 // Analyze command (primary command for documentation generation)
 program

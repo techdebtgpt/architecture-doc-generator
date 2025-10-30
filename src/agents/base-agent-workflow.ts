@@ -408,6 +408,19 @@ export abstract class BaseAgentWorkflow {
 
     const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
 
+    // Try to extract tokens directly from the response object if callback failed
+    if (actualOutputTokens === 0 && typeof result !== 'string') {
+      const responseUsage =
+        (result as any).usage_metadata ||
+        (result as any).usage ||
+        (result as any).response_metadata?.usage;
+
+      if (responseUsage) {
+        actualInputTokens = responseUsage.input_tokens || actualInputTokens;
+        actualOutputTokens = responseUsage.output_tokens || 0;
+      }
+    }
+
     const totalTokens = actualInputTokens + actualOutputTokens;
 
     // Calculate cost (Anthropic Claude Sonnet 4: $3/1M input, $15/1M output)
@@ -511,6 +524,19 @@ MISSING_INFORMATION:
     });
 
     const evaluationText = typeof result === 'string' ? result : result.content?.toString() || '';
+
+    // Try to extract tokens directly from the response object if callback failed
+    if (actualOutputTokens === 0 && typeof result !== 'string') {
+      const responseUsage =
+        (result as any).usage_metadata ||
+        (result as any).usage ||
+        (result as any).response_metadata?.usage;
+
+      if (responseUsage) {
+        actualInputTokens = responseUsage.input_tokens || actualInputTokens;
+        actualOutputTokens = responseUsage.output_tokens || 0;
+      }
+    }
 
     // Parse scores
     const completenessMatch = evaluationText.match(/COMPLETENESS_SCORE:\s*(\d+)/);
@@ -734,6 +760,19 @@ Example good questions:
 
     const questionsText = typeof result === 'string' ? result : result.content?.toString() || '';
 
+    // Try to extract tokens directly from the response object if callback failed
+    if (actualOutputTokens === 0 && typeof result !== 'string') {
+      const responseUsage =
+        (result as any).usage_metadata ||
+        (result as any).usage ||
+        (result as any).response_metadata?.usage;
+
+      if (responseUsage) {
+        actualInputTokens = responseUsage.input_tokens || actualInputTokens;
+        actualOutputTokens = responseUsage.output_tokens || 0;
+      }
+    }
+
     // Parse questions and limit to maxQuestions
     const questions = questionsText
       .split('\n')
@@ -874,6 +913,19 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     });
 
     const refinedAnalysis = typeof result === 'string' ? result : result.content?.toString() || '';
+
+    // Try to extract tokens directly from the response object if callback failed
+    if (actualOutputTokens === 0 && typeof result !== 'string') {
+      const responseUsage =
+        (result as any).usage_metadata ||
+        (result as any).usage ||
+        (result as any).response_metadata?.usage;
+
+      if (responseUsage) {
+        actualInputTokens = responseUsage.input_tokens || actualInputTokens;
+        actualOutputTokens = responseUsage.output_tokens || 0;
+      }
+    }
 
     const targetedGaps = Math.min(5, missingInformation.length);
     this.logger.info(
