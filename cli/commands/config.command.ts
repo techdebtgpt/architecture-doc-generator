@@ -169,31 +169,80 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
     },
   ]);
 
-  // Prompt for API key with validation
+  // Provider-specific configuration with available models
   const providerInfo = {
     anthropic: {
-      model: 'claude-sonnet-4-5-20250929',
+      defaultModel: 'claude-sonnet-4-5-20250929',
+      models: [
+        {
+          name: 'claude-sonnet-4-5-20250929 (recommended) - Latest, best quality',
+          value: 'claude-sonnet-4-5-20250929',
+        },
+        {
+          name: 'claude-haiku-4-5-20251001 - Fastest, most affordable',
+          value: 'claude-haiku-4-5-20251001',
+        },
+        { name: 'claude-opus-4-1-20250805 - Most powerful', value: 'claude-opus-4-1-20250805' },
+        {
+          name: 'claude-sonnet-4-20250514 - Previous generation',
+          value: 'claude-sonnet-4-20250514',
+        },
+      ],
       keyFormat: 'sk-ant-...',
       url: 'https://console.anthropic.com/',
     },
     openai: {
-      model: 'gpt-5',
+      defaultModel: 'gpt-5',
+      models: [
+        { name: 'gpt-5 (recommended) - Latest and most powerful', value: 'gpt-5' },
+        { name: 'gpt-4.1 - Previous generation flagship', value: 'gpt-4.1' },
+        { name: 'gpt-4-turbo - Fast and capable', value: 'gpt-4-turbo' },
+        { name: 'gpt-4 - Stable and reliable', value: 'gpt-4' },
+      ],
       keyFormat: 'sk-...',
       url: 'https://platform.openai.com/',
     },
     google: {
-      model: 'gemini-2.5-pro',
+      defaultModel: 'gemini-2.5-pro',
+      models: [
+        { name: 'gemini-2.5-pro (recommended) - Best reasoning', value: 'gemini-2.5-pro' },
+        { name: 'gemini-2.5-flash - Fastest multimodal', value: 'gemini-2.5-flash' },
+        { name: 'gemini-2.5-flash-lite - Most efficient', value: 'gemini-2.5-flash-lite' },
+        { name: 'gemini-1.5-pro - Previous generation', value: 'gemini-1.5-pro' },
+      ],
       keyFormat: 'AIza...',
       url: 'https://ai.google.dev/',
     },
     xai: {
-      model: 'grok-3-beta',
+      defaultModel: 'grok-3-beta',
+      models: [
+        {
+          name: 'grok-3-beta (recommended) - Latest with real-time insights',
+          value: 'grok-3-beta',
+        },
+        { name: 'grok-2 - Stable and reliable', value: 'grok-2' },
+      ],
       keyFormat: 'xai-...',
       url: 'https://console.x.ai/',
     },
   };
 
   const info = providerInfo[provider as keyof typeof providerInfo];
+
+  // Select model for the chosen provider
+  logger.info(`\n🎯 Available ${provider} models:\n`);
+
+  const { selectedModel } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedModel',
+      message: `Choose ${provider} model:`,
+      choices: info.models,
+      default: info.defaultModel,
+    },
+  ]);
+
+  // Prompt for API key with validation
   logger.info(`\nGet your API key at: ${info.url}`);
 
   const { apiKey } = await inquirer.prompt([
@@ -214,9 +263,9 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
   // Configure provider
   config.apiKeys[provider] = apiKey.trim();
   config.llm.provider = provider;
-  config.llm.model = info.model;
+  config.llm.model = selectedModel;
 
-  logger.info(`\n✅ Configured to use: ${provider} (${info.model})`);
+  logger.info(`\n✅ Configured to use: ${provider} (${selectedModel})`);
 
   // LangSmith tracing setup (optional)
   const { enableTracing } = await inquirer.prompt([

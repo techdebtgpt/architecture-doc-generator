@@ -23,11 +23,22 @@ if (fs.existsSync(configPath)) {
       if (config.apiKeys.anthropic) process.env.ANTHROPIC_API_KEY = config.apiKeys.anthropic;
       if (config.apiKeys.openai) process.env.OPENAI_API_KEY = config.apiKeys.openai;
       if (config.apiKeys.google) process.env.GOOGLE_API_KEY = config.apiKeys.google;
+      if (config.apiKeys.xai) process.env.XAI_API_KEY = config.apiKeys.xai;
     }
     if (config.tracing) {
-      if (config.tracing.enabled) process.env.LANGCHAIN_TRACING_V2 = 'true';
+      if (config.tracing.enabled) {
+        process.env.LANGCHAIN_TRACING_V2 = 'true';
+        // Warn if API key is missing
+        if (!config.tracing.apiKey && !process.env.LANGCHAIN_API_KEY) {
+          console.warn(
+            '\n⚠️  Warning: LangSmith tracing is enabled but no API key provided.\n' +
+              '   Set tracing.apiKey in config or LANGCHAIN_API_KEY environment variable.\n',
+          );
+        }
+      }
       if (config.tracing.apiKey) process.env.LANGCHAIN_API_KEY = config.tracing.apiKey;
       if (config.tracing.project) process.env.LANGCHAIN_PROJECT = config.tracing.project;
+      if (config.tracing.endpoint) process.env.LANGCHAIN_ENDPOINT = config.tracing.endpoint;
     }
   } catch (_err) {
     // Ignore parse errors, config will use defaults or explicit env vars
