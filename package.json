@@ -1,6 +1,6 @@
 {
   "name": "@techdebtgpt/archdoc-generator",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Language-agnostic AI-powered architecture documentation generator using LangChain and agentic workflows",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
