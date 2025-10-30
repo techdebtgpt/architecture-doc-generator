@@ -17,6 +17,8 @@ import { MemorySaver } from '@langchain/langgraph';
 import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
 import { version } from '../../package.json';
+import { ImportScanner } from '../scanners/import-scanner';
+import type { DependencyGraph, ImportInfo, ModuleInfo } from '../scanners/import-scanner';
 
 /**
  * Documentation generation state with LangGraph
@@ -73,6 +75,16 @@ const DocumentationState = Annotation.Root({
       return newMap;
     },
     default: () => new Map(),
+  }),
+
+  // Dependency graph state
+  dependencyGraph: Annotation<{
+    imports: ImportInfo[];
+    modules: ModuleInfo[];
+    graph: DependencyGraph;
+  } | null>({
+    reducer: (_, update) => update,
+    default: () => null,
   }),
 
   // Output state
@@ -147,6 +159,18 @@ export class DocumentationOrchestrator {
       followSymlinks: false,
     });
 
+    // Scan imports and build dependency graph
+    this.logger.info('Analyzing dependencies and imports...');
+    const importScanner = new ImportScanner();
+    const { imports, modules, graph } = await importScanner.scanProject(
+      projectPath,
+      scanResult.files.map((f) => f.path),
+    );
+
+    this.logger.info(
+      `Found ${imports.length} imports, ${modules.length} modules, ${graph.edges.length} dependencies`,
+    );
+
     // Get all agents
     const agents = this.agentRegistry.getAllAgents();
     const agentNames = agents.map((a) => a.getMetadata().name);
@@ -163,6 +187,7 @@ export class DocumentationOrchestrator {
       agentResults: new Map(),
       refinementAttempts: new Map(),
       clarityScores: new Map(),
+      dependencyGraph: { imports, modules, graph },
       output: null,
       executionTime: 0,
     };
@@ -251,7 +276,15 @@ export class DocumentationOrchestrator {
    * Each agent handles its own refinement internally via BaseAgentWorkflow
    */
   private async executeAgentNode(state: typeof DocumentationState.State) {
-    const { scanResult, projectPath, options, currentAgentIndex, agentNames, agentResults } = state;
+    const {
+      scanResult,
+      projectPath,
+      options,
+      currentAgentIndex,
+      agentNames,
+      agentResults,
+      dependencyGraph,
+    } = state;
 
     if (currentAgentIndex >= agentNames.length) {
       return state; // All agents executed
@@ -297,6 +330,7 @@ export class DocumentationOrchestrator {
       // Claude Sonnet 4 max: 200K input tokens - 10K safety margin - 8K max output = 182K budget
       tokenBudget: options.maxTokens || 182000,
       scanResult,
+      dependencyGraph: dependencyGraph || undefined,
     };
 
     // Execute agent with runnable config for tracing

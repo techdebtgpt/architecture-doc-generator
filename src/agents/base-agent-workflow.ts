@@ -3,6 +3,7 @@ import { MemorySaver } from '@langchain/langgraph';
 import type { AgentContext, AgentResult } from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
+import { FileSearchService } from './file-search-service';
 
 /**
  * Agent internal state for self-refinement workflow
@@ -50,6 +51,12 @@ export const AgentWorkflowState = Annotation.Root({
   // Questions for self-improvement
   selfQuestions: Annotation<string[]>({
     reducer: (_, update) => update, // Changed: replace instead of accumulate
+    default: () => [],
+  }),
+
+  // Retrieved files for refinement
+  retrievedFiles: Annotation<Array<{ path: string; content: string }>>({
+    reducer: (_, update) => update,
     default: () => [],
   }),
 
@@ -126,6 +133,7 @@ export abstract class BaseAgentWorkflow {
     graph.addNode('analyzeInitial', this.analyzeInitialNode.bind(this));
     graph.addNode('evaluateClarity', this.evaluateClarityNode.bind(this));
     graph.addNode('generateQuestions', this.generateQuestionsNode.bind(this));
+    graph.addNode('retrieveFiles', this.retrieveFilesNode.bind(this));
     graph.addNode('refineAnalysis', this.refineAnalysisNode.bind(this));
     graph.addNode('finalizeOutput', this.finalizeOutputNode.bind(this));
 
@@ -142,8 +150,11 @@ export abstract class BaseAgentWorkflow {
       finalize: 'finalizeOutput' as '__start__',
     });
 
-    // After generating questions, refine analysis
-    graph.addEdge('generateQuestions' as '__start__', 'refineAnalysis' as '__start__');
+    // After generating questions, retrieve relevant files
+    graph.addEdge('generateQuestions' as '__start__', 'retrieveFiles' as '__start__');
+
+    // After retrieving files, refine analysis
+    graph.addEdge('retrieveFiles' as '__start__', 'refineAnalysis' as '__start__');
 
     // After refinement, evaluate again
     graph.addEdge('refineAnalysis' as '__start__', 'evaluateClarity' as '__start__');
@@ -794,6 +805,68 @@ Example good questions:
   }
 
   /**
+   * Retrieve relevant files based on generated questions
+   * Uses keyword-based search to find files without embeddings (memory-efficient)
+   */
+  private async retrieveFilesNode(state: typeof AgentWorkflowState.State) {
+    const { selfQuestions, context, iteration } = state;
+
+    if (selfQuestions.length === 0) {
+      this.logger.debug(`Iteration ${iteration}: No questions to search files for`, '📂');
+      return {
+        ...state,
+        retrievedFiles: [],
+      };
+    }
+
+    this.logger.info(
+      `Iteration ${iteration}: Searching files for ${selfQuestions.length} question(s)...`,
+      '📂',
+    );
+
+    const fileSearch = new FileSearchService(context.projectPath, context.dependencyGraph);
+    const allRetrievedFiles: Array<{ path: string; content: string }> = [];
+
+    // Search files for each question
+    for (const question of selfQuestions) {
+      const scoredFiles = fileSearch.searchFiles(question, context.files, {
+        topK: 3, // Get top 3 files per question
+        maxFileSize: 50000, // 50KB limit per file
+      });
+
+      if (scoredFiles.length > 0) {
+        this.logger.debug(
+          `Question: "${question.substring(0, 60)}..." -> Found ${scoredFiles.length} file(s)`,
+          {
+            topFile: scoredFiles[0].path,
+            score: scoredFiles[0].score,
+          },
+        );
+
+        // Retrieve file contents
+        const fileContents = await fileSearch.retrieveFiles(scoredFiles, {
+          maxFileSize: 50000,
+        });
+
+        allRetrievedFiles.push(...fileContents.map((f) => ({ path: f.path, content: f.content })));
+      }
+    }
+
+    // Deduplicate files by path
+    const uniqueFiles = Array.from(new Map(allRetrievedFiles.map((f) => [f.path, f])).values());
+
+    this.logger.info(
+      `Retrieved ${uniqueFiles.length} unique file(s) (${allRetrievedFiles.length} total matches)`,
+      '✅',
+    );
+
+    return {
+      ...state,
+      retrievedFiles: uniqueFiles,
+    };
+  }
+
+  /**
    * Prioritize gaps by category and importance
    * Returns gaps sorted by priority (HIGH > MEDIUM > LOW)
    */
@@ -845,10 +918,17 @@ Example good questions:
    * Focus on filling gaps identified in missing information list
    */
   private async refineAnalysisNode(state: typeof AgentWorkflowState.State) {
-    const { currentAnalysis, selfQuestions, missingInformation, context, iteration } = state;
+    const {
+      currentAnalysis,
+      selfQuestions,
+      missingInformation,
+      context,
+      iteration,
+      retrievedFiles,
+    } = state;
 
     this.logger.info(
-      `Iteration ${iteration}: Refining analysis (${selfQuestions.length} questions, ${missingInformation.length} gaps)...`,
+      `Iteration ${iteration}: Refining analysis (${selfQuestions.length} questions, ${missingInformation.length} gaps, ${retrievedFiles.length} files)...`,
       '🔧',
     );
 
@@ -864,13 +944,24 @@ Example good questions:
             .join('\n')}`
         : '';
 
+    // Add retrieved file contents as context
+    const fileContext =
+      retrievedFiles.length > 0
+        ? `\n\nRELEVANT CODE FILES (${retrievedFiles.length} files):\n${retrievedFiles
+            .map((file) => {
+              const truncated = file.content.substring(0, 3000); // Limit each file to 3KB
+              return `\n--- ${file.path} ---\n${truncated}${file.content.length > 3000 ? '\n... (truncated)' : ''}`;
+            })
+            .join('\n')}`
+        : '';
+
     const refinementPrompt = `You are improving your previous analysis by addressing specific gaps and questions.
 
 Previous analysis:
 ${currentAnalysis}
 
 Questions to answer in this iteration:
-${selfQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}${gapsSummary}
+${selfQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}${gapsSummary}${fileContext}
 
 Instructions:
 1. **Keep everything good** from the previous analysis - don't remove existing content

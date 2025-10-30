@@ -22,13 +22,15 @@ import { MarkdownFormatter } from '../../src/formatters/markdown-formatter';
 async function checkConfiguration(): Promise<boolean> {
   const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
   const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const hasXAIKey = !!process.env.XAI_API_KEY;
   const hasGoogleKey = !!process.env.GOOGLE_API_KEY;
 
-  if (!hasAnthropicKey && !hasOpenAIKey && !hasGoogleKey) {
+  if (!hasAnthropicKey && !hasOpenAIKey && !hasXAIKey && !hasGoogleKey) {
     console.log(chalk.red('\n❌ No LLM API keys configured!\n'));
     console.log(chalk.yellow('You need at least one API key to use ArchDoc:'));
     console.log(chalk.gray('  • Anthropic Claude (recommended): https://console.anthropic.com/'));
     console.log(chalk.gray('  • OpenAI GPT-4: https://platform.openai.com/'));
+    console.log(chalk.gray('  • xAI Grok: https://x.ai/api'));
     console.log(chalk.gray('  • Google Gemini: https://ai.google.dev/\n'));
 
     console.log(chalk.cyan('Quick setup:'));
