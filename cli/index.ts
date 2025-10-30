@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 
 // Load ArchDoc configuration
-// Looks for .archdoc.config.json in: .arch-docs/ folder first, then root folder
+// Looks for .archdoc.config.json in: root folder first, then .arch-docs/ folder
 import * as path from 'path';
 import * as fs from 'fs';
 
 const cwd = process.cwd();
 const CONFIG_FILE = '.archdoc.config.json';
 
-// Try .arch-docs/.archdoc.config.json first
-let configPath = path.join(cwd, '.arch-docs', CONFIG_FILE);
+// Try root .archdoc.config.json first
+let configPath = path.join(cwd, CONFIG_FILE);
 if (!fs.existsSync(configPath)) {
-  // Fallback to root .archdoc.config.json
-  configPath = path.join(cwd, CONFIG_FILE);
+  // Fallback to .arch-docs/.archdoc.config.json
+  configPath = path.join(cwd, '.arch-docs', CONFIG_FILE);
 }
 
 if (fs.existsSync(configPath)) {

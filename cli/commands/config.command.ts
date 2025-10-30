@@ -82,17 +82,17 @@ const DEFAULT_CONFIG = {
 
 /**
  * Find existing config file
- * Priority: .arch-docs/.archdoc.config.json -> .archdoc.config.json
+ * Priority: .archdoc.config.json (root) -> .arch-docs/.archdoc.config.json
  */
 function findConfigPath(): string | null {
-  const outputConfig = path.join(process.cwd(), DEFAULT_OUTPUT_DIR, CONFIG_FILE);
   const rootConfig = path.join(process.cwd(), CONFIG_FILE);
+  const outputConfig = path.join(process.cwd(), DEFAULT_OUTPUT_DIR, CONFIG_FILE);
 
-  if (fs.existsSync(outputConfig)) {
-    return outputConfig;
-  }
   if (fs.existsSync(rootConfig)) {
     return rootConfig;
+  }
+  if (fs.existsSync(outputConfig)) {
+    return outputConfig;
   }
   return null;
 }
@@ -102,7 +102,7 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
 
   // Determine config location
   let configPath: string;
-  const location = options.location || 'output'; // default to .arch-docs/
+  const location = options.location || 'root'; // default to root folder
 
   if (location === 'output') {
     const outputDir = path.join(process.cwd(), DEFAULT_OUTPUT_DIR);
