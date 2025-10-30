@@ -484,8 +484,11 @@ Please perform a comprehensive security analysis:
         const content = await fs.readFile(file, 'utf-8');
         const relativePath = path.relative(projectPath, file);
         results.push({ relativePath, content });
-      } catch (_error) {
-        // Skip files that can't be read
+      } catch (error) {
+        // Skip files that can't be read (binary, permission issues, etc.)
+        this.logger.debug(`Skipping unreadable file: ${file}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
         continue;
       }
     }
