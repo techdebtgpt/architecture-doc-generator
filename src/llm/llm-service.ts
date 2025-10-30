@@ -368,22 +368,8 @@ Standalone Question:`;
     const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
     const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
 
-    // Debug logging if tokens are missing (helps diagnose callback structure issues)
+    // Try alternative extraction paths that might exist in different LangChain versions
     if (outputTokens === 0 && output) {
-      // Log the structure to understand what we're receiving
-      console.log('[DEBUG] Token extraction failed. Callback output structure:', {
-        hasLlmOutput: !!output.llmOutput,
-        hasGenerations: !!output.generations,
-        hasUsage: !!output.usage,
-        hasTokenUsage: !!output.token_usage,
-        hasMetadata: !!output.metadata,
-        hasResponseMetadata: !!output.response_metadata,
-        llmOutputKeys: output.llmOutput ? Object.keys(output.llmOutput) : [],
-        generationsLength: output.generations?.length,
-        topLevelKeys: Object.keys(output).slice(0, 10),
-      });
-
-      // Try alternative extraction paths that might exist in different LangChain versions
       const altUsage =
         output.usage ||
         output.token_usage ||
@@ -394,7 +380,6 @@ Standalone Question:`;
         const altInput = altUsage.input_tokens || altUsage.prompt_tokens || 0;
         const altOutput = altUsage.output_tokens || altUsage.completion_tokens || 0;
         if (altOutput > 0) {
-          console.log('[DEBUG] Found tokens in alternative path:', { altInput, altOutput });
           return { inputTokens: altInput || inputTokens, outputTokens: altOutput };
         }
       }
