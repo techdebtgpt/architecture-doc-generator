@@ -1,16 +1,20 @@
-# 🏗️ ArchDoc Generator# Architecture Documentation Generator# Architecture Documentation Generator# Architecture Documentation Generator# 🏗️ ArchDoc Generator
+# 🏗️ ArchDoc Generator# 🏗️ ArchDoc Generator# Architecture Documentation Generator# Architecture Documentation Generator# Architecture Documentation Generator# 🏗️ ArchDoc Generator
 
-> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
 
-[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
+
+> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
+
+
+
+[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🎯 Overview
 
@@ -18,7 +22,7 @@
 
 Architecture Documentation Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, security, and data flows.
 
-[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)> AI-powered automatic documentation generation for any codebase, in any language.> Language-agnostic AI-powered architecture documentation generator using LangChain and agentic workflows
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 
 ### Key Features
 
@@ -26,15 +30,15 @@ Architecture Documentation Generator is an intelligent tool that analyzes your c
 
 - 🤖 **7 Specialized Agents** - File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security
 
-- 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+- 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 
 - 🧠 **AI-Powered** - Uses LangChain with Claude 3.5, GPT-4, or Gemini
 
-- 📊 **Comprehensive Analysis** - Structure, dependencies, patterns, flows, schemas, securityArchitecture Documentation Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, and data flows.
+- 📊 **Comprehensive Analysis** - Structure, dependencies, patterns, flows, schemas, securityArchitecture Documentation Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, security, and data flows.
 
 - 📝 **Markdown Output** - Clean, version-controllable documentation
 
-- 🔄 **Iterative Refinement** - Self-improving analysis with quality checks[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
+- 🔄 **Iterative Refinement** - Self-improving analysis with quality checks[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)> AI-powered automatic documentation generation for any codebase, in any language.> Language-agnostic AI-powered architecture documentation generator using LangChain and agentic workflows
 
 - 🎨 **Customizable** - Prompt-based agent selection and configuration
 
@@ -42,23 +46,23 @@ Architecture Documentation Generator is an intelligent tool that analyzes your c
 
 - 🔒 **Security Analysis** - Vulnerability detection, authentication review, crypto analysis
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+## 🎯 Overview
 
 ## 🚀 Quick Start
 
-- 🤖 **Multi-Agent Architecture** - Specialized agents for different analysis tasks
+- 🤖 **7 Specialized Agents** - File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security
 
 ### Installation
 
-- 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)[![npm version](https://badge.fury.io/js/%40archdoc%2Fgenerator.svg)](https://www.npmjs.com/package/@archdoc/generator)
+- 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-```````bash
+```bash
 
-# Using npm- 🧠 **AI-Powered** - Uses LangChain with Claude, GPT-4, or Gemini
+# Using npm- 🧠 **AI-Powered** - Uses LangChain with Claude 3.5, GPT-4, or Gemini
 
 npm install -g @archdoc/generator
 
-- 📊 **Comprehensive Analysis** - Structure, dependencies, patterns, flows, schemas## 🎯 Overview
+- 📊 **Comprehensive Analysis** - Structure, dependencies, patterns, flows, schemas, securityArchitecture Documentation Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, and data flows.
 
 # Using yarn
 
@@ -66,7 +70,7 @@ yarn global add @archdoc/generator- 📝 **Markdown Output** - Clean, version-co
 
 
 
-# Using pnpm- 🔄 **Iterative Refinement** - Self-improving analysis with quality checks[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+# Using pnpm- 🔄 **Iterative Refinement** - Self-improving analysis with quality checks[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 
 pnpm add -g @archdoc/generator
 
@@ -74,351 +78,764 @@ pnpm add -g @archdoc/generator
 
 
 
-### Interactive Setup (Recommended)- 📈 **LangSmith Tracing** - Full observability of AI workflowsArchitecture Documentation Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, and data flows.
+### Interactive Setup (Recommended)- 📈 **LangSmith Tracing** - Full observability of AI workflows### Key Features
 
 
 
-Run the interactive configuration wizard:## 🚀 Quick Start[![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
+Run the interactive configuration wizard:- 🔒 **Security Analysis** - Vulnerability detection, authentication review, crypto analysis
 
 
 
-```bash### Installation### Key Features
+```bash[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 
 archdoc config --init
 
-``````bash
+```## 🚀 Quick Start
 
 
 
-This will:# Using npm
+This will:- 🤖 **Multi-Agent Architecture** - Specialized agents for different analysis tasks
 
 1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
 
-2. Ask for your API keynpm install -g @archdoc/generator- 🤖 **Multi-Agent Architecture** - Specialized agents for different analysis tasks
+2. Ask for your API key### Installation
 
 3. Create `.archdoc.config.json` with your configuration
 
-4. Validate your setup
+4. Validate your setup- 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)[![npm version](https://badge.fury.io/js/%40archdoc%2Fgenerator.svg)](https://www.npmjs.com/package/@archdoc/generator)
 
 
 
-### Manual Setup (Alternative)# Using yarn- 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more## Overview## 🌟 Features
+### Basic Usage```````bash
 
 
 
-Copy the example config and edit it:yarn global add @archdoc/generator
+```bash# Using npm- 🧠 **AI-Powered** - Uses LangChain with Claude, GPT-4, or Gemini
+
+# Analyze current directory
+
+archdoc analyzenpm install -g @archdoc/generator
 
 
 
-```bash- 🧠 **AI-Powered** - Uses LangChain with Claude, GPT-4, or Gemini
-
-cp .archdoc.config.example.json .archdoc.config.json
-
-# Edit .archdoc.config.json and add your API key# Using pnpm
-
-```````
-
-pnpm add -g @archdoc/generator- 📊 **Comprehensive Analysis** - Structure, dependencies, patterns, flows, schemas
-
-### Basic Usage
-
-````
-
-```bash
-
-# Analyze current directory- 📝 **Markdown Output** - Clean, version-controllable documentation
-
-archdoc analyze
-
-### Interactive Setup (Recommended)
-
-# Analyze specific project
-
-archdoc analyze /path/to/your/projectRun the interactive configuration wizard:
-
-
-
-# Focused analysis with prompt```bash
-
-archdoc analyze --prompt "analyze dependencies and patterns"archdoc config --init
-
-````
-
-# Custom output location
-
-archdoc analyze --output ./docsThis will:
-
-# Quick analysis (faster, less detailed)1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
-
-archdoc analyze --depth quick2. Ask for your API key
-
-```3. Create `.arch-docs/.archdoc.config.json` with your configuration
-
-4. Validate your setup
-
-## 📚 Documentation
-
-### Manual Setup (Alternative)
-
-- **[User Guide](./USER_GUIDE.md)** - Complete CLI reference, configuration, and examples
-
-- **[Architecture](./ARCHITECTURE.md)** - Technical design and system architectureCopy the example config and edit it:
-
-- **[Contributing](./CONTRIBUTING.md)** - Development setup and contribution guidelines
-
-- **[Publishing](./PUBLISHING.md)** - npm publishing guide```bash
-
-cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
-
-## 🎨 What Gets Generated# Edit .arch-docs/.archdoc.config.json and add your API key
-
-```
-
-The tool generates a multi-file documentation structure:
-
-### Basic Usage
-
-```
-
-docs/```````bash- **🌍 Language Agnostic** - Works with TypeScript, JavaScript, Python, Java, Go, Rust, C++, and more- **⚡ Intelligent Caching**: Reduces API costs with smart caching
-
-├── index.md # Table of contents
-
-├── metadata.md # Generation metadata```bash
-
-├── file-structure.md # Project structure and organization
-
-├── dependencies.md # Dependency analysis# Analyze current directory# Using npm
-
-├── patterns.md # Code patterns and practices
-
-├── flows.md # Data and control flowsarchdoc analyze
-
-├── schemas.md # Data structures and interfaces
-
-├── architecture.md # High-level architecturenpm install -g @archdoc/generator- **🤖 AI-Powered** - Leverages Claude 3.5, GPT-4, or Gemini for intelligent analysis- **🔄 Incremental Updates**: Update docs without full regeneration
-
-├── security.md # Security analysis and findings (NEW!)
-
-└── recommendations.md # Improvement suggestions# Analyze specific project
-
-```````
+# Analyze specific project- 📊 **Comprehensive Analysis** - Structure, dependencies, patterns, flows, schemas## 🎯 Overview
 
 archdoc analyze /path/to/your/project
 
+# Using yarn
+
+# Focused analysis with prompt
+
+archdoc analyze --prompt "analyze dependencies and security vulnerabilities"yarn global add @archdoc/generator- 📝 **Markdown Output** - Clean, version-controllable documentation
+
+
+
+# Custom output location
+
+archdoc analyze --output ./docs
+
+# Using pnpm- 🔄 **Iterative Refinement** - Self-improving analysis with quality checks[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+# Quick analysis (faster, less detailed)
+
+archdoc analyze --depth quickpnpm add -g @archdoc/generator
+
+```
+
+```- 🎨 **Customizable** - Prompt-based agent selection and configuration
+
+## 📚 Documentation
+
+
+
+Comprehensive documentation is available in the [`docs/`](./docs) directory:
+
+### Interactive Setup (Recommended)- 📈 **LangSmith Tracing** - Full observability of AI workflowsArchitecture Documentation Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, and data flows.
+
+- **[📖 User Guide](./docs/USER_GUIDE.md)** - Complete CLI reference, configuration, and examples
+
+- **[🏗️ Architecture](./docs/ARCHITECTURE.md)** - Technical design, patterns, and agent system
+
+- **[🔌 Integration Guide](./docs/INTEGRATION_GUIDE.md)** - CI/CD integration and programmatic usage
+
+- **[🤝 Contributing](./docs/CONTRIBUTING.md)** - Development setup and contribution guidelinesRun the interactive configuration wizard:## 🚀 Quick Start[![Node](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
+
+- **[⚙️ Configuration Guide](./docs/CONFIGURATION_GUIDE.md)** - Detailed configuration options
+
+- **[📚 API Reference](./docs/API.md)** - Programmatic API documentation
+
+- **[📋 Quick Config Reference](./docs/QUICK_CONFIG_REFERENCE.md)** - Configuration cheat sheet
+
+```bash### Installation### Key Features
+
+## 🎨 What Gets Generated
+
+archdoc config --init
+
+The tool generates a multi-file documentation structure:
+
+``````bash
+
+```
+
+docs/
+
+├── index.md                    # Table of contents
+
+├── metadata.md                 # Generation metadataThis will:# Using npm
+
+├── file-structure.md           # Project structure and organization
+
+├── dependencies.md             # Dependency analysis1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
+
+├── patterns.md                 # Code patterns and practices
+
+├── flows.md                    # Data and control flows2. Ask for your API keynpm install -g @archdoc/generator- 🤖 **Multi-Agent Architecture** - Specialized agents for different analysis tasks
+
+├── schemas.md                  # Data structures and interfaces
+
+├── architecture.md             # High-level architecture3. Create `.archdoc.config.json` with your configuration
+
+├── security.md                 # Security analysis and findings (NEW!)
+
+└── recommendations.md          # Improvement suggestions4. Validate your setup
+
+```
+
+
+
 ## 🤖 Available Agents
 
-
+### Manual Setup (Alternative)# Using yarn- 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more## Overview## 🌟 Features
 
 Each agent specializes in a specific analysis task:
 
-# Focused analysis with prompt# Using yarn- **🎯 Zero Configuration** - No language-specific parsers or AST setup required- **🎨 Customizable Workflows**: Create your own agents and workflows
+
 
 | Agent | Purpose | Priority | Output |
 
-|-------|---------|----------|--------|archdoc analyze --prompt "analyze dependencies and patterns"
+|-------|---------|----------|--------|Copy the example config and edit it:yarn global add @archdoc/generator
 
 | **File Structure** | Project organization, entry points | HIGH | Directory tree, key files |
 
-| **Dependency Analyzer** | External deps, internal imports | HIGH | Dependency graph, version info |yarn global add @archdoc/generator
+| **Dependency Analyzer** | External deps, internal imports | HIGH | Dependency graph, version info |
 
 | **Architecture Analyzer** | High-level design | HIGH | Component diagrams, layers |
 
-| **Pattern Detector** | Design patterns, conventions | MEDIUM | Pattern usage, best practices |# Custom output location
+| **Pattern Detector** | Design patterns, conventions | MEDIUM | Pattern usage, best practices |```bash- 🧠 **AI-Powered** - Uses LangChain with Claude, GPT-4, or Gemini
 
 | **Flow Visualization** | Control & data flows | MEDIUM | Flow diagrams, sequence charts |
 
-| **Schema Generator** | Data models, interfaces | MEDIUM | Type definitions, schemas |archdoc analyze --output ./docs- **📊 Comprehensive Analysis** - Structure, dependencies, patterns, quality, and technical debt- **📦 Multiple Interfaces**: CLI, npm package, VS Code extension
+| **Schema Generator** | Data models, interfaces | MEDIUM | Type definitions, schemas |cp .archdoc.config.example.json .archdoc.config.json
 
 | **Security Analyzer** | Vulnerabilities, auth, crypto | MEDIUM | Security findings, severity levels |
 
-
+# Edit .archdoc.config.json and add your API key# Using pnpm
 
 ### 🔒 Security Analyzer (New!)
 
-# Quick analysis (faster, less detailed)# Using pnpm
+```````
 
 The Security Analyzer agent provides comprehensive security analysis:
 
-archdoc analyze --depth quick
+pnpm add -g @archdoc/generator- 📊 **Comprehensive Analysis** - Structure, dependencies, patterns, flows, schemas
 
 **Capabilities:**
 
-- **Authentication & Authorization** - OAuth, JWT, session management, RBAC analysis```pnpm add -g @archdoc/generator- **🔌 Extensible** - Add custom agents for specialized analysis
+- **Authentication & Authorization** - OAuth, JWT, session management, RBAC analysis### Basic Usage
 
 - **Vulnerability Detection** - SQL injection, XSS, CSRF, command injection, path traversal
 
-- **Cryptography Review** - Weak algorithms, key management, hardcoded secrets
+- **Cryptography Review** - Weak algorithms, key management, hardcoded secrets````
 
 - **Data Protection** - PII handling, encryption at rest/transit, secure storage
 
-- **API Security** - Input validation, rate limiting, CORS, security headers## 📚 Documentation```
+- **API Security** - Input validation, rate limiting, CORS, security headers```bash
 
-- **Secret Management** - Hardcoded credentials, API key exposure, environment variable usage
+- **Secret Management** - Hardcoded credentials, API key exposure, environment variables
 
-
+# Analyze current directory- 📝 **Markdown Output** - Clean, version-controllable documentation
 
 **Severity Levels:**
 
-- 🔴 **Critical** - Immediate action required (e.g., hardcoded secrets, SQL injection)- **[📖 User Guide](./docs/USER_GUIDE.md)** - Complete CLI reference, configuration, and examples- **⚡ Multiple Interfaces** - CLI tool, programmatic API, or VS Code extension (coming soon)## 📋 Table of Contents
+- 🔴 **Critical** - Immediate action required (e.g., hardcoded secrets, SQL injection)archdoc analyze
 
 - 🟠 **High** - Important to fix soon (e.g., weak crypto, missing auth)
 
-- 🟡 **Medium** - Should address (e.g., missing security headers, weak validation)- **[🔌 Integration Guide](./docs/INTEGRATION_GUIDE.md)** - CI/CD integration and programmatic usage
+- 🟡 **Medium** - Should address (e.g., missing security headers, weak validation)### Interactive Setup (Recommended)
 
 - 🟢 **Low** - Good to improve (e.g., outdated libraries, minor issues)
 
-- 🔵 **Info** - Recommendations (e.g., security best practices)- **[🏗️ Architecture](./docs/ARCHITECTURE.md)** - Technical design and system architecture### Environment Setup
+- 🔵 **Info** - Recommendations (e.g., security best practices)# Analyze specific project
 
 
 
-**Supported Languages:**- **[📚 API Reference](./docs/API.md)** - Programmatic API documentation
+**Supported Languages:**archdoc analyze /path/to/your/projectRun the interactive configuration wizard:
 
-- JavaScript/TypeScript (Express, NestJS, React, Node.js)
-
-- Python (Django, Flask, FastAPI)- **[🤝 Contributing](./docs/CONTRIBUTING.md)** - Development setup and contribution guidelines- **📝 Multiple Formats** - Output as Markdown, JSON, or HTML
-
-- Java (Spring Boot, Jakarta EE)
-
-- C# (.NET, ASP.NET Core)
-
-- Go (Gin, Echo, net/http)
-
-- Rust (Actix, Rocket)## 🎨 What Gets GeneratedCreate a `.env` file with your API keys:
-
-- PHP (Laravel, Symfony)
-
-- Ruby (Rails, Sinatra)
+JavaScript/TypeScript, Python, Java, C#, Go, Rust, PHP, Ruby
 
 
 
-## 💡 Usage ExamplesThe tool generates a multi-file documentation structure:- [Installation](#installation)
+## 💡 Usage Examples
 
-
+# Focused analysis with prompt```bash
 
 ### Example 1: Full Project Documentation
 
+archdoc analyze --prompt "analyze dependencies and patterns"archdoc config --init
+
+```bash
+
+# Generate complete documentation````
+
+archdoc analyze /path/to/project --output ./docs --depth deep
+
+```# Custom output location
 
 
-```bash``````env
 
-# Generate complete documentation
+### Example 2: Focused Security Analysisarchdoc analyze --output ./docsThis will:
+
+
+
+```bash# Quick analysis (faster, less detailed)1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
+
+# Focus on security and dependencies
+
+archdoc analyze --prompt "analyze security vulnerabilities and dependencies"archdoc analyze --depth quick2. Ask for your API key
+
+```
+
+```3. Create `.arch-docs/.archdoc.config.json` with your configuration
+
+### Example 3: Quick Scan
+
+4. Validate your setup
+
+```bash
+
+# Fast analysis for quick insights## 📚 Documentation
+
+archdoc analyze --depth quick --output ./quick-docs
+
+```### Manual Setup (Alternative)
+
+
+
+### Example 4: CI/CD Integration- **[User Guide](./USER_GUIDE.md)** - Complete CLI reference, configuration, and examples
+
+
+
+```yaml- **[Architecture](./ARCHITECTURE.md)** - Technical design and system architectureCopy the example config and edit it:
+
+# GitHub Actions example
+
+name: Generate Architecture Docs- **[Contributing](./CONTRIBUTING.md)** - Development setup and contribution guideline
+
+on:
+
+  push:cp .archdoc.config.example.json .arch-docs/.archdoc.config.json
+
+    branches: [main]
+
+jobs:## 🎨 What Gets Generated# Edit .arch-docs/.archdoc.config.json and add your API key
+
+  docs:
+
+    runs-on: ubuntu-latest```
+
+    steps:
+
+      - uses: actions/checkout@v3The tool generates a multi-file documentation structure:
+
+      - name: Install ArchDoc
+
+        run: npm install -g @archdoc/generator### Basic Usage
+
+      - name: Generate Docs
+
+        env:```
+
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+        run: archdoc analyze . --output ./docs --depth normaldocs/```````bash- **🌍 Language Agnostic** - Works with TypeScript, JavaScript, Python, Java, Go, Rust, C++, and more- **⚡ Intelligent Caching**: Reduces API costs with smart caching
+
+      - name: Deploy to GitHub Pages
+
+        uses: peaceiris/actions-gh-pages@v3├── index.md # Table of contents
+
+        with:
+
+          github_token: ${{ secrets.GITHUB_TOKEN }}├── metadata.md # Generation metadata```bash
+
+          publish_dir: ./docs
+
+```├── file-structure.md # Project structure and organization
+
+
+
+## 🔧 Programmatic Usage├── dependencies.md # Dependency analysis# Analyze current directory# Using npm
+
+
+
+Use the library in your Node.js applications:├── patterns.md # Code patterns and practices
+
+
+
+```typescript├── flows.md # Data and control flowsarchdoc analyze
+
+import {
+
+  DocumentationOrchestrator,├── schemas.md # Data structures and interfaces
+
+  AgentRegistry,
+
+  FileSystemScanner├── architecture.md # High-level architecturenpm install -g @archdoc/generator- **🤖 AI-Powered** - Leverages Claude 3.5, GPT-4, or Gemini for intelligent analysis- **🔄 Incremental Updates**: Update docs without full regeneration
+
+} from '@archdoc/generator';
+
+├── security.md # Security analysis and findings (NEW!)
+
+// Setup registry with agents
+
+const registry = new AgentRegistry();└── recommendations.md # Improvement suggestions# Analyze specific project
+
+const scanner = new FileSystemScanner();
+
+const orchestrator = new DocumentationOrchestrator(registry, scanner);```````
+
+
+
+// Generate documentationarchdoc analyze /path/to/your/project
+
+const docs = await orchestrator.generateDocumentation('/path/to/project', {
+
+  maxTokens: 100000,## 🤖 Available Agents
+
+  parallel: true,
+
+  iterativeRefinement: {
+
+    enabled: true,
+
+    maxIterations: 5,Each agent specializes in a specific analysis task:
+
+    clarityThreshold: 80
+
+  }# Focused analysis with prompt# Using yarn- **🎯 Zero Configuration** - No language-specific parsers or AST setup required- **🎨 Customizable Workflows**: Create your own agents and workflows
+
+});
+
+| Agent | Purpose | Priority | Output |
+
+console.log('Generated:', docs.summary);
+
+```|-------|---------|----------|--------|archdoc analyze --prompt "analyze dependencies and patterns"
+
+
+
+See **[API Reference](./docs/API.md)** for complete programmatic documentation.| **File Structure** | Project organization, entry points | HIGH | Directory tree, key files |
+
+
+
+## 🏗️ Architecture Highlights| **Dependency Analyzer** | External deps, internal imports | HIGH | Dependency graph, version info |yarn global add @archdoc/generator
+
+
+
+### Multi-Agent System| **Architecture Analyzer** | High-level design | HIGH | Component diagrams, layers |
+
+
+
+```| **Pattern Detector** | Design patterns, conventions | MEDIUM | Pattern usage, best practices |# Custom output location
+
+┌─────────────────────────────────────────────┐
+
+│      Documentation Orchestrator             │| **Flow Visualization** | Control & data flows | MEDIUM | Flow diagrams, sequence charts |
+
+│  (Coordinates agents, manages workflow)     │
+
+└─────────────────────────────────────────────┘| **Schema Generator** | Data models, interfaces | MEDIUM | Type definitions, schemas |archdoc analyze --output ./docs- **📊 Comprehensive Analysis** - Structure, dependencies, patterns, quality, and technical debt- **📦 Multiple Interfaces**: CLI, npm package, VS Code extension
+
+              │
+
+    ┌─────────┴─────────┐| **Security Analyzer** | Vulnerabilities, auth, crypto | MEDIUM | Security findings, severity levels |
+
+    │  Agent Registry   │
+
+    └─────────┬─────────┘
+
+              │
+
+    ┌─────────┴──────────┬──────────────┬──────────────┐### 🔒 Security Analyzer (New!)
+
+    │                    │              │              │
+
+┌───▼────┐  ┌──────▼──────┐  ┌────▼─────┐  ┌────▼─────┐# Quick analysis (faster, less detailed)# Using pnpm
+
+│ File   │  │ Dependency  │  │ Pattern  │  │ Security │
+
+│Structure│  │  Analyzer   │  │ Detector │  │ Analyzer │The Security Analyzer agent provides comprehensive security analysis:
+
+└────────┘  └─────────────┘  └──────────┘  └──────────┘
+
+```archdoc analyze --depth quick
+
+
+
+### LangChain LCEL Integration**Capabilities:**
+
+
+
+All agents use LangChain Expression Language (LCEL) for composable AI workflows with unified LangSmith tracing.- **Authentication & Authorization** - OAuth, JWT, session management, RBAC analysis```pnpm add -g @archdoc/generator- **🔌 Extensible** - Add custom agents for specialized analysis
+
+
+
+See **[Architecture Documentation](./docs/ARCHITECTURE.md)** for detailed technical design.- **Vulnerability Detection** - SQL injection, XSS, CSRF, command injection, path traversal
+
+
+
+### Iterative Refinement- **Cryptography Review** - Weak algorithms, key management, hardcoded secrets
+
+
+
+Self-improving analysis with clarity scoring:- **Data Protection** - PII handling, encryption at rest/transit, secure storage
+
+
+
+1. Initial analysis by agent- **API Security** - Input validation, rate limiting, CORS, security headers## 📚 Documentation```
+
+2. Clarity evaluation (0-100)
+
+3. Generate refinement questions- **Secret Management** - Hardcoded credentials, API key exposure, environment variable usage
+
+4. Enhanced re-analysis
+
+5. Repeat until threshold met
+
+
+
+## 📊 Supported Languages**Severity Levels:**
+
+
+
+The tool is **language-agnostic** and works with:- 🔴 **Critical** - Immediate action required (e.g., hardcoded secrets, SQL injection)- **[📖 User Guide](./docs/USER_GUIDE.md)** - Complete CLI reference, configuration, and examples- **⚡ Multiple Interfaces** - CLI tool, programmatic API, or VS Code extension (coming soon)## 📋 Table of Contents
+
+
+
+- TypeScript/JavaScript (excellent support)- 🟠 **High** - Important to fix soon (e.g., weak crypto, missing auth)
+
+- Python (excellent support)
+
+- Java/Kotlin (good support)- 🟡 **Medium** - Should address (e.g., missing security headers, weak validation)- **[🔌 Integration Guide](./docs/INTEGRATION_GUIDE.md)** - CI/CD integration and programmatic usage
+
+- Go (good support)
+
+- C#/.NET (good support)- 🟢 **Low** - Good to improve (e.g., outdated libraries, minor issues)
+
+- Ruby (good support)
+
+- PHP (good support)- 🔵 **Info** - Recommendations (e.g., security best practices)- **[🏗️ Architecture](./docs/ARCHITECTURE.md)** - Technical design and system architecture### Environment Setup
+
+- Rust (experimental)
+
+- And more!
+
+
+
+## 🛠️ Configuration**Supported Languages:**- **[📚 API Reference](./docs/API.md)** - Programmatic API documentation
+
+
+
+### CLI Options- JavaScript/TypeScript (Express, NestJS, React, Node.js)
+
+
+
+```bash- Python (Django, Flask, FastAPI)- **[🤝 Contributing](./docs/CONTRIBUTING.md)** - Development setup and contribution guidelines- **📝 Multiple Formats** - Output as Markdown, JSON, or HTML
+
+archdoc analyze [path] [options]
+
+- Java (Spring Boot, Jakarta EE)
+
+Options:
+
+  --output <dir>              Output directory (default: .arch-docs)- C# (.NET, ASP.NET Core)
+
+  --prompt <text>             Focus analysis with natural language
+
+  --depth <level>             Analysis depth: quick|normal|deep (default: normal)- Go (Gin, Echo, net/http)
+
+  --provider <name>           LLM provider: anthropic|openai|google
+
+  --model <name>              Specific model to use- Rust (Actix, Rocket)## 🎨 What Gets GeneratedCreate a `.env` file with your API keys:
+
+  --refinement                Enable iterative refinement (default: true)
+
+  --refinement-iterations <n> Max refinement iterations (default: 5)- PHP (Laravel, Symfony)
+
+  --refinement-threshold <n>  Clarity threshold % (default: 80)
+
+  --no-clean                  Don't clear output directory- Ruby (Rails, Sinatra)
+
+  --verbose                   Show detailed progress
+
+```
+
+
+
+### Environment Variables## 💡 Usage ExamplesThe tool generates a multi-file documentation structure:- [Installation](#installation)
+
+
+
+| Variable | Description | Default |
+
+|----------|-------------|---------|
+
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key | - |### Example 1: Full Project Documentation
+
+| `OPENAI_API_KEY` | OpenAI GPT API key | - |
+
+| `GOOGLE_API_KEY` | Google Gemini API key | - |
+
+| `DEFAULT_LLM_PROVIDER` | Default provider | `anthropic` |
+
+| `DEFAULT_LLM_MODEL` | Default model | `claude-3-5-sonnet-20241022` |```bash``````env
+
+| `LANGCHAIN_TRACING_V2` | Enable LangSmith tracing | `false` |
+
+| `LANGCHAIN_API_KEY` | LangSmith API key | - |# Generate complete documentation
+
+| `LANGCHAIN_PROJECT` | LangSmith project name | - |
 
 archdoc analyze /path/to/project --output ./docs --depth deepdocs/
 
+See **[Configuration Guide](./docs/CONFIGURATION_GUIDE.md)** for detailed configuration options.
+
 ```````
+
+## 🔍 Use Cases
 
 ├── index.md # Table of contents# Required: Choose one LLM provider## Quick Start- [Quick Start](#quick-start)
 
+### 1. Onboarding New Developers
+
 ### Example 2: Focused Security Analysis
+
+Generate comprehensive docs to help new team members understand the codebase quickly.
 
 ├── metadata.md # Generation metadata
 
-````bash
+```bash
+
+archdoc analyze . --output ./onboarding-docs --depth deep````bash
+
+```
 
 # Focus on security and dependencies├── file-structure.md           # Project structure and organizationANTHROPIC_API_KEY=sk-ant-...        # Recommended: Claude 3.5
 
+### 2. Architecture Reviews
+
 archdoc analyze --prompt "analyze security vulnerabilities and dependencies"
+
+Create documentation for architecture review meetings.
 
 ```├── dependencies.md             # Dependency analysis
 
+```bash
 
+archdoc analyze --prompt "analyze architecture, patterns, and code quality"
+
+```
 
 ### Example 3: Quick Scan├── patterns.md                 # Code patterns and practicesOPENAI_API_KEY=sk-...               # Alternative: GPT-4- [Usage](#usage)
 
+### 3. Documentation Maintenance
 
+
+
+Keep docs in sync with code using CI/CD automation (see [Integration Guide](./docs/INTEGRATION_GUIDE.md)).
 
 ```bash├── flows.md                    # Data and control flows
 
+### 4. Security Audits
+
 # Fast analysis for quick insights
+
+Identify security vulnerabilities and areas needing improvement.
 
 archdoc analyze --depth quick --output ./quick-docs├── schemas.md                  # Data structures and interfacesGOOGLE_API_KEY=...                  # Alternative: Gemini
 
-````
+```bash
+
+archdoc analyze --prompt "analyze security vulnerabilities and authentication"````
+
+```
 
 ├── architecture.md # High-level architecture
 
+### 5. Legacy Code Understanding
+
 ### Example 4: CI/CD Integration
+
+Quickly understand undocumented legacy codebases.
 
 └── recommendations.md # Improvement suggestions### Installation - [CLI Usage](#cli-usage)
 
-````````yaml
+```bash
+
+archdoc analyze /path/to/legacy --depth deep --verbose````````yaml
+
+```
 
 # GitHub Actions example```````
 
+## 📈 LangSmith Tracing
+
 name: Generate Architecture Docs
+
+Enable full observability of AI workflows:
 
 on:# Optional: LangSmith tracing
 
-  push:
+```bash
 
-    branches: [main]## 🤖 Available Agents
+export LANGCHAIN_TRACING_V2=true  push:
 
-jobs:
+export LANGCHAIN_API_KEY=lsv2_pt_...
+
+export LANGCHAIN_PROJECT=my-project    branches: [main]## 🤖 Available Agents
+
+
+
+archdoc analyze . --verbosejobs:
+
+```
 
   docs:LANGCHAIN_TRACING_V2=true - [Programmatic Usage](#programmatic-usage)
 
+**Trace Hierarchy:**
+
     runs-on: ubuntu-latest
 
-    steps:Each agent specializes in a specific analysis task:
+```
 
-      - uses: actions/checkout@v3
+DocumentationGeneration-Complete    steps:Each agent specializes in a specific analysis task:
 
-      - name: Install ArchDocLANGCHAIN*API_KEY=lsv2_pt*...
+├── ScanProjectStructure
 
-        run: npm install -g @archdoc/generator
+├── CreateExecutionContext      - uses: actions/checkout@v3
 
-      - name: Generate Docs| Agent | Purpose | Output |
+├── ExecuteAgents
 
-        env:
+│   ├── Agent-file-structure (8.5s, 8.6K tokens)      - name: Install ArchDocLANGCHAIN*API_KEY=lsv2_pt*...
 
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}|-------|---------|--------|LANGCHAIN_PROJECT=my-project```bash - [VS Code Extension](#vs-code-extension)
+│   ├── Agent-dependency-analyzer (7.2s, 7.1K tokens)
 
-        run: archdoc analyze . --output ./docs --depth normal
+│   ├── Agent-pattern-detector (10.1s, 11.1K tokens)        run: npm install -g @archdoc/generator
 
-      - name: Deploy to GitHub Pages| **File Structure** | Project organization, entry points | Directory tree, key files |
+│   ├── Agent-flow-visualization (9.5s, 8.9K tokens)
 
-        uses: peaceiris/actions-gh-pages@v3
+│   ├── Agent-schema-generator (7.1s, 6.2K tokens)      - name: Generate Docs| Agent | Purpose | Output |
 
-        with:| **Dependency Analyzer** | External deps, internal imports | Dependency graph, version info |```
+│   ├── Agent-architecture-analyzer (9.2s, 9.5K tokens)
 
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+│   └── Agent-security-analyzer (8.8s, 7.8K tokens)        env:
 
-          publish_dir: ./docs| **Pattern Detector** | Design patterns, conventions | Pattern usage, best practices |
+└── AggregateResults
 
-````````
+```          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}|-------|---------|--------|LANGCHAIN_PROJECT=my-project```bash - [VS Code Extension](#vs-code-extension)
 
-| **Flow Visualization** | Control & data flows | Flow diagrams, sequence charts |npm install -g @archdoc/generator- [Configuration](#configuration)
 
-## 🔧 Programmatic Usage
 
-| **Schema Generator** | Data models, interfaces | Type definitions, schemas |
+## 🤝 Contributing        run: archdoc analyze . --output ./docs --depth normal
 
-Use the library in your Node.js applications:
+
+
+We welcome contributions! See **[Contributing Guide](./docs/CONTRIBUTING.md)** for:      - name: Deploy to GitHub Pages| **File Structure** | Project organization, entry points | Directory tree, key files |
+
+
+
+- Development setup        uses: peaceiris/actions-gh-pages@v3
+
+- Creating custom agents
+
+- Testing guidelines        with:| **Dependency Analyzer** | External deps, internal imports | Dependency graph, version info |```
+
+- Code style and standards
+
+- Pull request process          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+## 📄 License          publish_dir: ./docs| **Pattern Detector** | Design patterns, conventions | Pattern usage, best practices |
+
+
+
+Apache License 2.0 - see [LICENSE](./LICENSE) file for details.````````
+
+
+
+## 🙏 Acknowledgments| **Flow Visualization** | Control & data flows | Flow diagrams, sequence charts |npm install -g @archdoc/generator- [Configuration](#configuration)
+
+
+
+Built with:## 🔧 Programmatic Usage
+
+
+
+- [LangChain](https://www.langchain.com/) - LLM orchestration framework| **Schema Generator** | Data models, interfaces | Type definitions, schemas |
+
+- [Anthropic Claude](https://www.anthropic.com/) - Primary LLM
+
+- [TypeScript](https://www.typescriptlang.org/) - LanguageUse the library in your Node.js applications:
+
+- [Commander.js](https://github.com/tj/commander.js/) - CLI framework
 
 | **Architecture Analyzer** | High-level design | Component diagrams, layers |### Basic Usage
 
+## 📞 Support
+
 ````typescript
 
-import {## 💡 Usage Examples```- [Agents](#agents)
+- 🐛 [Report Issues](https://github.com/ritech/architecture-doc-generator/issues)
+
+- 💬 [Discussions](https://github.com/ritech/architecture-doc-generator/discussions)import {## 💡 Usage Examples```- [Agents](#agents)
+
+- 📖 [Documentation](./docs/README.md)
 
   DocumentationOrchestrator,
 
+## 🗺️ Roadmap
+
   AgentRegistry,### Example 1: Full Project Documentation```bash
 
-  FileSystemScanner
+- [ ] Visual diagram generation (Mermaid, PlantUML)
 
-} from '@archdoc/generator';```bash# Analyze current directory- [Custom Agents](#custom-agents)
+- [ ] Diff-based incremental updates  FileSystemScanner
+
+- [ ] Custom agent plugin system
+
+- [ ] Web UI for interactive exploration} from '@archdoc/generator';```bash# Analyze current directory- [Custom Agents](#custom-agents)
+
+- [ ] Integration with documentation platforms
+
+- [ ] Multi-repository analysis
+
+- [ ] Cost optimization modes
+
+- [ ] VS Code extension// Setup registry with agents# Generate complete documentation
 
 
 
-// Setup registry with agents# Generate complete documentation
+---const registry = new AgentRegistry();
 
-const registry = new AgentRegistry();
 
-const scanner = new FileSystemScanner();archdoc analyze /path/to/project --output ./docs --depth deeparchdoc analyze
 
-const orchestrator = new DocumentationOrchestrator(registry, scanner);
+**Made with ❤️ by the Ritech Team**const scanner = new FileSystemScanner();archdoc analyze /path/to/project --output ./docs --depth deeparchdoc analyze
+
+
+
+📖 **[View Full Documentation](./docs/README.md)** · 🏗️ **[Architecture](./docs/ARCHITECTURE.md)** · 🤝 **[Contributing](./docs/CONTRIBUTING.md)**const orchestrator = new DocumentationOrchestrator(registry, scanner);
+
 
 ````
 
