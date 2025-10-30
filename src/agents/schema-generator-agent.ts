@@ -287,8 +287,11 @@ Extract and document all schema definitions with Mermaid diagrams.`;
 
       // Try to parse as direct JSON
       return JSON.parse(result);
-    } catch (_error) {
+    } catch (error) {
       // Fallback: return a basic structure
+      this.logger.warn('Failed to parse schema analysis result', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         schemas: [],
         summary: 'Failed to parse schema analysis results',

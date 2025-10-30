@@ -203,8 +203,11 @@ Please analyze dependency health, security, and provide recommendations.`;
 
       dependencies.total = dependencies.production.length + dependencies.development.length;
       dependencies.scripts = pkg.scripts ? Object.keys(pkg.scripts) : [];
-    } catch (_error) {
+    } catch (error) {
       // Package.json not found or invalid, continue checking other formats
+      this.logger.debug('Package.json not found or invalid', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     // Check for requirements.txt (Python)
@@ -220,8 +223,11 @@ Please analyze dependency health, security, and provide recommendations.`;
         return { name: name.trim(), version: version?.trim() || 'latest' };
       });
       dependencies.total = dependencies.production.length;
-    } catch (_error) {
+    } catch (error) {
       // requirements.txt not found, continue
+      this.logger.debug('requirements.txt not found', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     return dependencies;
@@ -242,14 +248,17 @@ Please analyze dependency health, security, and provide recommendations.`;
         metrics: {},
         warnings: ['Failed to parse LLM response as JSON'],
       };
-    } catch (_error) {
+    } catch (error) {
+      this.logger.warn('Failed to parse dependency analysis result', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         summary: 'Error parsing analysis result',
         insights: [],
         vulnerabilities: [],
         recommendations: [],
         metrics: {},
-        warnings: [`Parse error: ${(_error as Error).message}`],
+        warnings: [`Parse error: ${(error as Error).message}`],
       };
     }
   }

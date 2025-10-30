@@ -158,12 +158,12 @@ export class LLMService {
           cached: false,
           metadata: {},
         };
-      } catch (_error) {
-        lastError = _error as Error;
+      } catch (error) {
+        lastError = error as Error;
 
         // Don't retry on certain errors
-        if (this.isNonRetryableError(_error)) {
-          throw _error;
+        if (this.isNonRetryableError(error)) {
+          throw error;
         }
 
         // Wait before retrying with exponential backoff

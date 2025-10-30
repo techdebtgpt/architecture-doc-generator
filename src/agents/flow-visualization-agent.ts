@@ -238,8 +238,11 @@ Create Mermaid diagrams for the most important flows in this system.`;
 
       // Try to parse as direct JSON
       return JSON.parse(result);
-    } catch (_error) {
+    } catch (error) {
       // Fallback: return a basic structure
+      this.logger.warn('Failed to parse flow analysis result', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         flows: [],
         summary: 'Failed to parse flow analysis results',

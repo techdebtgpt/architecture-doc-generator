@@ -303,8 +303,11 @@ Based on this structure, identify the architectural style, major components, lay
           warnings: parsed.warnings || [],
         };
       }
-    } catch (_error) {
+    } catch (error) {
       // Fallback to basic analysis
+      this.logger.debug('Failed to parse architecture analysis result', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     return {

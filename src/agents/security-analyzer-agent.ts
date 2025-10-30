@@ -270,7 +270,10 @@ Please perform a comprehensive security analysis:
         complianceNotes: [],
         warnings: ['Failed to parse LLM response as JSON'],
       };
-    } catch (_error) {
+    } catch (error) {
+      this.logger.warn('Failed to parse security analysis result', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return {
         summary: 'Error parsing security analysis result',
         insights: [],
@@ -279,7 +282,7 @@ Please perform a comprehensive security analysis:
         strengths: [],
         recommendations: [],
         complianceNotes: [],
-        warnings: [`Parse error: ${(_error as Error).message}`],
+        warnings: [`Parse error: ${(error as Error).message}`],
       };
     }
   }

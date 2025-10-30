@@ -100,8 +100,10 @@ export class FileSystemScanner implements IScanner {
           const current = languageDistribution.get(fileEntry.detectedType) || 0;
           languageDistribution.set(fileEntry.detectedType, current + 1);
         }
-      } catch (_error) {
-        warnings.push(`Error processing ${entry}: ${(_error as Error).message}`);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        warnings.push(`Error processing ${entry}: ${errorMessage}`);
+        // Error already captured in warnings array
       }
     }
 
