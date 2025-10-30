@@ -14,6 +14,7 @@ import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agen
 import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
+import { MarkdownFormatter } from '../../src/formatters/markdown-formatter';
 
 /**
  * Check if API keys are configured
@@ -52,11 +53,16 @@ interface AnalyzeOptions {
   model?: string;
   verbose?: boolean;
   clean?: boolean;
+  // Depth mode (simple) - conflicts with granular refinement flags
+  depth?: 'quick' | 'normal' | 'deep';
+  // Granular refinement options (advanced) - overrides depth mode
   refinement?: boolean;
   refinementThreshold?: number;
   refinementIterations?: number;
   refinementImprovement?: number;
-  depth?: 'quick' | 'normal' | 'deep';
+  // Output format options
+  format?: 'markdown' | 'json' | 'html';
+  singleFile?: boolean;
 }
 
 /**
@@ -201,7 +207,7 @@ export async function analyzeProject(
     }
 
     // Initialize orchestrator
-    spinner.start('Initializing documentation orchestrator...');
+    spinner.start('Initializing documentation orchestrator... \n');
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
 
     // Determine depth mode configuration
@@ -244,14 +250,71 @@ export async function analyzeProject(
 
     spinner.succeed('Documentation generation completed!');
 
-    // Format and save output (multi-file)
-    spinner.start('Generating multi-file documentation structure...');
+    // Format and save output
+    let outputLocation: string;
+    const format = options.format || 'markdown';
 
-    const multiFileFormatter = new MultiFileMarkdownFormatter();
-    await multiFileFormatter.format(documentation, { outputDir });
+    if (options.singleFile) {
+      // Single-file output with format selection
+      spinner.start(`Formatting documentation as ${format}...`);
 
-    const fileCount = (await fs.readdir(outputDir)).length;
-    spinner.succeed(`Generated ${fileCount} documentation files`);
+      let formattedOutput: string;
+      let fileExtension: string;
+
+      switch (format) {
+        case 'json':
+          formattedOutput = JSON.stringify(documentation, null, 2);
+          fileExtension = 'json';
+          break;
+        case 'html':
+          formattedOutput = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Documentation - ${path.basename(resolvedPath)}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
+    h1 { color: #2563eb; }
+    h2 { color: #3b82f6; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; }
+    pre { background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+    code { background: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h1>Architecture Documentation</h1>
+  <pre>${JSON.stringify(documentation, null, 2)}</pre>
+</body>
+</html>`;
+          fileExtension = 'html';
+          break;
+        case 'markdown':
+        default: {
+          const markdownFormatter = new MarkdownFormatter();
+          formattedOutput = await markdownFormatter.format(documentation);
+          fileExtension = 'md';
+          break;
+        }
+      }
+
+      await fs.mkdir(outputDir, { recursive: true });
+      const outputFile = path.join(outputDir, `architecture.${fileExtension}`);
+      await fs.writeFile(outputFile, formattedOutput, 'utf-8');
+      outputLocation = outputFile;
+
+      spinner.succeed(`Documentation saved to: ${outputFile}`);
+    } else {
+      // Multi-file output (default)
+      spinner.start('Generating multi-file documentation structure...');
+
+      const multiFileFormatter = new MultiFileMarkdownFormatter();
+      await multiFileFormatter.format(documentation, { outputDir });
+
+      const fileCount = (await fs.readdir(outputDir)).length;
+      outputLocation = path.join(outputDir, 'index.md');
+
+      spinner.succeed(`Generated ${fileCount} documentation files`);
+    }
 
     // Success message
     console.log('');
@@ -261,10 +324,14 @@ export async function analyzeProject(
     console.log(`  Project: ${path.basename(resolvedPath)}`);
     console.log(`  Files analyzed: ${scanResult.totalFiles}`);
     console.log(`  Agents executed: ${agentsToRun.length}`);
-    console.log(`  Output: ${outputDir}`);
+    console.log(
+      `  Output format: ${options.singleFile ? `single-file (${format})` : 'multi-file (markdown)'}`,
+    );
+    console.log(`  Output: ${outputLocation}`);
     console.log('');
     console.log(chalk.yellow('📖 Next steps:'));
-    console.log(`  • View: ${path.join(outputDir, 'index.md')}`);
+    console.log(`  • View: ${outputLocation}`);
+    console.log(`  • Single file output: archdoc analyze --single-file --format json`);
     console.log(`  • Customize: archdoc analyze --prompt "your focus area"`);
   } catch (error) {
     spinner.fail('Analysis failed');

@@ -16,6 +16,7 @@ import { StateGraph, Annotation, END } from '@langchain/langgraph';
 import { MemorySaver } from '@langchain/langgraph';
 import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
+import { version } from '../../package.json';
 
 /**
  * Documentation generation state with LangGraph
@@ -132,7 +133,7 @@ export class DocumentationOrchestrator {
   ): Promise<DocumentationOutput> {
     const startTime = Date.now();
 
-    this.logger.info('Starting documentation generation with LangGraph');
+    this.logger.info(`Starting documentation generation with LangGraph (v${version})`);
 
     // Scan project
     this.logger.info('Scanning project structure...');

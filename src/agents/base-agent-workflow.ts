@@ -387,7 +387,7 @@ export abstract class BaseAgentWorkflow {
 
     const model = this.llmService.getChatModel(modelOptions, agentName);
 
-    // Track token usage with callback (tech-debt-api pattern)
+    // Track token usage with callback
     let actualInputTokens = inputTokens;
     let actualOutputTokens = 0;
 
@@ -395,10 +395,9 @@ export abstract class BaseAgentWorkflow {
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handleLLMEnd: (output: any) => {
-          // prettier-ignore
-          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
-          actualInputTokens = usage.input_tokens || usage.prompt_tokens || inputTokens;
-          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+          const tokens = LLMService.extractTokensFromCallback(output);
+          actualInputTokens = tokens.inputTokens || inputTokens;
+          actualOutputTokens = tokens.outputTokens;
         },
       },
     ];
@@ -500,10 +499,9 @@ MISSING_INFORMATION:
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handleLLMEnd: (output: any) => {
-          // prettier-ignore
-          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
-          actualInputTokens = usage.input_tokens || usage.prompt_tokens || inputTokens;
-          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+          const tokens = LLMService.extractTokensFromCallback(output);
+          actualInputTokens = tokens.inputTokens || inputTokens;
+          actualOutputTokens = tokens.outputTokens;
         },
       },
     ];
@@ -723,10 +721,9 @@ Example good questions:
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handleLLMEnd: (output: any) => {
-          // prettier-ignore
-          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
-          actualInputTokens = usage.input_tokens || usage.prompt_tokens || 0;
-          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+          const tokens = LLMService.extractTokensFromCallback(output);
+          actualInputTokens = tokens.inputTokens;
+          actualOutputTokens = tokens.outputTokens;
         },
       },
     ];
@@ -865,10 +862,9 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handleLLMEnd: (output: any) => {
-          // prettier-ignore
-          const usage = output.llmOutput?.usage || output.generations?.[0]?.[0]?.generationInfo?.usage || {};
-          actualInputTokens = usage.input_tokens || usage.prompt_tokens || 0;
-          actualOutputTokens = usage.output_tokens || usage.completion_tokens || 0;
+          const tokens = LLMService.extractTokensFromCallback(output);
+          actualInputTokens = tokens.inputTokens;
+          actualOutputTokens = tokens.outputTokens;
         },
       },
     ];

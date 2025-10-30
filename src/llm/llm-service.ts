@@ -349,6 +349,28 @@ Standalone Question:`;
     };
   }
 
+  /**
+   * Extract token usage from handleLLMEnd callback output
+   * This is the correct structure for LangChain callback events
+   */
+  public static extractTokensFromCallback(output: any): {
+    inputTokens: number;
+    outputTokens: number;
+  } {
+    // LangChain callback structure: output.llmOutput.usage or output.generations[0][0].generationInfo
+    const usage =
+      output.llmOutput?.usage ||
+      output.llmOutput?.token_usage ||
+      output.generations?.[0]?.[0]?.generationInfo?.usage ||
+      output.generations?.[0]?.[0]?.generationInfo?.token_usage ||
+      {};
+
+    const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
+    const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
+
+    return { inputTokens, outputTokens };
+  }
+
   private isNonRetryableError(error: any): boolean {
     // Don't retry on authentication, invalid request, or content filter errors
     const nonRetryablePatterns = [
