@@ -29,11 +29,27 @@ npm access list packages
 
 ## Pre-Publishing Checklist
 
+Run the automated pre-publish check:
+
+```bash
+npm run prepublish:check
+```
+
+This script verifies:
+
+- [ ] package.json exists and has correct name/version
+- [ ] README.md exists
+- [ ] LICENSE file exists (Apache-2.0)
+- [ ] dist/ directory exists (built artifacts)
+- [ ] git working directory is clean
+- [ ] npm authentication is valid
 - [ ] All tests pass: `npm test`
 - [ ] Linting passes: `npm run lint`
 - [ ] Build succeeds: `npm run build`
-- [ ] README.md is up to date
-- [ ] LICENSE file exists
+
+Manual checklist:
+
+- [ ] All 7 agents working (file-structure, dependency-analyzer, pattern-detector, flow-visualization, schema-generator, architecture-analyzer, security-analyzer)
 - [ ] CHANGELOG.md updated (if you maintain one)
 - [ ] Version number bumped appropriately
 - [ ] GitHub repo URL is correct in package.json

@@ -50,13 +50,16 @@ All agents follow this structure:
 
 ```
 src/agents/
-├── agent.interface.ts          # Base agent interface
-├── agent-registry.ts           # Agent registration and discovery
-├── file-structure-agent.ts     # Example agent implementation
-├── dependency-analyzer-agent.ts
-├── pattern-detector-agent.ts
-├── flow-visualization-agent.ts
-└── schema-generator-agent.ts
+├── agent.interface.ts            # Base agent interface
+├── agent-registry.ts             # Agent registration and discovery
+├── base-agent-workflow.ts        # Base class with logging and refinement
+├── file-structure-agent.ts       # HIGH priority - Project organization
+├── dependency-analyzer-agent.ts  # HIGH priority - Dependency analysis
+├── architecture-analyzer-agent.ts # HIGH priority - Architecture design
+├── pattern-detector-agent.ts     # MEDIUM priority - Design patterns
+├── flow-visualization-agent.ts   # MEDIUM priority - Control/data flows
+├── schema-generator-agent.ts     # MEDIUM priority - Data models
+└── security-analyzer-agent.ts    # MEDIUM priority - Security vulnerabilities (NEW!)
 ```
 
 **Agent Implementation Template**:
@@ -139,6 +142,8 @@ export class MyAgent implements Agent {
 2. **Pass `options?.runnableConfig` to `.invoke()`** - Enables unified tracing
 3. **Use `.withConfig()` on individual steps** - For granular trace visibility
 4. **Return formatted markdown in `result.markdown`** - Used by multi-file formatter
+5. **Always log errors with context** - Use `this.logger.debug()` or `this.logger.warn()` with error details
+6. **Never use `_error` prefix** - All errors should be logged with proper context
 
 ### LangSmith Unified Tracing
 
@@ -202,11 +207,12 @@ Generates documentation files conditionally:
 
 - `index.md` - Table of contents
 - `metadata.md` - Generation metadata
-- Agent-specific files (if agent runs): `file-structure.md`, `dependencies.md`, etc.
+- Agent-specific files (if agent runs): `file-structure.md`, `dependencies.md`, `patterns.md`, `flows.md`, `schemas.md`
 
 **Conditionally Generated** (only if data exists):
 
 - `architecture.md` - Only if `output.architecture.components.length > 0`
+- `security.md` - Only if `output.security.findings.length > 0` (NEW!)
 - `code-quality.md` - Only if there are quality issues or scores > 0
 - `recommendations.md` - Only if there are recommendations
 
@@ -220,6 +226,48 @@ if (output.codeQuality.improvements.length > 0) {
   generatedFiles.push(qualityPath);
 }
 ```
+
+## Error Handling Patterns
+
+All agents should implement consistent error handling with proper logging:
+
+### Logging Levels
+
+- **`debug`** - Expected failures (file not found, missing dependencies)
+- **`warn`** - Recoverable failures (LLM parsing errors, analysis failures)
+- **`error`** - Critical failures (agent execution crashes)
+
+### Pattern
+
+```typescript
+try {
+  const content = await fs.readFile(filePath, 'utf-8');
+} catch (error) {
+  this.logger.debug('Expected failure message', {
+    error: error instanceof Error ? error.message : String(error),
+    context: { filePath },
+  });
+  // Handle gracefully
+}
+
+try {
+  const result = JSON.parse(llmOutput);
+} catch (error) {
+  this.logger.warn('Failed to parse LLM output', {
+    error: error instanceof Error ? error.message : String(error),
+    output: llmOutput.substring(0, 200),
+  });
+  // Fallback or retry
+}
+```
+
+### Rules
+
+1. **Never use `_error` prefix** - All caught errors should be logged
+2. **Provide context** - Include relevant data (file paths, inputs, etc.)
+3. **Type-safe error messages** - Use `error instanceof Error ? error.message : String(error)`
+4. **Choose appropriate level** - `debug` for expected, `warn` for unexpected but recoverable
+5. **Silent fallbacks only when acceptable** - TokenManager is an exception (estimation fallback)
 
 ## Testing Strategy
 
@@ -245,6 +293,8 @@ jest.mock('../llm/llm-service', () => ({
 4. ❌ **Don't create documentation files without user request** - Keep responses in chat
 5. ❌ **Don't use relative imports** - Use path aliases (configured in tsconfig)
 6. ❌ **Don't hardcode API keys** - Use `.archdoc.config.json` or environment variables
+7. ❌ **Don't use `_error` prefix** - All errors should be logged with proper context
+8. ❌ **Don't ignore caught errors** - Always log with `this.logger.debug()` or `this.logger.warn()`
 
 ## Key Files to Reference
 
