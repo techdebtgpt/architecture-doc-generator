@@ -16,3 +16,10 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 ## 🚀 Getting Started
 
 If you are new to the project, we recommend starting with the [**User Guide**](./USER_GUIDE.md) to get a full overview of how to install and use the tool. For a quick start, check out the main [**README.md**](../README.md) file.
+
+## 🔗 Resources
+
+- **🌐 Website**: [techdebtgpt.com](https://techdebtgpt.com)
+- **📦 GitHub**: [github.com/techdebtgpt/architecture-doc-generator](https://github.com/techdebtgpt/architecture-doc-generator)
+- **💬 Community**: [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
+- **🐛 Report Issues**: [GitHub Issues](https://github.com/techdebtgpt/architecture-doc-generator/issues)

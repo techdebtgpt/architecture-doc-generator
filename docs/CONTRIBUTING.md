@@ -95,6 +95,15 @@ Agents are the core of the analysis process. Here’s how to create one:
 2.  **Use the PR Template**: Fill out the pull request template with details about your changes.
 3.  **Engage in Review**: Respond to feedback from maintainers. We appreciate your collaboration!
 
+## 🔗 Resources
+
+- **🌐 Website**: [techdebtgpt.com](https://techdebtgpt.com)
+- **📦 GitHub**: [github.com/techdebtgpt/architecture-doc-generator](https://github.com/techdebtgpt/architecture-doc-generator)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
+- **🐛 Issues**: [Report Issues](https://github.com/techdebtgpt/architecture-doc-generator/issues)
+
 ---
 
 **Thank you for your contribution!**
+
+**Made with ❤️ by [TechDebtGPT](https://techdebtgpt.com)**

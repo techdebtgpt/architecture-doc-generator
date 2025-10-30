@@ -4,6 +4,8 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Website](https://img.shields.io/badge/Website-techdebtgpt.com-blue)](https://techdebtgpt.com)
+[![GitHub](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator?style=social)](https://github.com/techdebtgpt/architecture-doc-generator)
 
 > AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows.
 
@@ -235,6 +237,18 @@ We welcome contributions! See the **[Contributing Guide](./docs/CONTRIBUTING.md)
 - Code style and standards
 - Pull request process
 
-## 📄 License
+## � Resources
+
+- **🌐 Website**: [techdebtgpt.com](https://techdebtgpt.com)
+- **📦 GitHub**: [github.com/techdebtgpt/architecture-doc-generator](https://github.com/techdebtgpt/architecture-doc-generator)
+- **📚 Documentation**: [Full Documentation](./docs/README.md)
+- **💬 Discussions**: [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
+- **🐛 Issues**: [Report Issues](https://github.com/techdebtgpt/architecture-doc-generator/issues)
+
+## �📄 License
 
 Apache License 2.0 - see the [LICENSE](./LICENSE) file for details.
+
+---
+
+**Made with ❤️ by [TechDebtGPT](https://techdebtgpt.com)**
