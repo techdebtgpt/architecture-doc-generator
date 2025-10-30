@@ -12,6 +12,7 @@ import { DependencyAnalyzerAgent } from '../../src/agents/dependency-analyzer-ag
 import { PatternDetectorAgent } from '../../src/agents/pattern-detector-agent';
 import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agent';
 import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
+import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
 
 /**
@@ -168,6 +169,7 @@ export async function analyzeProject(
     agentRegistry.register(new PatternDetectorAgent());
     agentRegistry.register(new FlowVisualizationAgent());
     agentRegistry.register(new SchemaGeneratorAgent());
+    agentRegistry.register(new SecurityAnalyzerAgent()); // Security analysis
 
     const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
     spinner.succeed(`Registered ${availableAgents.length} agents: ${availableAgents.join(', ')}`);

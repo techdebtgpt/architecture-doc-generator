@@ -130,6 +130,20 @@ export class MultiFileMarkdownFormatter {
       generatedFiles.push(schemasPath);
     }
 
+    // Generate security file (if security-analyzer agent ran)
+    const securitySection = output.customSections.get
+      ? output.customSections.get('security-analyzer')
+      : (output.customSections as any)['security-analyzer'];
+    if (securitySection) {
+      const securityPath = path.join(opts.outputDir, 'security.md');
+      await fs.writeFile(
+        securityPath,
+        this.generateSecurityFile(securitySection, output, opts),
+        'utf-8',
+      );
+      generatedFiles.push(securityPath);
+    }
+
     // Generate metadata file
     const metaPath = path.join(opts.outputDir, 'metadata.md');
     await fs.writeFile(metaPath, this.generateMetadataFile(output, opts), 'utf-8');
@@ -199,19 +213,25 @@ export class MultiFileMarkdownFormatter {
       content += `${docIndex++}. **[Recommendations](./recommendations.md)** - Improvement suggestions and best practices\n`;
     }
 
-    // Add flows and schemas if they exist
+    // Add flows, schemas, and security if they exist
     const flowSection = output.customSections.get
       ? output.customSections.get('flow-visualization')
       : (output.customSections as Record<string, any>)['flow-visualization'];
     const schemaSection = output.customSections.get
       ? output.customSections.get('schema-generator')
       : (output.customSections as Record<string, any>)['schema-generator'];
+    const securitySection = output.customSections.get
+      ? output.customSections.get('security-analyzer')
+      : (output.customSections as Record<string, any>)['security-analyzer'];
 
     if (flowSection) {
       content += `${docIndex++}. **[Flow Visualizations](./flows.md)** - Data flows, process flows, and component interactions\n`;
     }
     if (schemaSection) {
       content += `${docIndex++}. **[Schema Documentation](./schemas.md)** - Database schemas, API schemas, and type definitions\n`;
+    }
+    if (securitySection) {
+      content += `${docIndex++}. **[Security Analysis](./security.md)** - Security assessment, vulnerabilities, and recommendations\n`;
     }
 
     // Metadata (always generated)
@@ -741,10 +761,32 @@ export class MultiFileMarkdownFormatter {
     options: MultiFileFormatterOptions,
   ): string {
     let content = `# Schema Documentation\n\n`;
-    content += `[← Back: Flows](./flows.md) | [Next: Metadata →](./metadata.md)\n\n`;
+    content += `[← Back: Flows](./flows.md) | [Next: Security →](./security.md)\n\n`;
     content += `---\n\n`;
 
     content += schemaSection.content;
+    content += `\n`;
+
+    if (options.includeMetadata) {
+      content += this.generateMetadataFooter(output);
+    }
+
+    return content;
+  }
+
+  /**
+   * Generate security documentation file
+   */
+  private generateSecurityFile(
+    securitySection: any,
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+  ): string {
+    let content = `# Security Analysis\n\n`;
+    content += `[← Back: Schemas](./schemas.md) | [Next: Metadata →](./metadata.md)\n\n`;
+    content += `---\n\n`;
+
+    content += securitySection.content;
     content += `\n`;
 
     if (options.includeMetadata) {

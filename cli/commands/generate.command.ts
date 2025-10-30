@@ -10,6 +10,7 @@ import { DependencyAnalyzerAgent } from '../../src/agents/dependency-analyzer-ag
 import { PatternDetectorAgent } from '../../src/agents/pattern-detector-agent';
 import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agent';
 import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
+import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
 import { ArchitectureAnalyzerAgent } from '../../src/agents/architecture-analyzer-agent';
 import { MarkdownFormatter } from '../../src/formatters/markdown-formatter';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
@@ -93,10 +94,10 @@ export async function generateDocumentation(
     agentRegistry.register(new PatternDetectorAgent());
     agentRegistry.register(new FlowVisualizationAgent());
     agentRegistry.register(new SchemaGeneratorAgent());
+    agentRegistry.register(new SecurityAnalyzerAgent()); // Security analysis
 
     // TODO: Add when implemented
     // agentRegistry.register(new CodeQualityAgent());
-    // agentRegistry.register(new SecurityScannerAgent());
 
     const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
     spinner.succeed(`Registered ${availableAgents.length} agents: ${availableAgents.join(', ')}`);
