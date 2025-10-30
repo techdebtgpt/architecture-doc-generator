@@ -105,8 +105,8 @@ export class SecurityAnalyzerAgent extends BaseAgentWorkflow implements Agent {
   ): Promise<AgentResult> {
     // Adaptive configuration - agent decides when analysis is complete
     const workflowConfig = {
-      maxIterations: 10,
-      clarityThreshold: 80, // Security analysis is complex, slightly lower threshold
+      maxIterations: 5, // Reduced from 10 - security patterns are identifiable quickly
+      clarityThreshold: 80, // Security analysis is complex, balanced threshold
       minImprovement: 3,
       enableSelfQuestioning: true,
       skipSelfRefinement: false,

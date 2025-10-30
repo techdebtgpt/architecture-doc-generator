@@ -286,7 +286,12 @@ export class DocumentationOrchestrator {
         type: 'Unknown',
       },
       previousResults: agentResults,
-      config: {},
+      config: {
+        // Pass iterative refinement configuration to agents
+        maxIterations: options.iterativeRefinement?.maxIterations,
+        clarityThreshold: options.iterativeRefinement?.clarityThreshold,
+        maxQuestionsPerIteration: options.agentOptions?.maxQuestionsPerIteration,
+      },
       // Claude Sonnet 4 max: 200K input tokens - 10K safety margin - 8K max output = 182K budget
       tokenBudget: options.maxTokens || 182000,
       scanResult,
@@ -517,6 +522,7 @@ export class DocumentationOrchestrator {
       { name: 'pattern-detector', emoji: '🎨', label: 'Patterns' },
       { name: 'flow-visualization', emoji: '🔄', label: 'Data Flow' },
       { name: 'schema-generator', emoji: '🗄️', label: 'Schema' },
+      { name: 'security-analyzer', emoji: '🔒', label: 'Security Analysis' },
     ];
 
     for (const { name, emoji, label } of agentHighlights) {

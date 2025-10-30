@@ -52,8 +52,8 @@ export class FileStructureAgent extends BaseAgentWorkflow implements Agent {
   ): Promise<AgentResult> {
     // Adaptive configuration - agent decides when analysis is complete
     const workflowConfig = {
-      maxIterations: 10, // High limit - agent self-determines when satisfied
-      clarityThreshold: 85, // High bar - ensures thorough analysis
+      maxIterations: 4, // Reduced from 10 - file structure is straightforward to analyze
+      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
       minImprovement: 3, // Accept small incremental improvements
       enableSelfQuestioning: true,
       skipSelfRefinement: false,

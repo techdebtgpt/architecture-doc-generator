@@ -93,8 +93,8 @@ export class ArchitectureAnalyzerAgent extends BaseAgentWorkflow implements Agen
     // Agent will refine until clarity score >= 85 (high bar for quality)
     // Not hardcoded iterations - agent self-determines completion
     const workflowConfig = {
-      maxIterations: 10, // High limit - agent decides when satisfied
-      clarityThreshold: 85, // High bar ensures comprehensive architecture analysis
+      maxIterations: 5, // Reduced from 10 - 5 iterations is sufficient for most cases
+      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
       minImprovement: 3, // Accept small incremental improvements
       enableSelfQuestioning: true,
       maxQuestionsPerIteration: 2, // Focused, specific questions

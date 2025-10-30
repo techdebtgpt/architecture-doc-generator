@@ -430,8 +430,8 @@ export abstract class BaseAgentWorkflow {
       ...state,
       currentAnalysis: analysisText,
       iteration: 1,
-      totalInputTokens: actualInputTokens,
-      totalOutputTokens: actualOutputTokens,
+      totalInputTokens: state.totalInputTokens + actualInputTokens,
+      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
     };
   }
 
@@ -579,8 +579,8 @@ MISSING_INFORMATION:
       previousGapCount: currentGapCount,
       gapReductionRate,
       allSeenGaps: updatedSeenGaps,
-      totalInputTokens: actualInputTokens,
-      totalOutputTokens: actualOutputTokens,
+      totalInputTokens: state.totalInputTokens + actualInputTokens,
+      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
     };
   }
 
@@ -752,8 +752,8 @@ Example good questions:
     return {
       ...state,
       selfQuestions: questions,
-      totalInputTokens: actualInputTokens,
-      totalOutputTokens: actualOutputTokens,
+      totalInputTokens: state.totalInputTokens + actualInputTokens,
+      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
     };
   }
 
@@ -892,8 +892,8 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       refinementNotes: [
         `Iteration ${iteration}: Addressed ${selfQuestions.length} questions targeting ${targetedGaps} gap(s)`,
       ],
-      totalInputTokens: actualInputTokens,
-      totalOutputTokens: actualOutputTokens,
+      totalInputTokens: state.totalInputTokens + actualInputTokens,
+      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
     };
   }
 

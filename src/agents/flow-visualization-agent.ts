@@ -85,14 +85,17 @@ export class FlowVisualizationAgent extends BaseAgentWorkflow implements Agent {
     options?: AgentExecutionOptions,
   ): Promise<AgentResult> {
     // Configure adaptive refinement workflow
-    // Agent will refine until clarity score >= 85 (high bar for quality)
-    // Not hardcoded iterations - agent self-determines completion
+    // Flow visualization benefits from focused analysis rather than excessive refinement
+    // Mermaid diagrams are either correct or not - excessive iterations don't help
+
+    // Use context.config if provided (from CLI depth mode), otherwise use agent defaults
     const workflowConfig = {
-      maxIterations: 10, // High limit - agent decides when satisfied
-      clarityThreshold: 85, // High bar ensures comprehensive flow visualization
+      maxIterations: (context.config?.maxIterations as number) || 3, // Default: 3 (or from CLI depth mode)
+      clarityThreshold: (context.config?.clarityThreshold as number) || 75, // Default: 75 (or from CLI depth mode)
       minImprovement: 3, // Accept small incremental improvements
       enableSelfQuestioning: true,
-      maxQuestionsPerIteration: 2, // Focused, specific questions
+      maxQuestionsPerIteration: (context.config?.maxQuestionsPerIteration as number) || 2, // Focused, specific questions
+      skipSelfRefinement: false, // Keep refinement for quality, but with lower thresholds
     };
 
     return this.executeWorkflow(

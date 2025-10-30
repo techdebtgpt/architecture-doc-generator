@@ -73,8 +73,8 @@ export class DependencyAnalyzerAgent extends BaseAgentWorkflow implements Agent 
   ): Promise<AgentResult> {
     // Adaptive configuration - agent decides when analysis is complete
     const workflowConfig = {
-      maxIterations: 10,
-      clarityThreshold: 85,
+      maxIterations: 4, // Reduced from 10 - dependencies are straightforward to analyze
+      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
       minImprovement: 3,
       enableSelfQuestioning: true,
       skipSelfRefinement: false,
