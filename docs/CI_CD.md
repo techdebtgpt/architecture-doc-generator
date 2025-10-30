@@ -20,6 +20,7 @@ Two automated workflows handle the entire CI/CD pipeline:
 **Purpose**: Ensure code quality before merging
 
 **Steps**:
+
 - ✅ Runs tests on Node.js 18.x and 20.x (matrix testing)
 - ✅ Runs ESLint linting
 - ✅ Builds the project
@@ -70,10 +71,12 @@ Two automated workflows handle the entire CI/CD pipeline:
 ### Required: Add npm Token
 
 1. **Get your npm token**:
+
    ```bash
    npm login
    npm token create
    ```
+
    Or use existing token if you have one.
 
 2. **Add to GitHub Secrets**:
@@ -112,21 +115,22 @@ Use **Conventional Commits** format for automatic version detection.
 
 ### Types
 
-| Type | Version Bump | Example |
-|------|--------------|---------|
-| `feat!:` or `BREAKING CHANGE:` | **Major** | `feat!: redesign API interface` |
-| `feat:` or `feature:` | **Minor** | `feat: add security analyzer agent` |
-| `fix:` or `bugfix:` | **Patch** | `fix: resolve token counting issue` |
-| `chore:` | **Patch** | `chore: update dependencies` |
-| `docs:` | **Patch** | `docs: update user guide` |
-| `refactor:` | **Patch** | `refactor: improve error handling` |
-| `perf:` | **Patch** | `perf: optimize agent execution` |
-| `test:` | **Patch** | `test: add unit tests for scanner` |
-| `style:` | **Patch** | `style: format code with prettier` |
+| Type                           | Version Bump | Example                             |
+| ------------------------------ | ------------ | ----------------------------------- |
+| `feat!:` or `BREAKING CHANGE:` | **Major**    | `feat!: redesign API interface`     |
+| `feat:` or `feature:`          | **Minor**    | `feat: add security analyzer agent` |
+| `fix:` or `bugfix:`            | **Patch**    | `fix: resolve token counting issue` |
+| `chore:`                       | **Patch**    | `chore: update dependencies`        |
+| `docs:`                        | **Patch**    | `docs: update user guide`           |
+| `refactor:`                    | **Patch**    | `refactor: improve error handling`  |
+| `perf:`                        | **Patch**    | `perf: optimize agent execution`    |
+| `test:`                        | **Patch**    | `test: add unit tests for scanner`  |
+| `style:`                       | **Patch**    | `style: format code with prettier`  |
 
 ### Examples
 
 **Major Version Bump (Breaking Changes)**:
+
 ```bash
 git commit -m "feat!: change agent interface signature
 
@@ -135,16 +139,18 @@ Update all agent implementations accordingly."
 ```
 
 **Minor Version Bump (New Features)**:
+
 ```bash
 git commit -m "feat: add security analyzer agent
 
 - Detects authentication vulnerabilities
-- Identifies hardcoded secrets  
+- Identifies hardcoded secrets
 - Analyzes API security patterns
 - Supports 8+ languages"
 ```
 
 **Patch Version Bump (Bug Fixes)**:
+
 ```bash
 git commit -m "fix: resolve empty file generation issue
 
@@ -154,6 +160,7 @@ git commit -m "fix: resolve empty file generation issue
 ```
 
 **Patch Version Bump (Documentation)**:
+
 ```bash
 git commit -m "docs: add CI/CD automation guide
 
@@ -180,11 +187,13 @@ The `[skip ci]` flag in the commit message prevents both workflows from running.
 ### Test PR Check Workflow
 
 1. Create a feature branch:
+
    ```bash
    git checkout -b test/ci-workflow
    ```
 
 2. Make a change:
+
    ```bash
    echo "# Test CI" >> test.md
    git add test.md
@@ -192,6 +201,7 @@ The `[skip ci]` flag in the commit message prevents both workflows from running.
    ```
 
 3. Push and create PR:
+
    ```bash
    git push origin test/ci-workflow
    ```
@@ -203,12 +213,14 @@ The `[skip ci]` flag in the commit message prevents both workflows from running.
 ### Test Release Workflow
 
 1. Ensure you're on main:
+
    ```bash
    git checkout main
    git pull origin main
    ```
 
 2. Make a change with conventional commit:
+
    ```bash
    git commit --allow-empty -m "feat: test automated release"
    git push origin main
@@ -239,30 +251,35 @@ Add these badges to your `README.md`:
 ## Troubleshooting
 
 ### Release workflow not running
+
 - **Check**: Commit message follows conventional commits format
 - **Check**: You're pushing to `main` branch (not a feature branch)
 - **Check**: Commit doesn't contain `[skip ci]`
 - **Check**: `NPM_TOKEN` secret is set correctly in GitHub
 
 ### npm publish fails with 401/403
+
 - **Verify**: Token has publish permissions: `npm token list`
 - **Check**: Token hasn't expired (check expiration date)
 - **Ensure**: You're logged in as correct user: `npm whoami`
 - **Verify**: Organization exists and you have access
 
 ### Version conflict / already published
+
 - Manual version bumps conflict with automated releases
 - **Solution**: Always let CI handle versioning
 - **Never**: Run `npm version` manually
 - If you need to skip: Use `[skip ci]` in commit message
 
 ### Tests pass locally but fail in CI
+
 - **Check**: `NODE_ENV` is not set to production in CI
 - **Verify**: All dependencies are in `package.json` (not global installs)
 - **Ensure**: No local `.env` files affecting tests
 - **Check**: Node version matches (CI uses 18.x and 20.x)
 
 ### Build fails: "dist/ is ignored"
+
 - **Cause**: `dist/` is in `.gitignore` (correct behavior)
 - **Solution**: Ensure `package.json` has no `version` or `postversion` scripts
 - **Note**: CI builds fresh `dist/` folder during workflow
