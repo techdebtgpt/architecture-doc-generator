@@ -5,6 +5,7 @@
 **Your npm token**: `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`
 
 ### Steps:
+
 1. Go to: https://github.com/techdebtgpt/architecture-doc-generator/settings/secrets/actions
 2. Click **"New repository secret"**
 3. Name: `NPM_TOKEN`
@@ -14,6 +15,7 @@
 ## What Happens Now
 
 ### On Pull Request:
+
 - ✅ Runs tests on Node 18.x and 20.x
 - ✅ Runs linting
 - ✅ Builds project
@@ -21,6 +23,7 @@
 - ❌ Blocks merge if any check fails
 
 ### On Merge to Main:
+
 1. ✅ Runs all tests
 2. ✅ Builds project
 3. 🔢 Analyzes commit messages
@@ -57,17 +60,20 @@ git commit -m "refactor: improve error handling"
 ## Testing the Workflow
 
 ### Test 1: Push to main (will trigger release)
+
 ```bash
 git push origin main
 ```
 
 This will:
+
 - Detect commit type: `ci: add automated PR checks...` → Patch bump
 - Bump version: 0.1.0 → **0.1.1**
 - Publish to npm
 - Create GitHub release
 
 ### Test 2: Create a PR (will run checks only)
+
 ```bash
 git checkout -b test/workflow
 echo "# Test" >> test.md

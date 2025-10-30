@@ -9,6 +9,7 @@ This project uses GitHub Actions for automated testing and publishing.
 **Trigger**: On every pull request to `main` or `develop`
 
 **What it does**:
+
 - ✅ Runs tests on Node.js 18.x and 20.x
 - ✅ Runs ESLint
 - ✅ Builds the project
@@ -16,7 +17,8 @@ This project uses GitHub Actions for automated testing and publishing.
 - ✅ Uploads coverage to Codecov (optional)
 - ✅ Runs security audit
 
-**Required secrets**: 
+**Required secrets**:
+
 - `CODECOV_TOKEN` (optional, for code coverage)
 
 ---
@@ -26,6 +28,7 @@ This project uses GitHub Actions for automated testing and publishing.
 **Trigger**: On every push to `main` branch
 
 **What it does**:
+
 1. ✅ Runs all tests
 2. ✅ Runs linting
 3. ✅ Builds the project
@@ -39,6 +42,7 @@ This project uses GitHub Actions for automated testing and publishing.
 8. 📝 Creates GitHub release
 
 **Required secrets**:
+
 - `NPM_TOKEN` (required for npm publishing)
 
 ---
@@ -48,10 +52,12 @@ This project uses GitHub Actions for automated testing and publishing.
 ### Step 1: Add npm Token to GitHub Secrets
 
 1. **Generate npm access token**:
+
    ```bash
    npm login
    npm token create --read-only=false
    ```
+
    Or use existing token: `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`
 
 2. **Add to GitHub**:
@@ -73,6 +79,7 @@ This project uses GitHub Actions for automated testing and publishing.
 ### Step 3: Test the Workflows
 
 #### Test PR Check:
+
 ```bash
 # Create a test branch
 git checkout -b test/ci-workflow
@@ -88,6 +95,7 @@ git push origin test/ci-workflow
 ```
 
 #### Test Release Workflow:
+
 ```bash
 # Make sure you're on main
 git checkout main
@@ -106,6 +114,7 @@ git push origin main
 Use **Conventional Commits** format for automatic version bumping:
 
 ### Format
+
 ```
 <type>(<scope>): <subject>
 
@@ -116,20 +125,21 @@ Use **Conventional Commits** format for automatic version bumping:
 
 ### Types that trigger releases:
 
-| Type | Bump | Example |
-|------|------|---------|
-| `feat!:` or `BREAKING CHANGE:` | **Major** (1.0.0 → 2.0.0) | `feat!: change API interface` |
-| `feat:` | **Minor** (0.1.0 → 0.2.0) | `feat: add new agent` |
-| `fix:` | **Patch** (0.1.0 → 0.1.1) | `fix: correct token counting` |
-| `chore:` | **Patch** | `chore: update dependencies` |
-| `docs:` | **Patch** | `docs: update README` |
-| `refactor:` | **Patch** | `refactor: improve error handling` |
-| `perf:` | **Patch** | `perf: optimize agent execution` |
-| `test:` | **Patch** | `test: add unit tests` |
+| Type                           | Bump                      | Example                            |
+| ------------------------------ | ------------------------- | ---------------------------------- |
+| `feat!:` or `BREAKING CHANGE:` | **Major** (1.0.0 → 2.0.0) | `feat!: change API interface`      |
+| `feat:`                        | **Minor** (0.1.0 → 0.2.0) | `feat: add new agent`              |
+| `fix:`                         | **Patch** (0.1.0 → 0.1.1) | `fix: correct token counting`      |
+| `chore:`                       | **Patch**                 | `chore: update dependencies`       |
+| `docs:`                        | **Patch**                 | `docs: update README`              |
+| `refactor:`                    | **Patch**                 | `refactor: improve error handling` |
+| `perf:`                        | **Patch**                 | `perf: optimize agent execution`   |
+| `test:`                        | **Patch**                 | `test: add unit tests`             |
 
 ### Examples:
 
 **Major version bump (breaking changes)**:
+
 ```bash
 git commit -m "feat!: change agent interface signature
 
@@ -137,6 +147,7 @@ BREAKING CHANGE: Agent.execute() now requires AgentExecutionOptions parameter"
 ```
 
 **Minor version bump (new features)**:
+
 ```bash
 git commit -m "feat: add security analyzer agent
 
@@ -146,6 +157,7 @@ git commit -m "feat: add security analyzer agent
 ```
 
 **Patch version bump (bug fixes)**:
+
 ```bash
 git commit -m "fix: resolve empty file generation issue
 
@@ -158,6 +170,7 @@ git commit -m "fix: resolve empty file generation issue
 ## Skip CI
 
 To push without triggering workflows:
+
 ```bash
 git commit -m "docs: update README [skip ci]"
 ```
@@ -180,21 +193,25 @@ Add to your README.md:
 ## Troubleshooting
 
 ### Release workflow not running
+
 - Check commit message follows conventional commits format
 - Ensure you're pushing to `main` branch
 - Verify `NPM_TOKEN` secret is set correctly
 
 ### npm publish fails
+
 - Verify token has publish permissions: `npm token list`
 - Check token hasn't expired
 - Ensure package name isn't already taken
 
 ### Version conflict
+
 - Manual version bumps will conflict with automated releases
 - Always let CI handle versioning
 - If needed, use `[skip ci]` for manual version changes
 
 ### Tests fail in CI but pass locally
+
 - Ensure `NODE_ENV` is not set to production in CI
 - Check for missing environment variables
 - Verify all dependencies are in `package.json` (not global installs)

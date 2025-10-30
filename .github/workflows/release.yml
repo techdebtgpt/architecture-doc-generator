@@ -48,7 +48,7 @@ jobs:
         run: |
           # Get commit messages since last tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
+
           if [ -z "$LAST_TAG" ]; then
             # No tags yet, use all commits
             COMMITS=$(git log --pretty=format:"%s" main)
@@ -56,10 +56,10 @@ jobs:
             # Get commits since last tag
             COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s")
           fi
-          
+
           echo "Analyzing commits:"
           echo "$COMMITS"
-          
+
           # Determine version bump type based on conventional commits
           if echo "$COMMITS" | grep -qE "^(feat|feature)(\(.+\))?!:|^BREAKING CHANGE:|breaking:"; then
             BUMP_TYPE="major"
@@ -71,7 +71,7 @@ jobs:
             # Default to patch for any other commits
             BUMP_TYPE="patch"
           fi
-          
+
           echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
           echo "Determined version bump: $BUMP_TYPE"
 
@@ -80,7 +80,7 @@ jobs:
         run: |
           BUMP_TYPE="${{ steps.version-bump.outputs.bump_type }}"
           echo "Bumping version: $BUMP_TYPE"
-          
+
           # Bump version and capture new version
           NEW_VERSION=$(npm version $BUMP_TYPE -m "chore(release): bump version to %s [skip ci]")
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
@@ -104,14 +104,14 @@ jobs:
           release_name: Release ${{ steps.bump.outputs.new_version }}
           body: |
             ## Changes in ${{ steps.bump.outputs.new_version }}
-            
+
             Auto-generated release from main branch.
-            
+
             ### Installation
             ```bash
             npm install -g @techdebtgpt/archdoc-generator@${{ steps.bump.outputs.new_version }}
             ```
-            
+
             ### What's Changed
             See commit history for detailed changes.
           draft: false
