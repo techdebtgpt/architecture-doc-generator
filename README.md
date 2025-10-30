@@ -1,10 +1,6 @@
 # 🏗️ ArchDoc Generator# 🏗️ ArchDoc Generator# Architecture Documentation Generator# Architecture Documentation Generator# Architecture Documentation Generator# 🏗️ ArchDoc Generator
 
-
-
 > AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
-
-
 
 [![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows
 
@@ -56,7 +52,7 @@ Architecture Documentation Generator is an intelligent tool that analyzes your c
 
 - 🌍 **Language Agnostic** - Works with TypeScript, Python, Java, Go, and more[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-```bash
+````````bash
 
 # Using npm- 🧠 **AI-Powered** - Uses LangChain with Claude 3.5, GPT-4, or Gemini
 
@@ -140,9 +136,9 @@ archdoc analyze --output ./docs
 
 archdoc analyze --depth quickpnpm add -g @archdoc/generator
 
-```
+````````
 
-```- 🎨 **Customizable** - Prompt-based agent selection and configuration
+```````- 🎨 **Customizable** - Prompt-based agent selection and configuration
 
 ## 📚 Documentation
 
@@ -176,31 +172,31 @@ The tool generates a multi-file documentation structure:
 
 ``````bash
 
-```
+```````
 
 docs/
 
-├── index.md                    # Table of contents
+├── index.md # Table of contents
 
-├── metadata.md                 # Generation metadataThis will:# Using npm
+├── metadata.md # Generation metadataThis will:# Using npm
 
-├── file-structure.md           # Project structure and organization
+├── file-structure.md # Project structure and organization
 
-├── dependencies.md             # Dependency analysis1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
+├── dependencies.md # Dependency analysis1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google)
 
-├── patterns.md                 # Code patterns and practices
+├── patterns.md # Code patterns and practices
 
-├── flows.md                    # Data and control flows2. Ask for your API keynpm install -g @archdoc/generator- 🤖 **Multi-Agent Architecture** - Specialized agents for different analysis tasks
+├── flows.md # Data and control flows2. Ask for your API keynpm install -g @archdoc/generator- 🤖 **Multi-Agent Architecture** - Specialized agents for different analysis tasks
 
-├── schemas.md                  # Data structures and interfaces
+├── schemas.md # Data structures and interfaces
 
-├── architecture.md             # High-level architecture3. Create `.archdoc.config.json` with your configuration
+├── architecture.md # High-level architecture3. Create `.archdoc.config.json` with your configuration
 
-├── security.md                 # Security analysis and findings (NEW!)
+├── security.md # Security analysis and findings (NEW!)
 
-└── recommendations.md          # Improvement suggestions4. Validate your setup
+└── recommendations.md # Improvement suggestions4. Validate your setup
 
-```
+````
 
 
 
@@ -234,7 +230,7 @@ Each agent specializes in a specific analysis task:
 
 ### 🔒 Security Analyzer (New!)
 
-```````
+````
 
 The Security Analyzer agent provides comprehensive security analysis:
 
@@ -268,13 +264,9 @@ pnpm add -g @archdoc/generator- 📊 **Comprehensive Analysis** - Structure, dep
 
 - 🔵 **Info** - Recommendations (e.g., security best practices)# Analyze specific project
 
-
-
 **Supported Languages:**archdoc analyze /path/to/your/projectRun the interactive configuration wizard:
 
 JavaScript/TypeScript, Python, Java, C#, Go, Rust, PHP, Ruby
-
-
 
 ## 💡 Usage Examples
 
@@ -284,7 +276,7 @@ JavaScript/TypeScript, Python, Java, C#, Go, Rust, PHP, Ruby
 
 archdoc analyze --prompt "analyze dependencies and patterns"archdoc config --init
 
-```bash
+`````bash
 
 # Generate complete documentation````
 
@@ -304,7 +296,7 @@ archdoc analyze /path/to/project --output ./docs --depth deep
 
 archdoc analyze --prompt "analyze security vulnerabilities and dependencies"archdoc analyze --depth quick2. Ask for your API key
 
-```
+`````
 
 ```3. Create `.arch-docs/.archdoc.config.json` with your configuration
 
@@ -312,7 +304,7 @@ archdoc analyze --prompt "analyze security vulnerabilities and dependencies"arch
 
 4. Validate your setup
 
-```bash
+````````bash
 
 # Fast analysis for quick insights## 📚 Documentation
 
@@ -578,13 +570,9 @@ Options:
 
   --verbose                   Show detailed progress
 
-```
-
-
+````````
 
 ### Environment Variables## 💡 Usage ExamplesThe tool generates a multi-file documentation structure:- [Installation](#installation)
-
-
 
 | Variable | Description | Default |
 
@@ -610,7 +598,7 @@ archdoc analyze /path/to/project --output ./docs --depth deepdocs/
 
 See **[Configuration Guide](./docs/CONFIGURATION_GUIDE.md)** for detailed configuration options.
 
-```````
+`````````
 
 ## 🔍 Use Cases
 
@@ -987,7 +975,7 @@ The tool is **language-agnostic** and works with:
 
 - And more!
 
-````````
+`````````
 
 ## 🛠️ Configuration
 
@@ -997,7 +985,7 @@ The tool is **language-agnostic** and works with:
 
 ## 🔧 Programmatic Usage
 
-```bash
+````````bash
 
 archdoc analyze [path] [options]Use the library in your Node.js applications:
 
@@ -1025,13 +1013,11 @@ Options:## 🎨 What Gets Generated### Generate Documentation```
 
   --verbose                   Show detailed progress  FileSystemScanner
 
-```
+````````
 
 } from '@archdoc/generator';
 
 ### Environment Variables
-
-
 
 | Variable | Description | Default |
 
@@ -1051,27 +1037,19 @@ Options:## 🎨 What Gets Generated### Generate Documentation```
 
 | `LANGCHAIN_API_KEY` | LangSmith API key | - |
 
-| `LANGCHAIN_PROJECT` | LangSmith project name | - |├── index.md                    # Table of contentscd /path/to/your/project
-
-
+| `LANGCHAIN_PROJECT` | LangSmith project name | - |├── index.md # Table of contentscd /path/to/your/project
 
 ## 🔍 Use Cases// Generate documentation
 
+### 1. Onboarding New Developersconst docs = await orchestrator.generateDocumentation('/path/to/project', {├── metadata.md # Generation metadata
 
+Generate comprehensive docs to help new team members understand the codebase quickly. maxTokens: 100000,
 
-### 1. Onboarding New Developersconst docs = await orchestrator.generateDocumentation('/path/to/project', {├── metadata.md                 # Generation metadata
-
-
-
-Generate comprehensive docs to help new team members understand the codebase quickly.  maxTokens: 100000,
-
-
-
-```bash  parallel: true,├── file-structure.md           # Project structure and organizationarchdoc generate . --output ./docs```bash
+`bash  parallel: true,├── file-structure.md           # Project structure and organizationarchdoc generate . --output ./docs`bash
 
 archdoc analyze . --output ./onboarding-docs --depth deep
 
-```  iterativeRefinement: {
+````````iterativeRefinement: {
 
 
 
@@ -1185,7 +1163,7 @@ DocumentationGeneration-Complete
 
 └── AggregateResults┌───▼────┐ ┌──────▼──────┐ ┌────▼─────┐ ┌────▼─────┐
 
-```
+````````
 
 │ File │ │ Dependency │ │ Pattern │ │ Flow │| **File Structure** | Project organization, entry points | Directory tree, key files |
 
@@ -1223,7 +1201,7 @@ All agents use LangChain Expression Language (LCEL) for composable AI workflows:
 
 Built with:
 
-```typescript
+`````typescript
 
 - [LangChain](https://www.langchain.com/) - LLM orchestration framework
 
@@ -1357,7 +1335,7 @@ Options:# Fast analysis for quick insights
 
   --verbose                   Show detailed progress- Configuration and setup files
 
-````
+`````
 
 ````yaml
 
@@ -2094,7 +2072,7 @@ archdoc generate ./my-django-app \    "ttl": 3600
 
   --model gpt-4-turbo}
 
-````````
+```````
 
 ### React Frontend### Environment Variables
 
