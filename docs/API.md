@@ -121,50 +121,345 @@ For detailed type definitions, please refer to the source code.
 
 ## ✨ Advanced Usage
 
-### Custom Agent
+### Creating Custom Agents
 
-You can create your own custom agents by implementing the `Agent` interface.
+You can extend the library with custom agents or override existing ones by implementing the `Agent` interface.
+
+#### Basic Custom Agent
 
 ```typescript
-import { Agent, AgentContext, AgentResult, AgentMetadata } from '@archdoc/generator';
+import {
+  Agent,
+  AgentMetadata,
+  AgentContext,
+  AgentResult,
+  AgentPriority,
+  AgentExecutionOptions,
+  LLMService,
+} from '@techdebtgpt/archdoc-generator';
 
-class MyCustomAgent implements Agent {
-  getMetadata(): AgentMetadata {
-    // Return metadata for your agent
+export class CustomSecurityAgent implements Agent {
+  private llmService: LLMService;
+
+  constructor() {
+    this.llmService = LLMService.getInstance();
   }
 
-  async execute(context: AgentContext): Promise<AgentResult> {
-    // Implement your analysis logic here
+  public getMetadata(): AgentMetadata {
+    return {
+      name: 'custom-security',
+      version: '1.0.0',
+      description: 'Custom security analysis with company-specific rules',
+      priority: AgentPriority.MEDIUM,
+      capabilities: {
+        supportsParallel: true,
+        requiresInternet: false,
+        supportedLanguages: ['typescript', 'javascript', 'python'],
+        dependencies: [], // Can depend on other agents
+      },
+      tags: ['security', 'custom'],
+    };
+  }
+
+  public async execute(
+    context: AgentContext,
+    options?: AgentExecutionOptions,
+  ): Promise<AgentResult> {
+    const startTime = Date.now();
+    const model = this.llmService.getChatModel({ temperature: 0.2 });
+
+    // Your custom analysis logic
+    const analysis = await this.performAnalysis(context, model);
+
+    return {
+      agentName: this.getMetadata().name,
+      status: 'success',
+      data: { findings: analysis.findings },
+      summary: `Found ${analysis.findings.length} security issues`,
+      markdown: this.formatReport(analysis),
+      confidence: 0.85,
+      tokenUsage: {
+        inputTokens: analysis.inputTokens,
+        outputTokens: analysis.outputTokens,
+        totalTokens: analysis.inputTokens + analysis.outputTokens,
+      },
+      executionTime: Date.now() - startTime,
+      errors: [],
+      warnings: [],
+      metadata: {},
+    };
+  }
+
+  private async performAnalysis(context: AgentContext, model: any) {
+    // Implementation...
+    return { findings: [], inputTokens: 1000, outputTokens: 500 };
+  }
+
+  private formatReport(analysis: any): string {
+    return `# Security Analysis\n\n...`;
+  }
+}
+```
+
+#### Registering Custom Agents
+
+```typescript
+import {
+  DocumentationOrchestrator,
+  AgentRegistry,
+  LLMService,
+  FileSystemScanner,
+  MultiFileMarkdownFormatter,
+} from '@techdebtgpt/archdoc-generator';
+import { CustomSecurityAgent } from './custom-security-agent';
+
+async function generateWithCustomAgent(projectPath: string, outputDir: string) {
+  // Initialize services
+  const llmService = LLMService.getInstance();
+  llmService.initialize({
+    provider: 'anthropic',
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+    model: 'claude-3-5-sonnet-20241022',
+  });
+
+  const scanner = new FileSystemScanner();
+  const formatter = new MultiFileMarkdownFormatter();
+
+  // Create agent registry and add custom agent
+  const agentRegistry = new AgentRegistry();
+  agentRegistry.register(new CustomSecurityAgent());
+
+  // Create orchestrator with custom registry
+  const orchestrator = new DocumentationOrchestrator(
+    llmService,
+    scanner,
+    formatter,
+    agentRegistry,
+  );
+
+  // Generate documentation using your custom agent
+  const result = await orchestrator.generate({
+    projectPath,
+    outputPath: outputDir,
+    selectedAgents: ['custom-security'],
+  });
+
+  return result;
+}
+```
+
+#### Overriding Built-in Agents
+
+You can extend and override existing agents:
+
+```typescript
+import {
+  DependencyAnalyzerAgent,
+  AgentContext,
+  AgentResult,
+  AgentExecutionOptions,
+} from '@techdebtgpt/archdoc-generator';
+
+export class EnhancedDependencyAgent extends DependencyAnalyzerAgent {
+  public async execute(
+    context: AgentContext,
+    options?: AgentExecutionOptions,
+  ): Promise<AgentResult> {
+    // Call parent implementation
+    const baseResult = await super.execute(context, options);
+
+    // Add your custom enhancements
+    const enhanced = {
+      ...baseResult.data,
+      customMetrics: {
+        internalDependencies: 42,
+        externalDependencies: 15,
+      },
+    };
+
+    return {
+      ...baseResult,
+      data: enhanced,
+      summary: `${baseResult.summary} + custom analysis`,
+    };
   }
 }
 
-// Register your custom agent
-const registry = new AgentRegistry();
-registry.register(new MyCustomAgent());
+// Use it
+const agentRegistry = new AgentRegistry();
+agentRegistry.register(new EnhancedDependencyAgent()); // Replaces default
+```
+
+#### Agent Dependencies
+
+Your custom agent can depend on results from other agents:
+
+```typescript
+public getMetadata(): AgentMetadata {
+  return {
+    name: 'custom-quality',
+    capabilities: {
+      // This agent runs after these agents
+      dependencies: ['file-structure', 'dependency-analyzer'],
+      supportsParallel: false,
+    },
+  };
+}
+
+public async execute(context: AgentContext): Promise<AgentResult> {
+  // Access results from dependency agents
+  const fileStructure = context.previousResults.get('file-structure');
+  const dependencies = context.previousResults.get('dependency-analyzer');
+
+  // Use their data
+  const analysis = this.analyzeQuality(fileStructure, dependencies);
+  // ...
+}
+```
+
+#### Managing Agents
+
+```typescript
+const agentRegistry = new AgentRegistry();
+
+// Register
+agentRegistry.register(new CustomSecurityAgent());
+
+// Unregister
+agentRegistry.unregister('security-analyzer');
+
+// Check if exists
+if (agentRegistry.hasAgent('pattern-detector')) {
+  console.log('Pattern detector available');
+}
+
+// Get all agents
+const allAgents = agentRegistry.getAllAgents();
+console.log(`Total agents: ${agentRegistry.getAgentCount()}`);
+
+// Get by priority
+const priorityAgents = agentRegistry.getAgentsByPriority();
+
+// Get by tags
+const securityAgents = agentRegistry.getAgentsByTags(['security']);
 ```
 
 ### Custom Workflow
 
-For more complex scenarios, you can create a custom workflow to control the entire process.
+For more complex scenarios, you can create a custom workflow:
 
 ```typescript
-import { DocumentationOrchestrator, AgentRegistry, FileSystemScanner } from '@archdoc/generator';
+import {
+  DocumentationOrchestrator,
+  AgentRegistry,
+  FileSystemScanner,
+  MultiFileMarkdownFormatter,
+  LLMService,
+} from '@techdebtgpt/archdoc-generator';
 
 class CustomWorkflow {
   private orchestrator: DocumentationOrchestrator;
 
   constructor() {
+    const llmService = LLMService.getInstance();
     const scanner = new FileSystemScanner();
+    const formatter = new MultiFileMarkdownFormatter();
     const registry = new AgentRegistry();
+    
     // Register specific agents for your workflow
-    this.orchestrator = new DocumentationOrchestrator(registry, scanner);
+    this.orchestrator = new DocumentationOrchestrator(
+      llmService,
+      scanner,
+      formatter,
+      registry,
+    );
   }
 
   async run(projectPath: string) {
-    const output = await this.orchestrator.generateDocumentation(projectPath, {
-      // Custom options
+    const output = await this.orchestrator.generate({
+      projectPath,
+      outputPath: './docs',
+      selectedAgents: ['file-structure', 'dependency-analyzer'],
     });
     return output;
+  }
+}
+```
+
+### Complete Example: Company Compliance Agent
+
+```typescript
+import {
+  Agent,
+  AgentMetadata,
+  AgentContext,
+  AgentResult,
+  AgentPriority,
+} from '@techdebtgpt/archdoc-generator';
+
+export class CompanyComplianceAgent implements Agent {
+  private companyRules = {
+    requiredLicenses: ['MIT', 'Apache-2.0'],
+    forbiddenPackages: ['left-pad'],
+    requiredFiles: ['SECURITY.md', 'CODE_OF_CONDUCT.md'],
+  };
+
+  public getMetadata(): AgentMetadata {
+    return {
+      name: 'company-compliance',
+      version: '1.0.0',
+      description: 'Enforces company-specific compliance rules',
+      priority: AgentPriority.HIGH,
+      capabilities: {
+        supportsParallel: true,
+        requiresInternet: false,
+        supportedLanguages: [],
+        dependencies: ['dependency-analyzer'],
+      },
+      tags: ['compliance', 'security'],
+    };
+  }
+
+  public async execute(context: AgentContext): Promise<AgentResult> {
+    const violations: string[] = [];
+
+    // Check required files
+    const missingFiles = this.companyRules.requiredFiles.filter(
+      (file) => !context.fileTree.some((f) => f.path.endsWith(file)),
+    );
+    violations.push(...missingFiles.map((f) => `Missing: ${f}`));
+
+    // Check licenses from dependency analyzer
+    const deps = context.previousResults.get('dependency-analyzer');
+    if (deps) {
+      violations.push(...this.checkLicenses(deps.data));
+    }
+
+    return {
+      agentName: 'company-compliance',
+      status: violations.length > 0 ? 'warning' : 'success',
+      data: { violations, rules: this.companyRules },
+      summary: `Found ${violations.length} compliance violations`,
+      markdown: this.formatReport(violations),
+      confidence: 1.0,
+      tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      executionTime: 50,
+      errors: [],
+      warnings: violations,
+      metadata: {},
+    };
+  }
+
+  private checkLicenses(dependencyData: any): string[] {
+    // Check against allowed licenses
+    return [];
+  }
+
+  private formatReport(violations: string[]): string {
+    if (violations.length === 0) {
+      return '# Compliance Check\n\n✅ All rules passed!';
+    }
+    return `# Violations\n\n${violations.map((v) => `- ❌ ${v}`).join('\n')}`;
   }
 }
 ```

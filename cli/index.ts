@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Load ArchDoc configuration
 // Looks for .archdoc.config.json in: root folder first, then .arch-docs/ folder
 import * as path from 'path';
