@@ -55,6 +55,7 @@
     "enabled": false,
     "apiKey": "",
     "project": "archdoc-analysis",
+    "runName": "analysis-{timestamp}",
     "endpoint": "https://api.smith.langchain.com"
   }
 }

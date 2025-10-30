@@ -237,6 +237,7 @@ export async function analyzeProject(
         clarityThreshold: options.refinementThreshold || depthConfig.clarityThreshold,
         minImprovement: options.refinementImprovement || 10,
       },
+      runName: process.env.ARCHDOC_RUN_NAME, // Custom run name from config (supports {timestamp}, {agent}, {project})
       agentOptions: {
         runnableConfig: {
           runName: 'DocumentationGeneration-Complete',

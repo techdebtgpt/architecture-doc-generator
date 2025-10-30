@@ -39,6 +39,7 @@ if (fs.existsSync(configPath)) {
       if (config.tracing.apiKey) process.env.LANGCHAIN_API_KEY = config.tracing.apiKey;
       if (config.tracing.project) process.env.LANGCHAIN_PROJECT = config.tracing.project;
       if (config.tracing.endpoint) process.env.LANGCHAIN_ENDPOINT = config.tracing.endpoint;
+      if (config.tracing.runName) process.env.ARCHDOC_RUN_NAME = config.tracing.runName;
     }
   } catch (_err) {
     // Ignore parse errors, config will use defaults or explicit env vars

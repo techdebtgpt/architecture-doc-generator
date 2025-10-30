@@ -209,6 +209,12 @@ The orchestrator coordinates agents to perform analysis.
 └────────┘  └───────┘  └───────┘
 ```
 
+### Self-Refining Analysis
+
+Each agent autonomously improves its analysis through iterative refinement. It evaluates its own output, identifies gaps, searches for relevant code, and refines until quality thresholds are met.
+
+**[Learn how the self-refinement workflow works →](./docs/AGENT_WORKFLOW.md)**
+
 ### LangChain LCEL Integration
 
 All agents use LangChain Expression Language (LCEL) for composable AI workflows with unified LangSmith tracing.

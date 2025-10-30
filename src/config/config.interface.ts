@@ -63,5 +63,6 @@ export interface AppConfig {
   tracing: {
     enabled: boolean;
     project: string;
+    runName?: string; // Custom run name for easier trace identification
   };
 }

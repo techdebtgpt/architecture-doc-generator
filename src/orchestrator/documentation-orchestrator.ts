@@ -105,6 +105,7 @@ export interface OrchestratorOptions {
   iterativeRefinement?: IterativeRefinementConfig;
   agentOptions?: AgentExecutionOptions;
   onAgentProgress?: (current: number, total: number, agentName: string) => void;
+  runName?: string; // Custom run name for LangSmith tracing (supports {timestamp}, {agent}, {project})
 }
 
 /**
@@ -299,10 +300,17 @@ export class DocumentationOrchestrator {
     };
 
     // Execute agent with runnable config for tracing
+    const customRunName = options.runName
+      ? options.runName
+          .replace('{timestamp}', new Date().toISOString())
+          .replace('{agent}', agentName)
+          .replace('{project}', projectPath.split(/[\\/]/).pop() || 'unknown')
+      : `Agent-${agentName}`;
+
     const agentOptions: AgentExecutionOptions = {
       ...options.agentOptions,
       runnableConfig: {
-        runName: `Agent-${agentName}`,
+        runName: customRunName,
       },
     };
 
