@@ -63,7 +63,7 @@ For the automated release workflow to function correctly, all commit messages **
 git commit -m "feat: add support for flow visualization"
 
 # A bug fix
-git commit -m "fix: correct token counting for Claude 3"
+git commit -m "fix: correct token counting for Claude 4.5"
 ```
 
 ## ⏩ Manual Control

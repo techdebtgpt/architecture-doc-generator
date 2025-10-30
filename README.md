@@ -29,7 +29,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 - 🤖 **7 Specialized Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, and Security.
 - 🌍 **Language Agnostic**: Works with TypeScript, Python, Java, Go, and more.
-- 🧠 **AI-Powered**: Uses LangChain with Claude 3.5, GPT-4, or Gemini.
+- 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, GPT-5, Gemini 2.5, or Grok 3.
 - 📊 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, and security.
 - 📝 **Markdown Output**: Clean, version-controllable documentation.
 - 🔄 **Iterative Refinement**: Self-improving analysis with quality checks.

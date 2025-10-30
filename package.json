@@ -54,16 +54,16 @@
     "ci-cd",
     "devops"
   ],
-  "author": "Ritech Team",
+  "author": "TechDebtGPT Team",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ritech/architecture-doc-generator.git"
+    "url": "https://github.com/techdebtgpt/architecture-doc-generator.git"
   },
   "bugs": {
-    "url": "https://github.com/ritech/architecture-doc-generator/issues"
+    "url": "https://github.com/techdebtgpt/architecture-doc-generator/issues"
   },
-  "homepage": "https://github.com/ritech/architecture-doc-generator#readme",
+  "homepage": "https://techdebtgpt.com",
   "engines": {
     "node": ">=18.0.0"
   },
