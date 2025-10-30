@@ -6,6 +6,7 @@ import { ILLMProvider } from './llm-provider.interface';
 import { AnthropicProvider } from './providers/anthropic-provider';
 import { OpenAIProvider } from './providers/openai-provider';
 import { GoogleProvider } from './providers/google-provider';
+import { XAIProvider } from './providers/xai-provider';
 import { TokenManager } from './token-manager';
 import { LLMProvider, LLMRequestOptions, LLMResponse, TokenUsageDetails } from '../types/llm.types';
 import { Logger } from '../utils/logger';
@@ -31,6 +32,7 @@ export class LLMService {
     this.providers.set(LLMProvider.ANTHROPIC, new AnthropicProvider());
     this.providers.set(LLMProvider.OPENAI, new OpenAIProvider());
     this.providers.set(LLMProvider.GOOGLE, new GoogleProvider());
+    this.providers.set(LLMProvider.XAI, new XAIProvider());
 
     // Set default provider based on configuration
     this.defaultProvider = this.getDefaultProviderFromEnv();
@@ -297,6 +299,8 @@ Standalone Question:`;
         return LLMProvider.OPENAI;
       case 'google':
         return LLMProvider.GOOGLE;
+      case 'xai':
+        return LLMProvider.XAI;
       case 'anthropic':
       default:
         return LLMProvider.ANTHROPIC;
@@ -306,13 +310,15 @@ Standalone Question:`;
   private getDefaultModel(provider: LLMProvider): string {
     switch (provider) {
       case LLMProvider.ANTHROPIC:
-        return process.env.ARCHDOC_LLM_MODEL || 'claude-sonnet-4-20250514';
+        return process.env.ARCHDOC_LLM_MODEL || 'claude-sonnet-4-5-20250929';
       case LLMProvider.OPENAI:
-        return process.env.ARCHDOC_LLM_MODEL || 'gpt-4-turbo';
+        return process.env.ARCHDOC_LLM_MODEL || 'gpt-5';
       case LLMProvider.GOOGLE:
-        return process.env.ARCHDOC_LLM_MODEL || 'gemini-1.5-pro';
+        return process.env.ARCHDOC_LLM_MODEL || 'gemini-2.5-pro';
+      case LLMProvider.XAI:
+        return process.env.ARCHDOC_LLM_MODEL || 'grok-3-beta';
       default:
-        return 'claude-sonnet-4-20250514';
+        return 'claude-sonnet-4-5-20250929';
     }
   }
 

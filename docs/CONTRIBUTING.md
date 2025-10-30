@@ -14,20 +14,24 @@ First off, thank you for considering contributing! We welcome any help, from bug
 ### Setup
 
 1.  **Fork & Clone**:
+
     ```bash
     git clone https://github.com/YOUR_USERNAME/architecture-doc-generator.git
     cd architecture-doc-generator
     ```
 
 2.  **Install Dependencies**:
+
     ```bash
     npm install
     ```
 
 3.  **Configure**: Create a `.archdoc.config.json` file in the root directory and add your API keys. You can start by copying the example:
+
     ```bash
     node dist/cli/index.js config --init
     ```
+
     Then, edit the newly created `.archdoc.config.json` to add your keys.
 
 4.  **Build & Test**:
@@ -39,6 +43,7 @@ First off, thank you for considering contributing! We welcome any help, from bug
 ## 🛠️ Development Workflow
 
 1.  **Create a Branch**: Name your branch using prefixes like `feature/`, `fix/`, or `docs/`.
+
     ```bash
     git checkout -b feature/my-awesome-feature
     ```
@@ -46,12 +51,14 @@ First off, thank you for considering contributing! We welcome any help, from bug
 2.  **Make Changes**: Write your code, following the project's style guidelines.
 
 3.  **Test Your Changes**:
+
     ```bash
     npm run lint:fix   # Fix linting issues
     npm test           # Run all unit tests
     ```
 
 4.  **Commit Your Work**: Use [Conventional Commits](https://www.conventionalcommits.org/) for clear and descriptive commit messages.
+
     ```bash
     git commit -m "feat: add new security analysis agent"
     ```

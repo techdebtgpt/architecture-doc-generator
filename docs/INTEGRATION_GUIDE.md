@@ -24,7 +24,7 @@ name: Generate Architecture Documentation
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   generate-docs:

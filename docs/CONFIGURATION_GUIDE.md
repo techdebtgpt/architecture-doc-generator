@@ -37,16 +37,13 @@ For project-specific settings, create a `.archdoc.config.json` file in your proj
 {
   "llm": {
     "provider": "anthropic",
-    "model": "claude-3-5-sonnet-20240620",
+    "model": "claude-sonnet-4-5-20250929",
     "temperature": 0.2,
     "maxTokens": 4096
   },
   "scan": {
     "maxFiles": 1000,
-    "excludePatterns": [
-      "**/node_modules/**",
-      "**/dist/**"
-    ]
+    "excludePatterns": ["**/node_modules/**", "**/dist/**"]
   },
   "output": {
     "directory": ".arch-docs",
@@ -70,6 +67,7 @@ You must provide an API key for at least one LLM provider.
 - `ANTHROPIC_API_KEY`: Your API key for Anthropic Claude.
 - `OPENAI_API_KEY`: Your API key for OpenAI.
 - `GOOGLE_API_KEY`: Your API key for Google Gemini.
+- `XAI_API_KEY`: Your API key for xAI Grok.
 
 ### Optional Variables
 

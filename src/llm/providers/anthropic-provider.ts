@@ -14,13 +14,73 @@ export class AnthropicProvider implements ILLMProvider {
 
   // Model configurations
   private readonly models = {
+    'claude-opus-4-1-20250805': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 15.0,
+      costPerMillionOutputTokens: 75.0,
+    },
+    'claude-sonnet-4-5-20250929': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 3.0,
+      costPerMillionOutputTokens: 15.0,
+    },
+    'claude-haiku-4-5-20251001': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 0.25,
+      costPerMillionOutputTokens: 1.25,
+    },
     'claude-sonnet-4-20250514': {
       maxInputTokens: 200000,
       maxOutputTokens: 8192,
       costPerMillionInputTokens: 3.0,
       costPerMillionOutputTokens: 15.0,
     },
+    'claude-sonnet-4-20250514-thinking': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 3.0,
+      costPerMillionOutputTokens: 15.0,
+    },
+    'claude-opus-4-20250514': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 15.0,
+      costPerMillionOutputTokens: 75.0,
+    },
+    'claude-opus-4-20250514-thinking': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 15.0,
+      costPerMillionOutputTokens: 75.0,
+    },
+    'claude-3-7-sonnet-latest': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 3.0,
+      costPerMillionOutputTokens: 15.0,
+    },
+    'claude-3-7-sonnet-20250219': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 3.0,
+      costPerMillionOutputTokens: 15.0,
+    },
+    'claude-3-5-sonnet-latest': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 3.0,
+      costPerMillionOutputTokens: 15.0,
+    },
     'claude-3-5-sonnet-20241022': {
+      maxInputTokens: 200000,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 3.0,
+      costPerMillionOutputTokens: 15.0,
+    },
+    'claude-3-5-sonnet-20240620': {
       maxInputTokens: 200000,
       maxOutputTokens: 8192,
       costPerMillionInputTokens: 3.0,
@@ -64,7 +124,7 @@ export class AnthropicProvider implements ILLMProvider {
   }
 
   public getChatModel(config?: any, _agentContext?: string): ChatAnthropic {
-    const modelName = config?.model || 'claude-sonnet-4-20250514';
+    const modelName = config?.model || 'claude-sonnet-4-5-20250929';
     const temperature = config?.temperature ?? 0.2;
     const maxTokens = config?.maxTokens ?? 4096;
 

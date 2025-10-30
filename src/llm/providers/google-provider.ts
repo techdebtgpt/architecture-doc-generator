@@ -13,6 +13,24 @@ export class GoogleProvider implements ILLMProvider {
 
   // Model configurations
   private readonly models = {
+    'gemini-2.5-pro': {
+      maxInputTokens: 2097152,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 1.0,
+      costPerMillionOutputTokens: 4.0,
+    },
+    'gemini-2.5-flash': {
+      maxInputTokens: 1048576,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 0.05,
+      costPerMillionOutputTokens: 0.2,
+    },
+    'gemini-2.5-flash-lite': {
+      maxInputTokens: 1048576,
+      maxOutputTokens: 8192,
+      costPerMillionInputTokens: 0.025,
+      costPerMillionOutputTokens: 0.1,
+    },
     'gemini-1.5-pro': {
       maxInputTokens: 2097152,
       maxOutputTokens: 8192,
@@ -48,7 +66,7 @@ export class GoogleProvider implements ILLMProvider {
     maxTokens?: number;
     topP?: number;
   }): BaseChatModel {
-    const modelName = config.model || 'gemini-1.5-flash';
+    const modelName = config.model || 'gemini-2.5-pro';
 
     return new ChatGoogleGenerativeAI({
       apiKey: this.apiKey,

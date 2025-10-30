@@ -4,49 +4,32 @@ import { ILLMProvider } from '../llm-provider.interface';
 import { TokenManager } from '../token-manager';
 
 /**
- * OpenAI GPT provider implementation
+ * xAI Grok provider implementation
+ * Uses OpenAI-compatible API
  */
-export class OpenAIProvider implements ILLMProvider {
-  public readonly name = 'openai';
+export class XAIProvider implements ILLMProvider {
+  public readonly name = 'xai';
   private readonly apiKey: string;
   private readonly tokenManager: TokenManager;
 
   // Model configurations
   private readonly models = {
-    'gpt-5': {
-      maxInputTokens: 256000,
+    'grok-3-beta': {
+      maxInputTokens: 131072,
       maxOutputTokens: 8192,
-      costPerMillionInputTokens: 20.0,
-      costPerMillionOutputTokens: 60.0,
+      costPerMillionInputTokens: 5.0,
+      costPerMillionOutputTokens: 15.0,
     },
-    'gpt-4.1': {
-      maxInputTokens: 128000,
+    'grok-2': {
+      maxInputTokens: 131072,
       maxOutputTokens: 8192,
-      costPerMillionInputTokens: 10.0,
-      costPerMillionOutputTokens: 30.0,
-    },
-    'gpt-4-turbo': {
-      maxInputTokens: 128000,
-      maxOutputTokens: 4096,
-      costPerMillionInputTokens: 10.0,
-      costPerMillionOutputTokens: 30.0,
-    },
-    'gpt-4': {
-      maxInputTokens: 8192,
-      maxOutputTokens: 4096,
-      costPerMillionInputTokens: 30.0,
-      costPerMillionOutputTokens: 60.0,
-    },
-    'gpt-3.5-turbo': {
-      maxInputTokens: 16384,
-      maxOutputTokens: 4096,
-      costPerMillionInputTokens: 0.5,
-      costPerMillionOutputTokens: 1.5,
+      costPerMillionInputTokens: 2.0,
+      costPerMillionOutputTokens: 10.0,
     },
   };
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.OPENAI_API_KEY || '';
+    this.apiKey = apiKey || process.env.XAI_API_KEY || '';
     this.tokenManager = TokenManager.getInstance();
   }
 
@@ -60,7 +43,7 @@ export class OpenAIProvider implements ILLMProvider {
     maxTokens?: number;
     topP?: number;
   }): BaseChatModel {
-    const modelName = config.model || 'gpt-5';
+    const modelName = config.model || 'grok-3-beta';
 
     return new ChatOpenAI({
       openAIApiKey: this.apiKey,
@@ -68,6 +51,9 @@ export class OpenAIProvider implements ILLMProvider {
       temperature: config.temperature ?? 0.2,
       maxTokens: config.maxTokens ?? 4096,
       topP: config.topP,
+      configuration: {
+        baseURL: 'https://api.x.ai/v1',
+      },
     }) as BaseChatModel;
   }
 
@@ -78,12 +64,13 @@ export class OpenAIProvider implements ILLMProvider {
   public getModelConfig(model: string) {
     const config = this.models[model as keyof typeof this.models];
     if (!config) {
-      throw new Error(`Unknown OpenAI model: ${model}`);
+      throw new Error(`Unknown xAI model: ${model}`);
     }
     return config;
   }
 
   public async countTokens(text: string, model?: string): Promise<number> {
-    return Promise.resolve(this.tokenManager.countTokens(text, model || 'gpt-5'));
+    // xAI uses similar tokenization to GPT-4
+    return Promise.resolve(this.tokenManager.countTokens(text, model || 'gpt-4'));
   }
 }

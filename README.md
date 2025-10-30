@@ -1,6 +1,6 @@
 # 🏗️ ArchDoc Generator
 
-[![npm version](https://img.shields.io/npm/v/@archdoc/generator.svg)](https://www.npmjs.com/package/@archdoc/generator)
+[![npm version](https://img.shields.io/npm/v/@techdebtgpt/archdoc-generator.svg)](https://www.npmjs.com/package/@techdebtgpt/archdoc-generator)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
@@ -41,13 +41,13 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 ```bash
 # Using npm
-npm install -g @archdoc/generator
+npm install -g @techdebtgpt/archdoc-generator
 
 # Using yarn
-yarn global add @archdoc/generator
+yarn global add @techdebtgpt/archdoc-generator
 
 # Using pnpm
-pnpm add -g @archdoc/generator
+pnpm add -g @techdebtgpt/archdoc-generator
 ```
 
 ### Interactive Setup (Recommended)
@@ -59,6 +59,7 @@ archdoc config --init
 ```
 
 This will:
+
 1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google).
 2. Ask for your API key.
 3. Create `.archdoc.config.json` with your configuration.
@@ -91,18 +92,18 @@ archdoc analyze [path] [options]
 
 **Options:**
 
-| Option | Description | Default |
-|---|---|---|
-| `--output <dir>` | Output directory | `.arch-docs` |
-| `--prompt <text>` | Focus analysis with natural language | |
-| `--depth <level>` | Analysis depth: `quick`, `normal`, `deep` | `normal` |
-| `--provider <name>` | LLM provider: `anthropic`, `openai`, `google` | |
-| `--model <name>` | Specific model to use | |
-| `--refinement` | Enable iterative refinement | `true` |
-| `--refinement-iterations <n>` | Max refinement iterations | `5` |
-| `--refinement-threshold <n>` | Clarity threshold % | `80` |
-| `--no-clean` | Don't clear output directory | |
-| `--verbose` | Show detailed progress | |
+| Option                        | Description                                   | Default      |
+| ----------------------------- | --------------------------------------------- | ------------ |
+| `--output <dir>`              | Output directory                              | `.arch-docs` |
+| `--prompt <text>`             | Focus analysis with natural language          |              |
+| `--depth <level>`             | Analysis depth: `quick`, `normal`, `deep`     | `normal`     |
+| `--provider <name>`           | LLM provider: `anthropic`, `openai`, `google` |              |
+| `--model <name>`              | Specific model to use                         |              |
+| `--refinement`                | Enable iterative refinement                   | `true`       |
+| `--refinement-iterations <n>` | Max refinement iterations                     | `5`          |
+| `--refinement-threshold <n>`  | Clarity threshold %                           | `80`         |
+| `--no-clean`                  | Don't clear output directory                  |              |
+| `--verbose`                   | Show detailed progress                        |              |
 
 ## 🔧 Programmatic Usage
 
@@ -113,7 +114,7 @@ import {
   DocumentationOrchestrator,
   AgentRegistry,
   FileSystemScanner,
-} from '@archdoc/generator';
+} from '@techdebtgpt/archdoc-generator';
 
 // Setup registry with agents
 const registry = new AgentRegistry();
@@ -140,16 +141,17 @@ See the **[API Reference](./docs/API.md)** for complete programmatic documentati
 
 ### Environment Variables
 
-| Variable | Description |
-|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic Claude API key |
-| `OPENAI_API_KEY` | OpenAI GPT API key |
-| `GOOGLE_API_KEY` | Google Gemini API key |
-| `DEFAULT_LLM_PROVIDER` | Default provider (e.g., `anthropic`) |
-| `DEFAULT_LLM_MODEL` | Default model (e.g., `claude-3-5-sonnet-20240620`) |
-| `LANGCHAIN_TRACING_V2` | Enable LangSmith tracing (`true`) |
-| `LANGCHAIN_API_KEY` | LangSmith API key |
-| `LANGCHAIN_PROJECT` | LangSmith project name |
+| Variable               | Description                                        |
+| ---------------------- | -------------------------------------------------- |
+| `ANTHROPIC_API_KEY`    | Anthropic Claude API key                           |
+| `OPENAI_API_KEY`       | OpenAI GPT API key                                 |
+| `GOOGLE_API_KEY`       | Google Gemini API key                              |
+| `XAI_API_KEY`          | xAI Grok API key                                   |
+| `DEFAULT_LLM_PROVIDER` | Default provider (e.g., `anthropic`)               |
+| `DEFAULT_LLM_MODEL`    | Default model (e.g., `claude-sonnet-4-5-20250929`) |
+| `LANGCHAIN_TRACING_V2` | Enable LangSmith tracing (`true`)                  |
+| `LANGCHAIN_API_KEY`    | LangSmith API key                                  |
+| `LANGCHAIN_PROJECT`    | LangSmith project name                             |
 
 See the **[Configuration Guide](./docs/CONFIGURATION_GUIDE.md)** for detailed options.
 
@@ -175,15 +177,15 @@ docs/
 
 Each agent specializes in a specific analysis task:
 
-| Agent | Purpose | Priority |
-|---|---|---|
-| **File Structure** | Project organization, entry points | HIGH |
-| **Dependency Analyzer** | External deps, internal imports | HIGH |
-| **Architecture Analyzer** | High-level design | HIGH |
-| **Pattern Detector** | Design patterns, conventions | MEDIUM |
-| **Flow Visualization** | Control & data flows | MEDIUM |
-| **Schema Generator** | Data models, interfaces | MEDIUM |
-| **Security Analyzer** | Vulnerabilities, auth, crypto | MEDIUM |
+| Agent                     | Purpose                            | Priority |
+| ------------------------- | ---------------------------------- | -------- |
+| **File Structure**        | Project organization, entry points | HIGH     |
+| **Dependency Analyzer**   | External deps, internal imports    | HIGH     |
+| **Architecture Analyzer** | High-level design                  | HIGH     |
+| **Pattern Detector**      | Design patterns, conventions       | MEDIUM   |
+| **Flow Visualization**    | Control & data flows               | MEDIUM   |
+| **Schema Generator**      | Data models, interfaces            | MEDIUM   |
+| **Security Analyzer**     | Vulnerabilities, auth, crypto      | MEDIUM   |
 
 ## 🏗️ Architecture Highlights
 

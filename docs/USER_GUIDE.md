@@ -41,6 +41,7 @@ archdoc config --init
 ```
 
 This command will guide you through:
+
 - Choosing an LLM provider (Anthropic, OpenAI, or Google).
 - Setting up your API key.
 - Creating a `.archdoc.config.json` file with your settings.
@@ -66,7 +67,7 @@ The generated documentation will be saved in the output directory (default: `.ar
 cat .arch-docs/index.md
 ```
 
-##  CLI Reference
+## CLI Reference
 
 ### `analyze`
 
@@ -77,19 +78,20 @@ archdoc analyze [path] [options]
 ```
 
 **Arguments:**
+
 - `[path]`: The path to the project you want to analyze. Defaults to the current directory.
 
 **Options:**
 
-| Flag | Description | Default |
-|---|---|---|
-| `--output <dir>` | Specifies the output directory for the generated files. | `.arch-docs` |
-| `--prompt <text>` | A natural language prompt to focus the analysis on specific aspects. | |
-| `--depth <level>` | The depth of the analysis. Can be `quick`, `normal`, or `deep`. | `normal` |
-| `--provider <name>` | The LLM provider to use (`anthropic`, `openai`, `google`). | |
-| `--model <name>` | The specific LLM model to use. | |
-| `--no-refinement` | Disables the iterative refinement process for a faster analysis. | |
-| `--verbose` | Shows detailed progress and debugging information. | |
+| Flag                | Description                                                          | Default      |
+| ------------------- | -------------------------------------------------------------------- | ------------ |
+| `--output <dir>`    | Specifies the output directory for the generated files.              | `.arch-docs` |
+| `--prompt <text>`   | A natural language prompt to focus the analysis on specific aspects. |              |
+| `--depth <level>`   | The depth of the analysis. Can be `quick`, `normal`, or `deep`.      | `normal`     |
+| `--provider <name>` | The LLM provider to use (`anthropic`, `openai`, `google`).           |              |
+| `--model <name>`    | The specific LLM model to use.                                       |              |
+| `--no-refinement`   | Disables the iterative refinement process for a faster analysis.     |              |
+| `--verbose`         | Shows detailed progress and debugging information.                   |              |
 
 ### `config`
 
@@ -101,13 +103,13 @@ archdoc config [options]
 
 **Options:**
 
-| Flag | Description |
-|---|---|
-| `--init` | Starts the interactive setup wizard. |
-| `--list` | Displays the current configuration settings. |
-| `--get <key>` | Retrieves the value of a specific configuration key. |
-| `--set <key=value>` | Sets a new value for a configuration key. |
-| `--reset` | Resets the configuration to its default settings. |
+| Flag                | Description                                          |
+| ------------------- | ---------------------------------------------------- |
+| `--init`            | Starts the interactive setup wizard.                 |
+| `--list`            | Displays the current configuration settings.         |
+| `--get <key>`       | Retrieves the value of a specific configuration key. |
+| `--set <key=value>` | Sets a new value for a configuration key.            |
+| `--reset`           | Resets the configuration to its default settings.    |
 
 ## ⚙️ Configuration
 
@@ -119,7 +121,7 @@ You can configure the generator by creating a `.archdoc.config.json` file in you
 {
   "llm": {
     "provider": "anthropic",
-    "model": "claude-3-5-sonnet-20240620",
+    "model": "claude-sonnet-4-5-20250929",
     "temperature": 0.2
   },
   "output": {
@@ -127,10 +129,7 @@ You can configure the generator by creating a `.archdoc.config.json` file in you
     "format": "markdown"
   },
   "scan": {
-    "excludePatterns": [
-      "**/node_modules/**",
-      "**/dist/**"
-    ]
+    "excludePatterns": ["**/node_modules/**", "**/dist/**"]
   }
 }
 ```
@@ -142,6 +141,7 @@ You can also use environment variables to configure the generator, which is usef
 - `ANTHROPIC_API_KEY`: Your API key for Anthropic Claude.
 - `OPENAI_API_KEY`: Your API key for OpenAI.
 - `GOOGLE_API_KEY`: Your API key for Google Gemini.
+- `XAI_API_KEY`: Your API key for xAI Grok.
 - `DEFAULT_LLM_PROVIDER`: The default LLM provider to use.
 - `DEFAULT_LLM_MODEL`: The default LLM model to use.
 - `LANGCHAIN_TRACING_V2`: Set to `true` to enable LangSmith tracing.
@@ -179,7 +179,7 @@ archdoc analyze --prompt "analyze dependencies and security vulnerabilities"
 You can specify a different LLM provider and model for the analysis.
 
 ```bash
-archdoc analyze --provider openai --model gpt-4-turbo
+archdoc analyze --provider openai --model gpt-5
 ```
 
 ## 🚨 Troubleshooting
@@ -195,12 +195,14 @@ archdoc config --init
 ### Slow Generation
 
 If the analysis is taking too long, you can speed it up by:
+
 - Using a faster analysis depth: `archdoc analyze --depth quick`
 - Disabling refinement: `archdoc analyze --no-refinement`
 
 ### Poor Quality Output
 
 If the documentation isn't accurate, try:
+
 - Using a deeper analysis: `archdoc analyze --depth deep`
-- Using a more powerful model: `archdoc analyze --model claude-3-opus-20240229`
+- Using a more powerful model: `archdoc analyze --model claude-opus-4-1-20250805`
 - Providing a more specific prompt to guide the analysis.

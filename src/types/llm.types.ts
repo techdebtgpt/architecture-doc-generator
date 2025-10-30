@@ -5,6 +5,7 @@ export enum LLMProvider {
   ANTHROPIC = 'anthropic',
   OPENAI = 'openai',
   GOOGLE = 'google',
+  XAI = 'xai',
 }
 
 /**

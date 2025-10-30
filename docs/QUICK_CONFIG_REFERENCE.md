@@ -30,7 +30,7 @@ The `.archdoc.config.json` file is the central place for all your settings. Here
 {
   "llm": {
     "provider": "anthropic",
-    "model": "claude-3-5-sonnet-20240620"
+    "model": "claude-sonnet-4-5-20250929"
   }
 }
 ```
@@ -41,16 +41,13 @@ The `.archdoc.config.json` file is the central place for all your settings. Here
 {
   "llm": {
     "provider": "anthropic",
-    "model": "claude-3-5-sonnet-20240620",
+    "model": "claude-sonnet-4-5-20250929",
     "temperature": 0.2,
     "maxTokens": 4096
   },
   "scan": {
     "maxFiles": 1000,
-    "excludePatterns": [
-      "**/node_modules/**",
-      "**/dist/**"
-    ]
+    "excludePatterns": ["**/node_modules/**", "**/dist/**"]
   },
   "output": {
     "directory": ".arch-docs",
@@ -68,16 +65,19 @@ The `.archdoc.config.json` file is the central place for all your settings. Here
 Manage your configuration directly from the command line.
 
 - **Initialize Configuration**:
+
   ```bash
   archdoc config --init
   ```
 
 - **List Current Settings**:
+
   ```bash
   archdoc config --list
   ```
 
 - **Get a Specific Value**:
+
   ```bash
   archdoc config --get llm.provider
   ```
@@ -91,7 +91,7 @@ Manage your configuration directly from the command line.
 
 For CI/CD or to override the config file, use environment variables.
 
-- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`: API keys for your chosen LLM provider.
+- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `XAI_API_KEY`: API keys for your chosen LLM provider.
 - `DEFAULT_LLM_PROVIDER`: Default LLM provider.
 - `DEFAULT_LLM_MODEL`: Default LLM model.
 - `LANGCHAIN_TRACING_V2`: Set to `true` to enable LangSmith tracing.
@@ -101,8 +101,9 @@ For CI/CD or to override the config file, use environment variables.
 
 Choose the LLM provider that best fits your needs.
 
-| Provider | Recommended Model | Best For |
-|---|---|---|
-| **Anthropic** | `claude-3-5-sonnet-20240620` | Deep code analysis and reasoning. |
-| **OpenAI** | `gpt-4-turbo` | Balanced performance and wide availability. |
-| **Google** | `gemini-1.5-pro` | Fast processing and cost-effectiveness. |
+| Provider      | Recommended Model            | Best For                                   |
+| ------------- | ---------------------------- | ------------------------------------------ |
+| **Anthropic** | `claude-sonnet-4-5-20250929` | Deep code analysis and reasoning.          |
+| **OpenAI**    | `gpt-5`                      | Latest and most powerful model.            |
+| **Google**    | `gemini-2.5-pro`             | Strong reasoning and large context window. |
+| **xAI**       | `grok-3-beta`                | Real-time insights and unique perspective. |

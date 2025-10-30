@@ -23,10 +23,11 @@ const DEFAULT_CONFIG = {
     anthropic: '',
     openai: '',
     google: '',
+    xai: '',
   },
   llm: {
     provider: 'anthropic',
-    model: 'claude-3-5-sonnet-20241022',
+    model: 'claude-sonnet-4-5-20250929',
     temperature: 0.2,
     maxTokens: 4096,
   },
@@ -145,19 +146,24 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
       message: 'Choose your LLM provider:',
       choices: [
         {
-          name: 'Anthropic Claude 3.5 Sonnet (recommended) - Best quality and accuracy',
+          name: 'Anthropic Claude 4.5 Sonnet (recommended) - Best quality and accuracy',
           value: 'anthropic',
           short: 'Anthropic',
         },
         {
-          name: 'OpenAI GPT-4 Turbo - Good alternative, widely available',
+          name: 'OpenAI GPT-5 - Latest and most powerful',
           value: 'openai',
           short: 'OpenAI',
         },
         {
-          name: 'Google Gemini 2.0 Flash - Fast and cost-effective',
+          name: 'Google Gemini 2.5 Pro - Strong reasoning and large context',
           value: 'google',
           short: 'Google',
+        },
+        {
+          name: 'xAI Grok 3 Beta - Real-time insights and unique perspective',
+          value: 'xai',
+          short: 'xAI',
         },
       ],
     },
@@ -166,19 +172,24 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
   // Prompt for API key with validation
   const providerInfo = {
     anthropic: {
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-sonnet-4-5-20250929',
       keyFormat: 'sk-ant-...',
       url: 'https://console.anthropic.com/',
     },
     openai: {
-      model: 'gpt-4-turbo',
+      model: 'gpt-5',
       keyFormat: 'sk-...',
       url: 'https://platform.openai.com/',
     },
     google: {
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-pro',
       keyFormat: 'AIza...',
       url: 'https://ai.google.dev/',
+    },
+    xai: {
+      model: 'grok-3-beta',
+      keyFormat: 'xai-...',
+      url: 'https://console.x.ai/',
     },
   };
 
@@ -278,7 +289,7 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
   logger.info(`  • Tracing: ${config.tracing.enabled ? 'Enabled' : 'Disabled'}`);
   logger.info('\n💡 Tips:');
   logger.info('  • Change provider: archdoc config --set llm.provider=openai');
-  logger.info('  • Change model: archdoc config --set llm.model=gpt-4-turbo');
+  logger.info('  • Change model: archdoc config --set llm.model=gpt-5');
   logger.info('  • Update API key: archdoc config --set apiKeys.anthropic=sk-ant-...');
   logger.info('  • View settings: archdoc config --list');
   logger.info('\nNext steps:');
