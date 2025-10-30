@@ -12,7 +12,6 @@ interface ConfigOptions {
   list?: boolean;
   init?: boolean;
   reset?: boolean;
-  location?: 'root' | 'output';
 }
 
 const CONFIG_FILE = '.archdoc.config.json';
@@ -81,40 +80,23 @@ const DEFAULT_CONFIG = {
 };
 
 /**
- * Find existing config file
- * Priority: .archdoc.config.json (root) -> .arch-docs/.archdoc.config.json
+ * Find existing config file in root directory only
  */
 function findConfigPath(): string | null {
   const rootConfig = path.join(process.cwd(), CONFIG_FILE);
-  const outputConfig = path.join(process.cwd(), DEFAULT_OUTPUT_DIR, CONFIG_FILE);
 
   if (fs.existsSync(rootConfig)) {
     return rootConfig;
   }
-  if (fs.existsSync(outputConfig)) {
-    return outputConfig;
-  }
   return null;
 }
 
-async function initializeConfig(options: ConfigOptions): Promise<void> {
+async function initializeConfig(): Promise<void> {
   logger.info('🚀 Welcome to ArchDoc Setup!\n');
 
-  // Determine config location
-  let configPath: string;
-  const location = options.location || 'root'; // default to root folder
-
-  if (location === 'output') {
-    const outputDir = path.join(process.cwd(), DEFAULT_OUTPUT_DIR);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-    configPath = path.join(outputDir, CONFIG_FILE);
-    logger.info(`Creating configuration in: ${DEFAULT_OUTPUT_DIR}/${CONFIG_FILE}`);
-  } else {
-    configPath = path.join(process.cwd(), CONFIG_FILE);
-    logger.info(`Creating configuration in: ${CONFIG_FILE}`);
-  }
+  // Always create config in root directory
+  const configPath = path.join(process.cwd(), CONFIG_FILE);
+  logger.info(`Creating configuration in: ${CONFIG_FILE}`);
 
   // Check if config already exists
   if (fs.existsSync(configPath)) {
@@ -306,31 +288,6 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   logger.info(`\n✅ Created ${path.relative(process.cwd(), configPath)}`);
 
-  // Suggest adding to .gitignore if it's in .arch-docs/
-  if (location === 'output') {
-    const gitignorePath = path.join(process.cwd(), '.gitignore');
-    let shouldAddGitignore = false;
-    if (fs.existsSync(gitignorePath)) {
-      const gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
-      if (!gitignoreContent.includes('.arch-docs/')) {
-        const { addToGitignore } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'addToGitignore',
-            message: 'Add .arch-docs/ to .gitignore?',
-            default: true,
-          },
-        ]);
-        shouldAddGitignore = addToGitignore;
-      }
-    }
-
-    if (shouldAddGitignore) {
-      fs.appendFileSync(gitignorePath, '\n# ArchDoc output and configuration\n.arch-docs/\n');
-      logger.info('✅ Added .arch-docs/ to .gitignore');
-    }
-  }
-
   logger.info('\n🎉 Setup complete!');
   logger.info('\n📝 Configuration Summary:');
   logger.info(`  • Config file: ${path.relative(process.cwd(), configPath)}`);
@@ -459,11 +416,6 @@ export function registerConfigCommand(program: Command): void {
     .command('config')
     .description('Manage ArchDoc configuration')
     .option('--init', 'Initialize configuration with interactive setup')
-    .option(
-      '--location <type>',
-      'Config location: "output" (.arch-docs/) or "root" (project root)',
-      'output',
-    )
     .option('--list', 'List all configuration values (API keys masked)')
     .option('--get <key>', 'Get specific configuration value (e.g., llm.temperature)')
     .option('--set <key=value>', 'Set configuration value (e.g., llm.temperature=0.5)')
@@ -471,7 +423,7 @@ export function registerConfigCommand(program: Command): void {
     .action(async (options: ConfigOptions) => {
       try {
         if (options.init) {
-          await initializeConfig(options);
+          await initializeConfig();
         } else if (options.list) {
           listConfig();
         } else if (options.get) {
@@ -483,7 +435,6 @@ export function registerConfigCommand(program: Command): void {
         } else {
           logger.info('Usage:');
           logger.info('  archdoc config --init                    # Interactive setup');
-          logger.info('  archdoc config --init --location root    # Create in project root');
           logger.info('  archdoc config --list                    # Show all settings');
           logger.info('  archdoc config --get llm.model           # Get specific value');
           logger.info('  archdoc config --set llm.temperature=0.5 # Set value');
