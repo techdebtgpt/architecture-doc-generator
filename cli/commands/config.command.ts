@@ -146,22 +146,22 @@ async function initializeConfig(options: ConfigOptions): Promise<void> {
       message: 'Choose your LLM provider:',
       choices: [
         {
-          name: 'Anthropic Claude 4.5 Sonnet (recommended) - Best quality and accuracy',
+          name: 'Anthropic Claude (recommended) - Best quality and accuracy',
           value: 'anthropic',
           short: 'Anthropic',
         },
         {
-          name: 'OpenAI GPT-5 - Latest and most powerful',
+          name: 'OpenAI GPT - Latest and most powerful',
           value: 'openai',
           short: 'OpenAI',
         },
         {
-          name: 'Google Gemini 2.5 Pro - Strong reasoning and large context',
+          name: 'Google Gemini - Strong reasoning and large context',
           value: 'google',
           short: 'Google',
         },
         {
-          name: 'xAI Grok 3 Beta - Real-time insights and unique perspective',
+          name: 'xAI Grok - Real-time insights and unique perspective',
           value: 'xai',
           short: 'xAI',
         },
