@@ -68,7 +68,28 @@ Two automated workflows handle the entire CI/CD pipeline:
 
 ## Setup Instructions
 
-### Required: Add npm Token
+### Step 1: Add Personal Access Token (PAT) - Required
+
+The workflow needs write access to push version bumps and tags.
+
+1. **Create a Personal Access Token**:
+   - Go to: https://github.com/settings/tokens/new
+   - Name: `WORKFLOW_PAT` or `CI_CD_TOKEN`
+   - Expiration: Choose 90 days or longer
+   - Select scopes:
+     - ✅ `repo` (Full control of private repositories)
+     - ✅ `workflow` (Update GitHub Action workflows)
+   - Click **"Generate token"**
+   - **Copy the token** (you won't see it again!)
+
+2. **Add PAT to GitHub Secrets**:
+   - Navigate to: `https://github.com/YOUR_ORG/architecture-doc-generator/settings/secrets/actions`
+   - Click **"New repository secret"**
+   - Name: `PAT_TOKEN`
+   - Value: Your personal access token (starts with `ghp_...`)
+   - Click **"Add secret"**
+
+### Step 2: Add npm Token - Required
 
 1. **Get your npm token**:
 
@@ -86,7 +107,7 @@ Two automated workflows handle the entire CI/CD pipeline:
    - Value: Your npm token (starts with `npm_...`)
    - Click **"Add secret"**
 
-### Optional: Add Codecov Token
+### Step 3: Add Codecov Token - Optional
 
 For code coverage reporting:
 
