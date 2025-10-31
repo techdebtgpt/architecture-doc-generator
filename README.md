@@ -77,8 +77,9 @@ archdoc analyze
 # Analyze specific project
 archdoc analyze /path/to/your/project
 
-# Focused analysis with prompt
-archdoc analyze --prompt "analyze dependencies and security vulnerabilities"
+# Enhanced analysis with user focus (runs all agents with extra attention to specified topics)
+archdoc analyze --prompt "security vulnerabilities and authentication patterns"
+archdoc analyze --prompt "database schema design and API architecture"
 
 # Custom output location
 archdoc analyze --output ./docs
@@ -95,18 +96,18 @@ archdoc analyze [path] [options]
 
 **Options:**
 
-| Option                        | Description                                   | Default      |
-| ----------------------------- | --------------------------------------------- | ------------ |
-| `--output <dir>`              | Output directory                              | `.arch-docs` |
-| `--prompt <text>`             | Focus analysis with natural language          |              |
-| `--depth <level>`             | Analysis depth: `quick`, `normal`, `deep`     | `normal`     |
-| `--provider <name>`           | LLM provider: `anthropic`, `openai`, `google` |              |
-| `--model <name>`              | Specific model to use                         |              |
-| `--refinement`                | Enable iterative refinement                   | `true`       |
-| `--refinement-iterations <n>` | Max refinement iterations                     | `5`          |
-| `--refinement-threshold <n>`  | Clarity threshold %                           | `80`         |
-| `--no-clean`                  | Don't clear output directory                  |              |
-| `--verbose`                   | Show detailed progress                        |              |
+| Option                        | Description                                             | Default      |
+| ----------------------------- | ------------------------------------------------------- | ------------ |
+| `--output <dir>`              | Output directory                                        | `.arch-docs` |
+| `--prompt <text>`             | Enhance analysis with focus area (all agents still run) |              |
+| `--depth <level>`             | Analysis depth: `quick`, `normal`, `deep`               | `normal`     |
+| `--provider <name>`           | LLM provider: `anthropic`, `openai`, `google`           |              |
+| `--model <name>`              | Specific model to use                                   |              |
+| `--refinement`                | Enable iterative refinement                             | `true`       |
+| `--refinement-iterations <n>` | Max refinement iterations                               | `5`          |
+| `--refinement-threshold <n>`  | Clarity threshold %                                     | `80`         |
+| `--no-clean`                  | Don't clear output directory                            |              |
+| `--verbose`                   | Show detailed progress                                  |              |
 
 ## 🔧 Programmatic Usage
 

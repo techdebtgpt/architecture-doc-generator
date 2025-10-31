@@ -114,6 +114,9 @@ export interface IterativeRefinementConfig {
 export interface OrchestratorOptions {
   maxTokens?: number;
   parallel?: boolean;
+  userPrompt?: string; // User's focus area or question to enhance agent analysis
+  incrementalMode?: boolean; // Skip full regeneration if existing docs + prompt provided
+  existingDocsPath?: string; // Path to existing documentation for incremental updates
   iterativeRefinement?: IterativeRefinementConfig;
   agentOptions?: AgentExecutionOptions;
   onAgentProgress?: (current: number, total: number, agentName: string) => void;
@@ -174,6 +177,18 @@ export class DocumentationOrchestrator {
     const startTime = Date.now();
 
     this.logger.info(`Starting documentation generation with LangGraph (v${version})`);
+
+    // Check for incremental mode - enhance existing docs instead of full regeneration
+    if (options.incrementalMode && options.existingDocsPath && options.userPrompt) {
+      this.logger.info('🚀 Running in incremental enhancement mode');
+      this.logger.info(`📝 User prompt: "${options.userPrompt}"`);
+      return await this.generateIncrementalDocumentation(
+        projectPath,
+        options.existingDocsPath,
+        options.userPrompt,
+        options,
+      );
+    }
 
     // Apply custom language configuration if provided
     if (options.languageConfig) {
@@ -260,6 +275,255 @@ export class DocumentationOrchestrator {
         generationDuration: executionTime,
       },
     };
+  }
+
+  /**
+   * Generate incremental documentation enhancement based on user prompt
+   * Loads existing docs, runs lightweight analysis focused on user's question
+   */
+  private async generateIncrementalDocumentation(
+    projectPath: string,
+    existingDocsPath: string,
+    userPrompt: string,
+    options: OrchestratorOptions,
+  ): Promise<DocumentationOutput> {
+    const startTime = Date.now();
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    this.logger.info('Loading existing documentation...');
+
+    // Load existing documentation files
+    const existingDocs: Record<string, string> = {};
+    try {
+      const files = await fs.readdir(existingDocsPath);
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          const filePath = path.join(existingDocsPath, file);
+          existingDocs[file] = await fs.readFile(filePath, 'utf-8');
+        }
+      }
+      this.logger.info(`Loaded ${Object.keys(existingDocs).length} existing documentation files`);
+    } catch (error) {
+      this.logger.warn(`Failed to load existing docs: ${error}`);
+      // Fall back to full generation
+      return this.generateDocumentation(projectPath, {
+        ...options,
+        incrementalMode: false,
+        existingDocsPath: undefined,
+      });
+    }
+
+    // Quick project scan for context
+    this.logger.info('Scanning project for updated context...');
+    const scanResult = await this.scanner.scan({
+      rootPath: projectPath,
+      maxFiles: 10000,
+      maxFileSize: 1048576,
+      respectGitignore: true,
+      includeHidden: false,
+      followSymlinks: false,
+    });
+
+    // Build prompt enhancement section
+    const model = this.llmService.getChatModel({
+      temperature: 0.3,
+      maxTokens: 8000,
+    });
+
+    const enhancementPrompt = `You are enhancing existing architecture documentation based on a user's specific question or focus area.
+
+**User's Focus Area**: ${userPrompt}
+
+**Existing Documentation Summary**:
+${Object.entries(existingDocs)
+  .map(
+    ([file, content]) =>
+      `\n### ${file}\n${content.substring(0, 1000)}${content.length > 1000 ? '...' : ''}`,
+  )
+  .join('\n')}
+
+**Project Context**:
+- Total files: ${scanResult.totalFiles}
+- Languages: ${scanResult.languages.map((l) => l.language).join(', ')}
+- Project path: ${projectPath}
+
+**Your Task**:
+1. Analyze the user's focus area: "${userPrompt}"
+2. Review the existing documentation to understand what's already covered
+3. Generate a NEW SECTION that addresses the user's specific question/focus
+4. Provide detailed, actionable insights related to the focus area
+5. Reference existing documentation sections when relevant
+
+**Output Requirements**:
+- Create a comprehensive markdown section titled based on the user's focus
+- Include specific findings, examples, and recommendations
+- Link to relevant parts of existing documentation
+- Add new information not already covered
+- Be detailed and thorough (aim for 500-2000 words)
+
+Generate the enhancement section now:`;
+
+    this.logger.info('Generating enhancement based on user prompt...');
+    const enhancement = await model.invoke(enhancementPrompt);
+    const enhancementText =
+      typeof enhancement === 'string' ? enhancement : enhancement.content?.toString() || '';
+
+    // Save the enhancement as a new custom documentation file
+    const executionTime = Date.now() - startTime;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const enhancementFileName = `prompt-${timestamp}.md`;
+    const enhancementFilePath = path.join(existingDocsPath, enhancementFileName);
+
+    // Create formatted enhancement document
+    const formattedEnhancement = `# ${userPrompt}
+
+**Generated**: ${new Date().toISOString()}
+**Mode**: Incremental Enhancement
+**Duration**: ${(executionTime / 1000).toFixed(2)}s
+
+---
+
+${enhancementText}
+
+---
+
+*This section was generated as an incremental enhancement to existing documentation.*
+*Existing documentation files have been preserved.*`;
+
+    // Write enhancement to file
+    await fs.writeFile(enhancementFilePath, formattedEnhancement, 'utf-8');
+
+    // Update index.md to include the new enhancement
+    const indexPath = path.join(existingDocsPath, 'index.md');
+    try {
+      const indexContent = await fs.readFile(indexPath, 'utf-8');
+      const updatedIndex = indexContent.replace(
+        /## Documentation Sections/,
+        `## Documentation Sections\n\n### Latest Enhancement\n- [${userPrompt}](./${enhancementFileName})\n`,
+      );
+      await fs.writeFile(indexPath, updatedIndex, 'utf-8');
+      this.logger.info('Updated index.md with new enhancement link');
+    } catch {
+      this.logger.warn('Could not update index.md - file may not exist');
+    }
+
+    this.logger.info(`✅ Enhancement saved to: ${enhancementFileName}`);
+    this.logger.info(
+      `Incremental documentation completed in ${(executionTime / 1000).toFixed(2)}s`,
+    );
+
+    // For incremental mode, return a minimal valid output
+    // The actual enhancement was already written to disk above
+    return {
+      projectName: path.basename(projectPath),
+      timestamp: new Date(),
+      version: version,
+      overview: {
+        description: 'Incremental documentation update',
+        primaryLanguage: scanResult.languages[0]?.language || 'unknown',
+        languages: scanResult.languages.map((l) => l.language),
+        frameworks: [],
+        projectType: 'incremental-update',
+        keyFeatures: [`Enhancement: ${userPrompt}`],
+        statistics: {
+          totalFiles: scanResult.totalFiles,
+          totalLines: 0,
+          totalSize: scanResult.totalSize,
+          codeFiles: scanResult.totalFiles,
+          testFiles: 0,
+          configFiles: 0,
+          documentationFiles: Object.keys(existingDocs).length,
+          averageFileSize: Math.floor(scanResult.totalSize / scanResult.totalFiles),
+          largestFiles: [],
+        },
+      },
+      architecture: {
+        style: 'preserved',
+        patterns: [],
+        components: [],
+        relationships: [],
+        dataFlow: 'See existing documentation',
+        designPrinciples: [],
+      },
+      fileStructure: {
+        rootStructure: {
+          name: path.basename(projectPath),
+          path: projectPath,
+          type: 'directory',
+          children: [],
+          size: scanResult.totalSize,
+          fileCount: scanResult.totalFiles,
+          purpose: 'Project root',
+        },
+        keyDirectories: new Map(),
+        organizationStrategy: 'See existing documentation',
+        namingConventions: [],
+      },
+      dependencies: {
+        productionDeps: [],
+        developmentDeps: [],
+        dependencyGraph: { nodes: [], edges: [], clusters: [] },
+        outdatedDeps: [],
+        securityVulnerabilities: [],
+        licenseInfo: [],
+        vulnerabilities: [],
+        insights: [],
+      },
+      patterns: {
+        designPatterns: [],
+        architecturalPatterns: [],
+        codingPatterns: [],
+        antiPatterns: [],
+        codePatterns: [],
+        recommendations: [],
+      },
+      codeQuality: {
+        overallScore: 0,
+        metrics: {
+          maintainability: 0,
+          reliability: 0,
+          security: 0,
+          codeSmells: 0,
+          technicalDebt: '0h',
+        },
+        complexity: {
+          cyclomatic: 0,
+          cognitive: 0,
+          halstead: { difficulty: 0, effort: 0, volume: 0 },
+        },
+        issues: [],
+        improvements: [],
+        bestPractices: [],
+      },
+      customSections: new Map([
+        [
+          enhancementFileName,
+          {
+            title: userPrompt,
+            content: formattedEnhancement,
+            metadata: {
+              generatedAt: new Date().toISOString(),
+              mode: 'incremental',
+              executionTime,
+              filePath: enhancementFilePath,
+            },
+          },
+        ],
+      ]),
+      metadata: {
+        generatorVersion: version,
+        generationDuration: executionTime,
+        totalTokensUsed: 2000 + Math.floor(enhancementText.length / 4),
+        agentsExecuted: ['incremental-enhancer'],
+        configuration: { mode: 'incremental', userPrompt, enhancementFile: enhancementFileName },
+        warnings: [
+          'Incremental mode: Only enhancement generated',
+          'Existing documentation preserved',
+          `New file created: ${enhancementFileName}`,
+        ],
+      },
+    } as unknown as DocumentationOutput;
   }
 
   /**
@@ -361,6 +625,7 @@ export class DocumentationOrchestrator {
         clarityThreshold: options.iterativeRefinement?.clarityThreshold,
         maxQuestionsPerIteration: options.agentOptions?.maxQuestionsPerIteration,
       },
+      query: options.userPrompt, // Pass user's focus area to enhance agent analysis
       // Claude Sonnet 4 max: 200K input tokens - 10K safety margin - 8K max output = 182K budget
       tokenBudget: options.maxTokens || 182000,
       scanResult,

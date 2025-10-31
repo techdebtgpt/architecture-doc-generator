@@ -308,7 +308,8 @@ export abstract class BaseAgentWorkflow {
     const execStartTime = startTime || Date.now();
 
     const systemPrompt = await this.buildSystemPrompt(context);
-    const humanPrompt = await this.buildHumanPrompt(context);
+    const baseHumanPrompt = await this.buildHumanPrompt(context);
+    const humanPrompt = await this.enhancePromptWithUserQuery(baseHumanPrompt, context);
 
     const model = this.llmService.getChatModel(
       {
@@ -377,7 +378,8 @@ export abstract class BaseAgentWorkflow {
     this.logger.info(`Starting initial analysis...`, '🤖');
 
     const systemPrompt = await this.buildSystemPrompt(context);
-    const humanPrompt = await this.buildHumanPrompt(context);
+    const baseHumanPrompt = await this.buildHumanPrompt(context);
+    const humanPrompt = await this.enhancePromptWithUserQuery(baseHumanPrompt, context);
 
     const modelOptions = {
       temperature: 0.3,
@@ -933,7 +935,8 @@ Example good questions:
     );
 
     const systemPrompt = await this.buildSystemPrompt(context);
-    const humanPrompt = await this.buildHumanPrompt(context);
+    const baseHumanPrompt = await this.buildHumanPrompt(context);
+    const humanPrompt = await this.enhancePromptWithUserQuery(baseHumanPrompt, context);
 
     // Build a focused refinement prompt that targets specific gaps
     const gapsSummary =
@@ -1119,6 +1122,30 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       '🔄',
     );
     return 'refine';
+  }
+
+  /**
+   * Enhance human prompt with user's focus area if provided
+   * This allows the --prompt flag to guide analysis without replacing standard analysis
+   */
+  protected async enhancePromptWithUserQuery(
+    basePrompt: string,
+    context: AgentContext,
+  ): Promise<string> {
+    if (!context.query) {
+      return basePrompt;
+    }
+
+    // Add user's focus area at the beginning to make it prominent
+    const enhancedPrompt = `**USER'S FOCUS AREA**: ${context.query}
+
+Please pay special attention to the above focus area in your analysis. While you should still provide comprehensive documentation across all relevant areas, ensure that topics related to the user's focus are analyzed in extra detail and highlighted prominently in your response.
+
+---
+
+${basePrompt}`;
+
+    return enhancedPrompt;
   }
 
   // Abstract methods that subclasses must implement
