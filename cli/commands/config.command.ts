@@ -288,6 +288,32 @@ async function initializeConfig(): Promise<void> {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
   logger.info(`\n✅ Created ${path.relative(process.cwd(), configPath)}`);
 
+  // Suggest adding config file to .gitignore (contains API keys)
+  const gitignorePath = path.join(process.cwd(), '.gitignore');
+  let shouldAddGitignore = false;
+  if (fs.existsSync(gitignorePath)) {
+    const gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
+    if (!gitignoreContent.includes('.archdoc.config.json')) {
+      const { addToGitignore } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'addToGitignore',
+          message: 'Add .archdoc.config.json to .gitignore? (recommended - contains API keys)',
+          default: true,
+        },
+      ]);
+      shouldAddGitignore = addToGitignore;
+    }
+  }
+
+  if (shouldAddGitignore) {
+    fs.appendFileSync(
+      gitignorePath,
+      '\n# ArchDoc configuration (contains API keys)\n.archdoc.config.json\n',
+    );
+    logger.info('✅ Added .archdoc.config.json to .gitignore');
+  }
+
   logger.info('\n🎉 Setup complete!');
   logger.info('\n📝 Configuration Summary:');
   logger.info(`  • Config file: ${path.relative(process.cwd(), configPath)}`);
