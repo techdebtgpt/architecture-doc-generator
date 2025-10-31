@@ -55,6 +55,36 @@ export interface AgentContext {
 
   /** Scan result with file and language information */
   scanResult: ScanResult;
+
+  /** Dependency graph from import analysis */
+  dependencyGraph?: {
+    imports: Array<{
+      source: string;
+      target: string;
+      imports?: string[];
+      type: 'local' | 'external' | 'framework';
+      resolvedPath?: string;
+    }>;
+    modules: Array<{
+      name: string;
+      path: string;
+      files: string[];
+      dependencies: string[];
+      exports: string[];
+    }>;
+    graph: {
+      nodes: Array<{
+        id: string;
+        type: 'file' | 'module' | 'external';
+        name: string;
+      }>;
+      edges: Array<{
+        from: string;
+        to: string;
+        type: 'import' | 'require';
+      }>;
+    };
+  };
 }
 
 /**

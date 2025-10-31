@@ -17,6 +17,8 @@ import { MemorySaver } from '@langchain/langgraph';
 import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
 import { version } from '../../package.json';
+import { ImportScanner } from '../scanners/import-scanner';
+import type { DependencyGraph, ImportInfo, ModuleInfo } from '../scanners/import-scanner';
 
 /**
  * Documentation generation state with LangGraph
@@ -75,6 +77,16 @@ const DocumentationState = Annotation.Root({
     default: () => new Map(),
   }),
 
+  // Dependency graph state
+  dependencyGraph: Annotation<{
+    imports: ImportInfo[];
+    modules: ModuleInfo[];
+    graph: DependencyGraph;
+  } | null>({
+    reducer: (_, update) => update,
+    default: () => null,
+  }),
+
   // Output state
   output: Annotation<DocumentationOutput | null>({
     reducer: (_, update) => update,
@@ -106,6 +118,33 @@ export interface OrchestratorOptions {
   agentOptions?: AgentExecutionOptions;
   onAgentProgress?: (current: number, total: number, agentName: string) => void;
   runName?: string; // Custom run name for LangSmith tracing (supports {timestamp}, {agent}, {project})
+  languageConfig?: {
+    custom?: Record<
+      string,
+      {
+        displayName?: string;
+        filePatterns?: {
+          extensions?: string[];
+          namePatterns?: string[];
+          excludePatterns?: string[];
+        };
+        importPatterns?: Record<string, string>;
+        componentPatterns?: Record<string, string[]>;
+        keywords?: Record<string, string[]>;
+        frameworks?: string[];
+      }
+    >;
+    overrides?: Record<
+      string,
+      {
+        filePatterns?: {
+          extensions?: string[];
+          excludePatterns?: string[];
+        };
+        keywords?: Record<string, string[]>;
+      }
+    >;
+  };
 }
 
 /**
@@ -136,6 +175,13 @@ export class DocumentationOrchestrator {
 
     this.logger.info(`Starting documentation generation with LangGraph (v${version})`);
 
+    // Apply custom language configuration if provided
+    if (options.languageConfig) {
+      this.logger.debug('Applying custom language configuration...');
+      const { applyLanguageConfig } = await import('../config/language-config');
+      applyLanguageConfig(options.languageConfig);
+    }
+
     // Scan project
     this.logger.info('Scanning project structure...');
     const scanResult = await this.scanner.scan({
@@ -146,6 +192,18 @@ export class DocumentationOrchestrator {
       includeHidden: false,
       followSymlinks: false,
     });
+
+    // Scan imports and build dependency graph
+    this.logger.info('Analyzing dependencies and imports...');
+    const importScanner = new ImportScanner();
+    const { imports, modules, graph } = await importScanner.scanProject(
+      projectPath,
+      scanResult.files.map((f) => f.relativePath),
+    );
+
+    this.logger.info(
+      `Found ${imports.length} imports, ${modules.length} modules, ${graph.edges.length} dependencies`,
+    );
 
     // Get all agents
     const agents = this.agentRegistry.getAllAgents();
@@ -163,6 +221,7 @@ export class DocumentationOrchestrator {
       agentResults: new Map(),
       refinementAttempts: new Map(),
       clarityScores: new Map(),
+      dependencyGraph: { imports, modules, graph },
       output: null,
       executionTime: 0,
     };
@@ -251,7 +310,15 @@ export class DocumentationOrchestrator {
    * Each agent handles its own refinement internally via BaseAgentWorkflow
    */
   private async executeAgentNode(state: typeof DocumentationState.State) {
-    const { scanResult, projectPath, options, currentAgentIndex, agentNames, agentResults } = state;
+    const {
+      scanResult,
+      projectPath,
+      options,
+      currentAgentIndex,
+      agentNames,
+      agentResults,
+      dependencyGraph,
+    } = state;
 
     if (currentAgentIndex >= agentNames.length) {
       return state; // All agents executed
@@ -297,6 +364,7 @@ export class DocumentationOrchestrator {
       // Claude Sonnet 4 max: 200K input tokens - 10K safety margin - 8K max output = 182K budget
       tokenBudget: options.maxTokens || 182000,
       scanResult,
+      dependencyGraph: dependencyGraph || undefined,
     };
 
     // Execute agent with runnable config for tracing
