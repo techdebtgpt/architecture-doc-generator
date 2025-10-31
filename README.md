@@ -5,7 +5,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Website](https://img.shields.io/badge/Website-techdebtgpt.com-blue)](https://techdebtgpt.com)
-[![GitHub](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator?style=social)](https://github.com/techdebtgpt/architecture-doc-generator)
+[![GitHub stars](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator)](https://github.com/techdebtgpt/architecture-doc-generator)
 
 > AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows.
 
