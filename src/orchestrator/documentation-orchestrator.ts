@@ -198,7 +198,7 @@ export class DocumentationOrchestrator {
     const importScanner = new ImportScanner();
     const { imports, modules, graph } = await importScanner.scanProject(
       projectPath,
-      scanResult.files.map((f) => f.path),
+      scanResult.files.map((f) => f.relativePath),
     );
 
     this.logger.info(
