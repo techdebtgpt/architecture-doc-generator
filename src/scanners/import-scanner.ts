@@ -1,15 +1,16 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
+import { getLanguageRegistry } from '../config/language-config';
 
 /**
- * Import/dependency information
+ * Represents a single import statement
  */
 export interface ImportInfo {
-  source: string; // File doing the import
-  target: string; // Module being imported
-  imports: string[]; // Named imports
-  type: 'local' | 'external' | 'framework'; // Import type
+  source: string; // File that contains the import
+  target: string; // Module/file being imported
+  imports?: string[]; // Specific symbols imported (optional)
+  type: 'local' | 'external' | 'framework'; // Type of import
   resolvedPath?: string; // Resolved file path for local imports
 }
 
@@ -46,6 +47,7 @@ export interface DependencyGraph {
  */
 export class ImportScanner {
   private logger = new Logger('ImportScanner');
+  private languageRegistry = getLanguageRegistry();
 
   /**
    * Scan project for imports and build dependency graph
@@ -95,100 +97,47 @@ export class ImportScanner {
 
       const imports: ImportInfo[] = [];
 
-      // TypeScript/JavaScript ES6 imports
-      const es6ImportRegex =
-        /import\s+(?:(?:\{[^}]*\}|\*\s+as\s+\w+|\w+)\s+from\s+)?['"]([^'"]+)['"]/g;
-      let match;
-      while ((match = es6ImportRegex.exec(content)) !== null) {
-        const modulePath = match[1];
-        const importClause = match[0];
+      // Detect language from file extension
+      const ext = path.extname(filePath);
+      const languageConfig = this.languageRegistry.detectFromExtension(ext);
 
-        // Extract named imports
-        const namedImports = this.extractNamedImports(importClause);
-
-        imports.push({
-          source: filePath,
-          target: modulePath,
-          imports: namedImports,
-          type: this.classifyImport(modulePath),
-          resolvedPath: this.resolveLocalImport(projectPath, filePath, modulePath),
-        });
+      if (!languageConfig) {
+        this.logger.debug(`No language config found for ${ext} - skipping ${filePath}`);
+        return imports;
       }
 
-      // CommonJS require statements
-      const requireRegex = /require\s*\(['"]([^'"]+)['"]\)/g;
-      while ((match = requireRegex.exec(content)) !== null) {
-        const modulePath = match[1];
+      // Apply all import patterns from the language configuration dynamically
+      const patterns = languageConfig.importPatterns;
 
-        imports.push({
-          source: filePath,
-          target: modulePath,
-          imports: [], // Require doesn't have named imports in same way
-          type: this.classifyImport(modulePath),
-          resolvedPath: this.resolveLocalImport(projectPath, filePath, modulePath),
-        });
-      }
+      // Iterate through all patterns defined in the language config
+      for (const [patternName, patternRegex] of Object.entries(patterns)) {
+        if (!patternRegex) continue;
 
-      // Python imports
-      const pythonImportRegex = /(?:from\s+(\S+)\s+)?import\s+([^\n]+)/g;
-      while ((match = pythonImportRegex.exec(content)) !== null) {
-        const modulePath = match[1] || match[2].split(',')[0].trim();
-        const importNames = match[2].split(',').map((n) => n.trim());
+        try {
+          const regex = new RegExp(patternRegex.source, patternRegex.flags);
+          let match: RegExpExecArray | null;
 
-        imports.push({
-          source: filePath,
-          target: modulePath,
-          imports: importNames,
-          type: this.classifyImport(modulePath),
-          resolvedPath: this.resolveLocalImport(projectPath, filePath, modulePath),
-        });
-      }
+          while ((match = regex.exec(content)) !== null) {
+            // Extract target from first non-empty capture group
+            const target = match[1] || match[2] || match[0];
+            if (!target) continue;
 
-      // Java imports
-      const javaImportRegex = /import\s+(static\s+)?([^;]+);/g;
-      while ((match = javaImportRegex.exec(content)) !== null) {
-        const importPath = match[2].trim();
-        const parts = importPath.split('.');
-        const className = parts[parts.length - 1];
+            // Special handling for specific pattern types
+            const importInfo = this.extractImportInfo(
+              patternName,
+              match,
+              filePath,
+              projectPath,
+              target,
+            );
 
-        imports.push({
-          source: filePath,
-          target: importPath,
-          imports: [className],
-          type: this.classifyImport(importPath),
-        });
-      }
-
-      // Go imports
-      const goImportRegex = /import\s+(?:\(\s*([^)]+)\s*\)|"([^"]+)")/g;
-      while ((match = goImportRegex.exec(content)) !== null) {
-        const importList = match[1] || match[2];
-        const imports_go = importList
-          .split('\n')
-          .map((line) => line.trim().replace(/"/g, ''))
-          .filter((line) => line && !line.startsWith('//'));
-
-        for (const imp of imports_go) {
-          imports.push({
-            source: filePath,
-            target: imp,
-            imports: [],
-            type: this.classifyImport(imp),
-          });
+            imports.push(importInfo);
+          }
+        } catch (error) {
+          this.logger.debug(
+            `Error applying pattern ${patternName} to ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
-      }
-
-      // C# using statements
-      const csharpUsingRegex = /using\s+(?:static\s+)?([^;]+);/g;
-      while ((match = csharpUsingRegex.exec(content)) !== null) {
-        const namespace = match[1].trim();
-
-        imports.push({
-          source: filePath,
-          target: namespace,
-          imports: [],
-          type: this.classifyImport(namespace),
-        });
       }
 
       return imports;
@@ -197,6 +146,90 @@ export class ImportScanner {
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
+    }
+  }
+
+  /**
+   * Extract import info based on pattern type and match groups
+   * This method handles pattern-specific logic for different import styles
+   */
+  private extractImportInfo(
+    patternName: string,
+    match: RegExpExecArray,
+    filePath: string,
+    projectPath: string,
+    target: string,
+  ): ImportInfo {
+    // Handle special cases based on pattern name
+    switch (patternName) {
+      case 'es6Import':
+      case 'commonjsRequire': {
+        // ES6/CommonJS: extract named imports from clause
+        const importClause = match[0];
+        const imports = this.extractNamedImports(importClause);
+        return {
+          source: filePath,
+          target,
+          imports,
+          type: this.classifyImport(target),
+          resolvedPath: this.resolveLocalImport(projectPath, filePath, target),
+        };
+      }
+
+      case 'pythonImport': {
+        // Python: from X import Y, Z
+        const modulePath = match[1] || match[2]?.split(',')[0].trim() || target;
+        const importNames = match[2]?.split(',').map((n) => n.trim()) || [];
+        return {
+          source: filePath,
+          target: modulePath,
+          imports: importNames,
+          type: this.classifyImport(modulePath),
+          resolvedPath: this.resolveLocalImport(projectPath, filePath, modulePath),
+        };
+      }
+
+      case 'javaImport': {
+        // Java: import com.package.ClassName;
+        const importPath = match[2]?.trim() || match[1] || target;
+        const parts = importPath.split('.');
+        const className = parts[parts.length - 1];
+        return {
+          source: filePath,
+          target: importPath,
+          imports: [className],
+          type: this.classifyImport(importPath),
+        };
+      }
+
+      case 'goImport': {
+        // Go: import ("pkg1" "pkg2") or import "pkg"
+        const importList = match[1] || match[2] || target;
+        const imports_go = importList
+          .split('\n')
+          .map((line) => line.trim().replace(/"/g, ''))
+          .filter((line) => line && !line.startsWith('//'));
+
+        // If multiple imports, return first one (caller will iterate)
+        const firstImport = imports_go[0] || target;
+        return {
+          source: filePath,
+          target: firstImport,
+          imports: [],
+          type: this.classifyImport(firstImport),
+        };
+      }
+
+      default: {
+        // Generic handler for all other patterns (C#, Rust, PHP, Ruby, custom languages)
+        return {
+          source: filePath,
+          target,
+          imports: [],
+          type: this.classifyImport(target),
+          resolvedPath: this.resolveLocalImport(projectPath, filePath, target),
+        };
+      }
     }
   }
 

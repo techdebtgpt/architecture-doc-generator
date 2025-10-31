@@ -65,4 +65,43 @@ export interface AppConfig {
     project: string;
     runName?: string; // Custom run name for easier trace identification
   };
+
+  // Language Configuration (optional - extends built-in languages)
+  languages?: {
+    // Register new languages or extend existing ones
+    custom?: Record<
+      string,
+      {
+        displayName?: string;
+        filePatterns?: {
+          extensions?: string[];
+          namePatterns?: string[];
+          excludePatterns?: string[];
+        };
+        importPatterns?: {
+          [key: string]: string; // RegExp pattern as string (will be converted to RegExp)
+        };
+        componentPatterns?: {
+          [key: string]: string[]; // Array of RegExp patterns as strings
+        };
+        keywords?: {
+          [category: string]: string[];
+        };
+        frameworks?: string[];
+      }
+    >;
+    // Override settings for built-in languages
+    overrides?: Record<
+      string,
+      {
+        filePatterns?: {
+          extensions?: string[];
+          excludePatterns?: string[];
+        };
+        keywords?: {
+          [category: string]: string[];
+        };
+      }
+    >;
+  };
 }

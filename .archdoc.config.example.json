@@ -57,5 +57,35 @@
     "project": "archdoc-analysis",
     "runName": "analysis-{timestamp}",
     "endpoint": "https://api.smith.langchain.com"
+  },
+  "languages": {
+    "custom": {
+      "rust": {
+        "displayName": "Rust",
+        "filePatterns": {
+          "extensions": [".rs"],
+          "excludePatterns": ["target", "Cargo.lock"]
+        },
+        "importPatterns": {
+          "rustUse": "use\\s+([^;]+);"
+        },
+        "componentPatterns": {
+          "modules": ["mod\\.rs$", "lib\\.rs$", "main\\.rs$"],
+          "tests": ["_test\\.rs$", "tests/"]
+        },
+        "keywords": {
+          "service": ["service", "handler", "processor"],
+          "model": ["struct", "enum", "trait"],
+          "test": ["test", "mock"]
+        }
+      }
+    },
+    "overrides": {
+      "typescript": {
+        "keywords": {
+          "service": ["service", "provider", "use-case", "interactor"]
+        }
+      }
+    }
   }
 }

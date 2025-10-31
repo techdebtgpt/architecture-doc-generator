@@ -118,6 +118,33 @@ export interface OrchestratorOptions {
   agentOptions?: AgentExecutionOptions;
   onAgentProgress?: (current: number, total: number, agentName: string) => void;
   runName?: string; // Custom run name for LangSmith tracing (supports {timestamp}, {agent}, {project})
+  languageConfig?: {
+    custom?: Record<
+      string,
+      {
+        displayName?: string;
+        filePatterns?: {
+          extensions?: string[];
+          namePatterns?: string[];
+          excludePatterns?: string[];
+        };
+        importPatterns?: Record<string, string>;
+        componentPatterns?: Record<string, string[]>;
+        keywords?: Record<string, string[]>;
+        frameworks?: string[];
+      }
+    >;
+    overrides?: Record<
+      string,
+      {
+        filePatterns?: {
+          extensions?: string[];
+          excludePatterns?: string[];
+        };
+        keywords?: Record<string, string[]>;
+      }
+    >;
+  };
 }
 
 /**
@@ -147,6 +174,13 @@ export class DocumentationOrchestrator {
     const startTime = Date.now();
 
     this.logger.info(`Starting documentation generation with LangGraph (v${version})`);
+
+    // Apply custom language configuration if provided
+    if (options.languageConfig) {
+      this.logger.debug('Applying custom language configuration...');
+      const { applyLanguageConfig } = await import('../config/language-config');
+      applyLanguageConfig(options.languageConfig);
+    }
 
     // Scan project
     this.logger.info('Scanning project structure...');

@@ -38,7 +38,7 @@ export interface DependencyGraphData {
   imports: Array<{
     source: string;
     target: string;
-    imports: string[];
+    imports?: string[];
     type: 'local' | 'external' | 'framework';
     resolvedPath?: string;
   }>;

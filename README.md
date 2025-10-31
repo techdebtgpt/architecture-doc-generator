@@ -28,7 +28,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 ## ✨ Features
 
 - 🤖 **7 Specialized Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, and Security.
-- 🌍 **Language Agnostic**: Works with TypeScript, Python, Java, Go, and more.
+- 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
 - 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, GPT-5, Gemini 2.5, or Grok 3.
 - 📊 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, and security.
 - 📝 **Markdown Output**: Clean, version-controllable documentation.
@@ -36,6 +36,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - 🎨 **Customizable**: Prompt-based agent selection and configuration.
 - 📈 **LangSmith Tracing**: Full observability of AI workflows.
 - 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
+- ➕ **Extensible**: Add support for any language via configuration—no code changes required.
 
 ## 🚀 Quick Start
 
@@ -219,19 +220,83 @@ Each agent autonomously improves its analysis through iterative refinement. It e
 
 All agents use LangChain Expression Language (LCEL) for composable AI workflows with unified LangSmith tracing.
 
-## 📊 Supported Languages
+## 📊 Language Support
 
-The tool is **language-agnostic** and works with:
+ArchDoc Generator supports **17 programming and markup languages** out-of-the-box with **zero configuration**:
 
-- TypeScript/JavaScript
-- Python
-- Java/Kotlin
-- Go
-- C#/.NET
-- Ruby
-- PHP
-- Rust (experimental)
-- And more!
+### Programming Languages
+
+| Language                  | Extensions                                       | Import Detection              | Framework Support                             |
+| ------------------------- | ------------------------------------------------ | ----------------------------- | --------------------------------------------- |
+| **TypeScript/JavaScript** | `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`     | ES6 imports, CommonJS require | NestJS, Express, React, Angular, Vue, Next.js |
+| **Python**                | `.py`, `.pyi`, `.pyx`                            | `from...import`, `import`     | Django, Flask, FastAPI, Pyramid               |
+| **Java**                  | `.java`                                          | `import` statements           | Spring Boot, Quarkus, Micronaut               |
+| **Go**                    | `.go`                                            | `import` blocks               | Gin, Echo, Fiber, Chi                         |
+| **C#**                    | `.cs`, `.csx`                                    | `using` statements            | ASP.NET, Entity Framework                     |
+| **C/C++**                 | `.c`, `.cpp`, `.cc`, `.cxx`, `.h`, `.hpp`, `.hh` | `#include` directives         | Linux, POSIX                                  |
+| **Kotlin**                | `.kt`, `.kts`                                    | `import` statements           | Spring, Ktor, Micronaut                       |
+| **PHP**                   | `.php`                                           | `use`, `require`              | Laravel, Symfony                              |
+| **Ruby**                  | `.rb`, `.rake`                                   | `require` statements          | Rails, Sinatra                                |
+| **Rust**                  | `.rs`                                            | `use` statements              | Tokio, Actix, Rocket                          |
+| **Scala**                 | `.scala`                                         | `import` statements           | Akka, Play                                    |
+| **Swift**                 | `.swift`                                         | `import` statements           | SwiftUI, Vapor                                |
+
+### Web & Data Languages
+
+| Language              | Extensions               | Detection                | Notes                        |
+| --------------------- | ------------------------ | ------------------------ | ---------------------------- |
+| **CSS**               | `.css`, `.scss`, `.sass` | `@import` rules          | Theme and variable detection |
+| **HTML**              | `.html`, `.htm`          | `src`, `href` attributes | Script/link/image extraction |
+| **JSON**              | `.json`                  | N/A                      | Configuration file analysis  |
+| **XML**               | `.xml`                   | `xi:include` elements    | XInclude support             |
+| **Flex/ActionScript** | `.as`, `.mxml`           | `import` statements      | Flash/Flex project support   |
+
+### Multi-Language Projects
+
+The scanner **automatically detects** all supported languages in your project:
+
+```bash
+# Just run the command - no configuration needed!
+archdoc analyze ./my-project
+
+# Example output:
+# ✅ Found 487 imports across 17 file types
+# - TypeScript: 234 imports
+# - Python: 123 imports
+# - Rust: 89 imports
+# - CSS: 41 imports
+```
+
+### Custom Language Support
+
+Need support for a language not listed? **No code changes required!**
+
+Add custom language configurations via `.archdoc.config.json`:
+
+```json
+{
+  "languages": {
+    "custom": {
+      "myLanguage": {
+        "displayName": "My Language",
+        "filePatterns": {
+          "extensions": [".mylang"]
+        },
+        "importPatterns": {
+          "myImport": "^import\\s+([^;]+);"
+        }
+      }
+    }
+  }
+}
+```
+
+See **[Custom Language Configuration Guide](./docs/CUSTOM_LANGUAGES.md)** for complete documentation on:
+
+- Adding new languages
+- Extending built-in language configurations
+- Custom import pattern syntax
+- Language-specific frameworks and keywords
 
 ## 🤝 Contributing
 
