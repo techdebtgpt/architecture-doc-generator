@@ -56,6 +56,21 @@ export interface AgentContext {
   /** Scan result with file and language information */
   scanResult: ScanResult;
 
+  /** Existing documentation files for incremental updates */
+  existingDocs?: Map<string, string>;
+
+  /** Incremental mode flag - if true, agent should merge with existing docs */
+  isIncrementalMode?: boolean;
+
+  /** Refinement gaps from previous quality evaluation */
+  refinementGaps?: {
+    qualityScore: number;
+    priority: 'high' | 'medium' | 'low';
+    needsUpdate: boolean;
+    improvements: string[];
+    lastEvaluated: string;
+  };
+
   /** Dependency graph from import analysis */
   dependencyGraph?: {
     imports: Array<{
@@ -88,6 +103,32 @@ export interface AgentContext {
 }
 
 /**
+ * Generated documentation file from an agent
+ */
+export interface AgentFile {
+  /** Filename (e.g., "flows.md", "data-flow-diagram.md") */
+  filename: string;
+
+  /** Full markdown content */
+  content: string;
+
+  /** Human-readable title */
+  title: string;
+
+  /** Optional category for grouping (e.g., "analysis", "visualization", "detail") */
+  category?: string;
+
+  /** Optional navigation order hint (lower = earlier in TOC) */
+  order?: number;
+
+  /** Merge strategy for incremental mode (default: 'replace') */
+  mergeStrategy?: 'replace' | 'append' | 'section-update';
+
+  /** Section identifier for section-update strategy (e.g., "## Security Analysis") */
+  sectionId?: string;
+}
+
+/**
  * Result returned by an agent after execution
  */
 export interface AgentResult {
@@ -103,8 +144,11 @@ export interface AgentResult {
   /** Human-readable summary */
   summary: string;
 
-  /** Markdown-formatted detailed analysis */
+  /** Markdown-formatted detailed analysis (deprecated - use files instead) */
   markdown: string;
+
+  /** Generated documentation files (NEW - agents own their file generation) */
+  files?: AgentFile[];
 
   /** Confidence score (0-1) */
   confidence: number;
@@ -215,6 +259,9 @@ export interface AgentMetadata {
 
   /** Agent tags for filtering */
   tags: string[];
+
+  /** Optional: Primary output filename (e.g., 'dependencies.md'). If not specified, defaults to '{name}.md' */
+  outputFilename?: string;
 }
 
 /**
@@ -253,6 +300,9 @@ export interface AgentExecutionOptions {
 
   /** Maximum questions per refinement iteration (depth mode) */
   maxQuestionsPerIteration?: number;
+
+  /** Skip self-refinement workflow for faster execution (quick mode) */
+  skipSelfRefinement?: boolean;
 }
 
 /**

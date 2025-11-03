@@ -1,12 +1,8 @@
 import { Agent } from './agent.interface';
-import {
-  AgentContext,
-  AgentResult,
-  AgentMetadata,
-  AgentPriority,
-  AgentExecutionOptions,
-} from '../types/agent.types';
-import { BaseAgentWorkflow } from './base-agent-workflow';
+import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { LLMJsonParser } from '../utils/json-parser';
+import { getSupportedLanguages, getSchemaFiles } from '../config/language-config';
 
 /**
  * Schema types that can be extracted
@@ -70,60 +66,24 @@ export class SchemaGeneratorAgent extends BaseAgentWorkflow implements Agent {
         dependencies: ['file-structure'],
         supportsIncremental: false,
         estimatedTokens: 10000,
-        supportedLanguages: ['typescript', 'javascript', 'prisma', 'graphql'],
+        supportedLanguages: getSupportedLanguages(),
       },
       tags: ['schema', 'database', 'api', 'types', 'erd', 'mermaid'],
+      outputFilename: 'schemas.md',
     };
   }
 
   public async canExecute(context: AgentContext): Promise<boolean> {
-    // Check if there are schema-related files
-    const schemaFiles = context.files.filter(
-      (f) =>
-        f.includes('schema') ||
-        f.includes('entity') ||
-        f.includes('dto') ||
-        f.includes('types') ||
-        f.includes('model') ||
-        f.endsWith('.prisma') ||
-        f.endsWith('.graphql') ||
-        f.endsWith('.gql'),
-    );
-    return schemaFiles.length > 0;
+    // Check if there are schema-related files using centralized detection
+    const schemaFiles = getSchemaFiles(context.files);
+    return schemaFiles.all.length > 0;
   }
 
   public async estimateTokens(context: AgentContext): Promise<number> {
-    const schemaFiles = context.files.filter(
-      (f) =>
-        f.includes('schema') ||
-        f.includes('entity') ||
-        f.includes('dto') ||
-        f.includes('types') ||
-        f.includes('model'),
-    );
+    const schemaFiles = getSchemaFiles(context.files);
 
     // Base cost + per schema analysis
-    return 4000 + Math.min(schemaFiles.length, 30) * 300;
-  }
-
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    // Configure adaptive refinement workflow
-    const workflowConfig = {
-      maxIterations: 4, // Reduced from 10 - schema extraction is deterministic
-      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
-      minImprovement: 3, // Accept small incremental improvements
-      enableSelfQuestioning: true,
-      maxQuestionsPerIteration: 2, // Focused, specific questions
-    };
-
-    return this.executeWorkflow(
-      context,
-      workflowConfig,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
+    return 4000 + Math.min(schemaFiles.all.length, 30) * 300;
   }
 
   // Abstract method implementations
@@ -191,8 +151,8 @@ Provide **comprehensive schema documentation** with valid Mermaid syntax.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
-    const schemaFiles = this.identifySchemaFiles(context.files);
-    const fileCategories = this.categorizeSchemaFiles(schemaFiles);
+    const schemaDetection = getSchemaFiles(context.files);
+    const fileCategories = this.categorizeSchemaFiles(schemaDetection.all);
 
     return `Extract schema information from this project:
 
@@ -216,7 +176,18 @@ Extract and document all schema definitions with Mermaid diagrams.`;
   }
 
   protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {
-    return this.parseAnalysisResult(analysis);
+    const result = this.parseAnalysisResult(analysis);
+
+    // CRITICAL: If NO schemas found, prepend marker to analysis text
+    // This signals to base workflow to force-stop iteration
+    const schemas = result.schemas as SchemaDocumentation[] | undefined;
+    if (!schemas || schemas.length === 0) {
+      this.logger.info('No schemas found - will stop after this iteration', '⏹️');
+      // Prepend invisible marker that will be detected by base workflow
+      result.__FORCE_STOP__ = true;
+    }
+
+    return result;
   }
 
   protected async formatMarkdown(
@@ -231,27 +202,7 @@ Extract and document all schema definitions with Mermaid diagrams.`;
     return summary || 'Schema documentation completed';
   }
 
-  private identifySchemaFiles(files: string[]): string[] {
-    return files.filter((f) => {
-      const lower = f.toLowerCase();
-      return (
-        f.endsWith('.prisma') ||
-        f.endsWith('.graphql') ||
-        f.endsWith('.gql') ||
-        lower.includes('schema') ||
-        lower.includes('entity.ts') ||
-        lower.includes('entity.js') ||
-        lower.includes('model.ts') ||
-        lower.includes('model.js') ||
-        lower.includes('dto.ts') ||
-        lower.includes('dto.js') ||
-        lower.includes('types.ts') ||
-        lower.includes('types.js') ||
-        lower.includes('interfaces.ts') ||
-        f.endsWith('.d.ts')
-      );
-    });
-  }
+  // Removed: identifySchemaFiles - now using getSchemaFiles() from language-config
 
   private categorizeSchemaFiles(files: string[]): {
     prisma: string[];
@@ -276,26 +227,16 @@ Extract and document all schema definitions with Mermaid diagrams.`;
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
-    try {
-      // Try to extract JSON from markdown code blocks
-      const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]);
-      }
-
-      // Try to parse as direct JSON
-      return JSON.parse(result);
-    } catch (error) {
-      // Fallback: return a basic structure
-      this.logger.warn('Failed to parse schema analysis result', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
+    return LLMJsonParser.parse(result, {
+      contextName: 'schema-generator',
+      logErrors: true,
+      fallback: {
         schemas: [],
-        summary: 'Failed to parse schema analysis results',
-        warnings: ['Could not parse LLM response as valid JSON'],
-      };
-    }
+        summary:
+          'No schema definitions found in the provided codebase. The analysis only includes a single main.ts file, which does not contain schema definitions for databases, APIs, or GraphQL.',
+        warnings: ['Could not parse LLM response as valid JSON - LLM returned markdown instead'],
+      },
+    });
   }
 
   private formatMarkdownReport(analysis: Record<string, unknown>): string {
@@ -360,5 +301,23 @@ Extract and document all schema definitions with Mermaid diagrams.`;
     }
 
     return markdown;
+  }
+
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+    const metadata = this.getMetadata();
+
+    return [
+      {
+        filename: 'schemas.md',
+        content: markdown,
+        title: 'Schema Documentation',
+        category: 'documentation',
+        order: metadata.priority,
+      },
+    ];
   }
 }

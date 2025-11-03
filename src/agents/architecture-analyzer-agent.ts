@@ -1,12 +1,13 @@
 import { Agent } from './agent.interface';
+import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { LLMJsonParser } from '../utils/json-parser';
 import {
-  AgentContext,
-  AgentResult,
-  AgentMetadata,
-  AgentPriority,
-  AgentExecutionOptions,
-} from '../types/agent.types';
-import { BaseAgentWorkflow } from './base-agent-workflow';
+  getSupportedLanguages,
+  getCodeFiles,
+  getComponentFiles,
+  getSchemaFiles,
+} from '../config/language-config';
 
 /**
  * Architectural styles
@@ -62,49 +63,36 @@ export class ArchitectureAnalyzerAgent extends BaseAgentWorkflow implements Agen
       capabilities: {
         supportsParallel: true,
         requiresFileContents: false, // Works with file paths and structure
-        dependencies: ['file-structure'], // Benefits from file structure analysis
+        dependencies: [
+          'file-structure',
+          'dependency-analyzer',
+          'schema-generator',
+          'pattern-detector',
+          'flow-visualization',
+          'security-analyzer',
+        ], // Synthesizes insights from ALL other agents
         supportsIncremental: false,
         estimatedTokens: 12000,
-        supportedLanguages: ['typescript', 'javascript', 'java', 'python', 'csharp', 'go'],
+        supportedLanguages: getSupportedLanguages(),
       },
       tags: ['architecture', 'components', 'layers', 'c4', 'system-design', 'high-level'],
+      outputFilename: 'architecture.md',
     };
   }
 
   public async canExecute(context: AgentContext): Promise<boolean> {
-    // Can execute on any project with source files
-    const sourceFiles = context.files.filter((f) => /\.(ts|js|tsx|jsx|java|py|cs|go)$/.test(f));
+    // Can execute on any project with source files (uses centralized language config)
+    const sourceFiles = getCodeFiles(context.files);
     return sourceFiles.length > 10; // Need minimum project size for meaningful analysis
   }
 
   public async estimateTokens(context: AgentContext): Promise<number> {
-    const sourceFiles = context.files.filter((f) => /\.(ts|js|tsx|jsx|java|py|cs|go)$/.test(f));
+    // Use centralized code file detection across all languages
+    const sourceFiles = getCodeFiles(context.files);
 
     // Base cost + scaling with project size
     const fileCount = Math.min(sourceFiles.length, 200);
     return 5000 + fileCount * 35;
-  }
-
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    // Configure adaptive refinement workflow
-    // Agent will refine until clarity score >= 85 (high bar for quality)
-    // Not hardcoded iterations - agent self-determines completion
-    const workflowConfig = {
-      maxIterations: 5, // Reduced from 10 - 5 iterations is sufficient for most cases
-      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
-      minImprovement: 3, // Accept small incremental improvements
-      enableSelfQuestioning: true,
-      maxQuestionsPerIteration: 2, // Focused, specific questions
-    };
-
-    return this.executeWorkflow(
-      context,
-      workflowConfig,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
   }
 
   // Abstract method implementations
@@ -158,6 +146,9 @@ Provide **comprehensive architectural analysis** with actionable insights.`;
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const projectStructure = this.analyzeProjectStructure(context.files);
 
+    // Step 1: Quick architectural style detection to determine relevant components
+    const architectureHint = await this.detectArchitectureStyle(context, projectStructure);
+
     // Limit file lists to avoid token overflow for large projects
     const summarizeFileList = (files: string[], limit = 20): string => {
       if (files.length === 0) return 'None';
@@ -170,43 +161,27 @@ Provide **comprehensive architectural analysis** with actionable insights.`;
       );
     };
 
+    // Step 2: Get architecture-specific component categories
+    const relevantCategories = this.getRelevantCategories(architectureHint, projectStructure);
+
+    const structureSummary = relevantCategories
+      .filter((cat) => cat.files.length > 0) // Only include non-empty categories
+      .map(
+        (cat) =>
+          `**${cat.name}** (${cat.files.length}):\n${summarizeFileList(cat.files, cat.limit)}`,
+      )
+      .join('\n\n');
+
     return `Analyze the architecture of this system:
 
 **Project**: ${context.projectPath}
 **Total Files**: ${context.files.length}
 **Languages**: ${context.languageHints.map((lh) => lh.language).join(', ')}
+**Detected Architecture Style**: ${architectureHint}
 
 **Project Structure Summary**:
 
-**Modules** (${projectStructure.modules.length}):
-${summarizeFileList(projectStructure.modules, 15)}
-
-**Controllers** (${projectStructure.controllers.length}):
-${summarizeFileList(projectStructure.controllers, 10)}
-
-**Services** (${projectStructure.services.length}):
-${summarizeFileList(projectStructure.services, 15)}
-
-**Repositories** (${projectStructure.repositories.length}):
-${summarizeFileList(projectStructure.repositories, 10)}
-
-**Models/Entities** (${projectStructure.models.length}):
-${summarizeFileList(projectStructure.models, 10)}
-
-**Configuration** (${projectStructure.configs.length}):
-${summarizeFileList(projectStructure.configs, 5)}
-
-**Middleware** (${projectStructure.middleware.length}):
-${summarizeFileList(projectStructure.middleware, 5)}
-
-**Routes/Endpoints** (${projectStructure.routes.length}):
-${summarizeFileList(projectStructure.routes, 10)}
-
-**External Integrations** (${projectStructure.external.length}):
-${summarizeFileList(projectStructure.external, 10)}
-
-**Tests** (${projectStructure.tests.length}):
-${summarizeFileList(projectStructure.tests, 5)}
+${structureSummary}
 
 Based on this structure, identify the architectural style, major components, layers, and create a comprehensive component diagram.`;
   }
@@ -228,6 +203,114 @@ Based on this structure, identify the architectural style, major components, lay
     return summary || 'Architecture analysis completed';
   }
 
+  /**
+   * Quick LLM-based architecture style detection to guide component categorization
+   */
+  private async detectArchitectureStyle(
+    context: AgentContext,
+    structure: ReturnType<typeof this.analyzeProjectStructure>,
+  ): Promise<string> {
+    const model = this.llmService.getChatModel({ temperature: 0.1, maxTokens: 100 });
+
+    const prompt = `Based on this project structure, identify the most likely architectural style in ONE WORD:
+
+Project: ${context.projectPath}
+Languages: ${context.languageHints.map((lh) => lh.language).join(', ')}
+Files: ${context.files.length} total
+
+Components found:
+- Modules: ${structure.modules.length}
+- Controllers: ${structure.controllers.length}
+- Services: ${structure.services.length}
+- Repositories: ${structure.repositories.length}
+- Models: ${structure.models.length}
+- Middleware: ${structure.middleware.length}
+- Routes: ${structure.routes.length}
+
+Respond with ONE WORD only: monolithic, microservices, layered, event-driven, hexagonal, serverless, or modular-monolith`;
+
+    try {
+      const response = await model.invoke(prompt);
+      const content = typeof response.content === 'string' ? response.content : '';
+      const style = content.trim().toLowerCase();
+
+      // Validate response
+      const validStyles = [
+        'monolithic',
+        'microservices',
+        'layered',
+        'event-driven',
+        'hexagonal',
+        'serverless',
+        'modular-monolith',
+      ];
+      return validStyles.includes(style) ? style : 'layered'; // Default to layered
+    } catch (error) {
+      this.logger.debug('Failed to detect architecture style', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 'layered'; // Safe default
+    }
+  }
+
+  /**
+   * Get component categories relevant to the detected architecture
+   */
+  private getRelevantCategories(
+    architectureStyle: string,
+    structure: ReturnType<typeof this.analyzeProjectStructure>,
+  ): Array<{ name: string; files: string[]; limit: number }> {
+    const allCategories = {
+      modules: { name: 'Modules', files: structure.modules, limit: 15 },
+      controllers: { name: 'Controllers', files: structure.controllers, limit: 10 },
+      services: { name: 'Services', files: structure.services, limit: 15 },
+      repositories: { name: 'Repositories', files: structure.repositories, limit: 10 },
+      models: { name: 'Models/Entities', files: structure.models, limit: 10 },
+      configs: { name: 'Configuration', files: structure.configs, limit: 5 },
+      middleware: { name: 'Middleware', files: structure.middleware, limit: 5 },
+      routes: { name: 'Routes/Endpoints', files: structure.routes, limit: 10 },
+      external: { name: 'External Integrations', files: structure.external, limit: 10 },
+      tests: { name: 'Tests', files: structure.tests, limit: 5 },
+    };
+
+    // Architecture-specific category prioritization
+    const architectureMap: Record<string, Array<keyof typeof allCategories>> = {
+      microservices: ['services', 'external', 'configs', 'routes', 'models', 'tests'],
+      serverless: ['services', 'external', 'configs', 'models', 'tests'],
+      layered: [
+        'controllers',
+        'services',
+        'repositories',
+        'models',
+        'middleware',
+        'routes',
+        'configs',
+        'tests',
+      ],
+      'event-driven': ['services', 'external', 'middleware', 'models', 'configs', 'tests'],
+      hexagonal: ['services', 'repositories', 'external', 'models', 'configs', 'tests'],
+      monolithic: [
+        'modules',
+        'controllers',
+        'services',
+        'repositories',
+        'models',
+        'middleware',
+        'routes',
+        'configs',
+        'external',
+        'tests',
+      ],
+      'modular-monolith': ['modules', 'services', 'repositories', 'models', 'configs', 'tests'],
+    };
+
+    const relevantKeys = architectureMap[architectureStyle] || Object.keys(allCategories);
+
+    return relevantKeys
+      .map((key) => allCategories[key as keyof typeof allCategories])
+      .filter((cat) => cat !== undefined);
+  }
+
   private analyzeProjectStructure(files: string[]): {
     modules: string[];
     controllers: string[];
@@ -240,94 +323,50 @@ Based on this structure, identify the architectural style, major components, lay
     external: string[];
     tests: string[];
   } {
-    const categorized = {
-      modules: [] as string[],
-      controllers: [] as string[],
-      services: [] as string[],
-      repositories: [] as string[],
-      models: [] as string[],
-      configs: [] as string[],
-      middleware: [] as string[],
-      routes: [] as string[],
-      external: [] as string[],
-      tests: [] as string[],
+    // Use centralized language config for component detection
+    const schemas = getSchemaFiles(files);
+
+    return {
+      modules: getComponentFiles(files, 'modules'),
+      controllers: getComponentFiles(files, 'controllers'),
+      services: getComponentFiles(files, 'services'),
+      repositories: getComponentFiles(files, 'repositories'),
+      models: schemas.models, // Models/schemas/entities from language config
+      configs: schemas.configs, // Config files from language config
+      middleware: getComponentFiles(files, 'middleware'),
+      routes: getComponentFiles(files, 'routes'),
+      external: files.filter((f) => {
+        const lower = f.toLowerCase();
+        return lower.includes('client') || lower.includes('adapter') || lower.includes('api/');
+      }),
+      tests: getComponentFiles(files, 'tests'),
     };
-
-    for (const file of files) {
-      const lower = file.toLowerCase();
-
-      if (lower.includes('test') || lower.includes('spec')) {
-        categorized.tests.push(file);
-      } else if (lower.includes('module')) {
-        categorized.modules.push(file);
-      } else if (lower.includes('controller')) {
-        categorized.controllers.push(file);
-      } else if (lower.includes('service')) {
-        categorized.services.push(file);
-      } else if (lower.includes('repository') || lower.includes('repo.') || lower.includes('dao')) {
-        categorized.repositories.push(file);
-      } else if (lower.includes('model') || lower.includes('entity') || lower.includes('schema')) {
-        categorized.models.push(file);
-      } else if (lower.includes('config') || lower.includes('settings') || lower.includes('.env')) {
-        categorized.configs.push(file);
-      } else if (lower.includes('middleware') || lower.includes('interceptor')) {
-        categorized.middleware.push(file);
-      } else if (
-        lower.includes('route') ||
-        lower.includes('router') ||
-        lower.includes('endpoint')
-      ) {
-        categorized.routes.push(file);
-      } else if (lower.includes('client') || lower.includes('adapter') || lower.includes('api/')) {
-        categorized.external.push(file);
-      }
-    }
-
-    return categorized;
   }
 
   private parseAnalysisResult(result: string): ArchitectureAnalysis {
-    try {
-      // Try to extract JSON from the result
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          style: parsed.style || ArchitecturalStyle.MONOLITHIC,
-          components: parsed.components || [],
-          layers: parsed.layers || [],
-          integrations: parsed.integrations || [],
-          diagram: parsed.diagram || '',
-          insights: parsed.insights || [],
-          summary: parsed.summary || 'Architecture analysis completed',
-          warnings: parsed.warnings || [],
-        };
-      }
-    } catch (error) {
-      // Fallback to basic analysis
-      this.logger.debug('Failed to parse architecture analysis result', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    const parsed = LLMJsonParser.parse<Partial<ArchitectureAnalysis>>(result, {
+      contextName: 'architecture-analyzer',
+      logErrors: true,
+      fallback: {},
+    });
 
     return {
-      style: ArchitecturalStyle.MONOLITHIC,
-      components: [],
-      layers: [],
-      integrations: [],
-      diagram: '',
-      insights: [],
-      summary: 'Unable to parse architecture analysis - LLM output format error',
-      warnings: ['Failed to parse architecture analysis JSON'],
+      style: parsed.style || ArchitecturalStyle.MONOLITHIC,
+      components: parsed.components || [],
+      layers: parsed.layers || [],
+      integrations: parsed.integrations || [],
+      diagram: parsed.diagram || '',
+      insights: parsed.insights || [],
+      summary: parsed.summary || 'Unable to parse architecture analysis - LLM output format error',
+      warnings: parsed.warnings || ['Failed to parse architecture analysis JSON'],
     };
   }
 
   private formatMarkdownReport(analysis: ArchitectureAnalysis): string {
-    let report = `# ${analysis.summary}\n\n`;
+    let report = `# 🏗️ System Architecture\n\n`;
     report += `[← Back to Index](./index.md)\n\n`;
     report += `---\n\n`;
 
-    report += `# 🏗️ System Architecture\n\n`;
     report += `## Overview\n\n`;
     report += `${analysis.summary}\n\n`;
 
@@ -405,5 +444,23 @@ Based on this structure, identify the architectural style, major components, lay
     report += `_Generated by ${this.getMetadata().version} on ${new Date().toISOString()}_\n`;
 
     return report;
+  }
+
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+    const metadata = this.getMetadata();
+
+    return [
+      {
+        filename: 'architecture.md',
+        content: markdown,
+        title: 'Architecture Analysis',
+        category: 'architecture',
+        order: metadata.priority,
+      },
+    ];
   }
 }

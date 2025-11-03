@@ -1,12 +1,8 @@
 import { Agent } from './agent.interface';
-import {
-  AgentContext,
-  AgentResult,
-  AgentMetadata,
-  AgentPriority,
-  AgentExecutionOptions,
-} from '../types/agent.types';
-import { BaseAgentWorkflow } from './base-agent-workflow';
+import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { LLMJsonParser } from '../utils/json-parser';
+import { getSupportedLanguages } from '../config/language-config';
 
 interface DesignPattern {
   pattern: string;
@@ -43,13 +39,14 @@ export class PatternDetectorAgent extends BaseAgentWorkflow implements Agent {
       priority: AgentPriority.HIGH,
       capabilities: {
         supportsParallel: true,
-        requiresFileContents: true,
-        dependencies: ['file-structure'],
-        supportsIncremental: true,
-        estimatedTokens: 5000,
-        supportedLanguages: ['javascript', 'typescript', 'python', 'java', 'csharp', 'go'],
+        requiresFileContents: false,
+        dependencies: ['file-structure'], // Needs structure to understand project organization
+        supportsIncremental: false,
+        estimatedTokens: 8000,
+        supportedLanguages: getSupportedLanguages(),
       },
-      tags: ['patterns', 'architecture', 'design', 'anti-patterns', 'best-practices'],
+      tags: ['patterns', 'design-patterns', 'best-practices', 'code-quality'],
+      outputFilename: 'patterns.md',
     };
   }
 
@@ -65,27 +62,7 @@ export class PatternDetectorAgent extends BaseAgentWorkflow implements Agent {
     return 4000 + context.files.length * 3;
   }
 
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    // Configure adaptive refinement workflow
-    const workflowConfig = {
-      maxIterations: 4, // Reduced from 10 - pattern detection doesn't need many iterations
-      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
-      minImprovement: 3, // Accept small incremental improvements
-      enableSelfQuestioning: true,
-      maxQuestionsPerIteration: 2, // Focused, specific questions
-    };
-
-    return this.executeWorkflow(
-      context,
-      workflowConfig,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
-  }
-
-  // Abstract method implementations
+  // Abstract method implementations for BaseAgentWorkflow
 
   protected getAgentName(): string {
     return 'pattern-detector';
@@ -228,33 +205,18 @@ Detect design patterns, architectural patterns, and anti-patterns with specific 
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
-    try {
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      return {
-        summary: 'Failed to parse structured analysis',
-        designPatterns: [],
-        architecturalPatterns: [],
-        antiPatterns: [],
-        recommendations: [],
-        warnings: ['Failed to parse LLM response as JSON'],
-      };
-    } catch (error) {
-      this.logger.warn('Failed to parse pattern analysis result', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
+    return LLMJsonParser.parse(result, {
+      contextName: 'pattern-detector',
+      logErrors: true,
+      fallback: {
         summary: 'Error parsing analysis result',
         designPatterns: [],
         architecturalPatterns: [],
         antiPatterns: [],
         recommendations: [],
-        warnings: [`Parse error: ${(error as Error).message}`],
-      };
-    }
+        warnings: ['Failed to parse LLM response as JSON'],
+      },
+    });
   }
 
   private formatMarkdownReport(
@@ -340,5 +302,23 @@ ${(recommendations || []).map((rec: string, index: number) => `${index + 1}. ${r
             .join(', ')
         : 'None'
     }`;
+  }
+
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+    const metadata = this.getMetadata();
+
+    return [
+      {
+        filename: 'patterns.md',
+        content: markdown,
+        title: 'Design Patterns Analysis',
+        category: 'analysis',
+        order: metadata.priority,
+      },
+    ];
   }
 }

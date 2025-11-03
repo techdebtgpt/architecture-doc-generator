@@ -3,7 +3,6 @@ import * as fs from 'fs/promises';
 import chalk from 'chalk';
 import ora from 'ora';
 import { DocumentationOrchestrator } from '../../src/orchestrator/documentation-orchestrator';
-import { AgentSelector } from '../../src/orchestrator/agent-selector';
 import { FileSystemScanner } from '../../src/scanners/file-system-scanner';
 import { AgentRegistry } from '../../src/agents/agent-registry';
 import { ArchitectureAnalyzerAgent } from '../../src/agents/architecture-analyzer-agent';
@@ -15,6 +14,34 @@ import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
 import { MarkdownFormatter } from '../../src/formatters/markdown-formatter';
+
+/**
+ * Check if existing documentation exists in output directory
+ */
+async function checkExistingDocumentation(outputDir: string): Promise<boolean> {
+  try {
+    // Check if output directory exists
+    await fs.access(outputDir);
+
+    // Check for key documentation files
+    const indexPath = path.join(outputDir, 'index.md');
+    const metadataPath = path.join(outputDir, 'metadata.md');
+
+    const hasIndex = await fs
+      .access(indexPath)
+      .then(() => true)
+      .catch(() => false);
+    const hasMetadata = await fs
+      .access(metadataPath)
+      .then(() => true)
+      .catch(() => false);
+
+    // Consider docs existing if both index and metadata are present
+    return hasIndex && hasMetadata;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check if API keys are configured
@@ -55,6 +82,7 @@ interface AnalyzeOptions {
   model?: string;
   verbose?: boolean;
   clean?: boolean;
+  maxCost?: number; // Maximum cost in dollars before halting (default: 5.0)
   // Depth mode (simple) - conflicts with granular refinement flags
   depth?: 'quick' | 'normal' | 'deep';
   // Granular refinement options (advanced) - overrides depth mode
@@ -73,7 +101,7 @@ interface AnalyzeOptions {
  * This is the primary command for analyzing a project. It:
  * 1. Auto-detects project path (defaults to current directory)
  * 2. Clears the output directory (default: ./.arch-docs)
- * 3. Runs all 5 agents by default (comprehensive analysis)
+ * 3. Runs all agents by default (comprehensive analysis)
  * 4. Generates multi-file markdown documentation
  *
  * @example
@@ -81,9 +109,13 @@ interface AnalyzeOptions {
  * archdoc analyze
  * archdoc analyze ./my-project
  *
- * // Focused analysis
- * archdoc analyze --prompt "dependencies only"
- * archdoc analyze --prompt "flows and schemas"
+ * // Enhanced analysis with user focus
+ * archdoc analyze --prompt "security vulnerabilities and authentication patterns"
+ * archdoc analyze --prompt "database schema design and relationships"
+ *
+ * // The --prompt flag enhances ALL agent analyses with your focus area
+ * // It does NOT filter agents - all sections are still generated
+ * // Agents will emphasize topics related to your prompt in their analysis
  *
  * // Custom output
  * archdoc analyze --output ./custom-docs
@@ -115,23 +147,65 @@ export async function analyzeProject(
       process.exit(1);
     }
 
+    // Validate prompt if provided
+    if (options.prompt !== undefined && options.prompt.trim().length < 3) {
+      spinner.fail('The --prompt flag requires a meaningful description (at least 3 characters).');
+      console.log(chalk.gray('  Example: --prompt "security vulnerabilities and authentication"'));
+      process.exit(1);
+    }
+
     // Determine output directory (default: <project>/.arch-docs)
     const outputDir = options.output
       ? path.resolve(options.output)
       : path.join(resolvedPath, '.arch-docs');
 
-    // Clean output directory if it exists (unless --no-clean)
-    if (options.clean !== false) {
-      spinner.text = 'Cleaning output directory...';
-      if (
-        await fs
-          .access(outputDir)
-          .then(() => true)
-          .catch(() => false)
-      ) {
-        await fs.rm(outputDir, { recursive: true, force: true });
-        if (options.verbose) {
-          console.log(chalk.gray(`  Cleared: ${outputDir}`));
+    // Check if documentation already exists
+    const hasExistingDocs = await checkExistingDocumentation(outputDir);
+
+    // Determine mode:
+    // 1. Incremental mode WITH prompt: hasExistingDocs && prompt provided → enhance specific area
+    // 2. Refinement check mode: hasExistingDocs && NO prompt → check for improvements
+    // 3. Full generation: !hasExistingDocs → generate from scratch
+    const isIncrementalMode = hasExistingDocs && !!options.prompt;
+    const isRefinementCheckMode = hasExistingDocs && !options.prompt;
+
+    if (isIncrementalMode) {
+      spinner.info(chalk.cyan('📝 Existing documentation detected with --prompt flag'));
+      spinner.info(
+        chalk.cyan('🚀 Running incremental enhancement mode (faster, preserves existing docs)'),
+      );
+
+      if (options.verbose) {
+        console.log(chalk.gray('  Mode: Incremental update'));
+        console.log(chalk.gray(`  Focus: "${options.prompt}"`));
+        console.log(chalk.gray('  Existing docs will be enhanced, not regenerated'));
+      }
+    } else if (isRefinementCheckMode) {
+      spinner.info(chalk.cyan('📝 Existing documentation detected'));
+      spinner.info(
+        chalk.cyan('🔍 Running refinement check mode (evaluating documentation quality)'),
+      );
+
+      if (options.verbose) {
+        console.log(chalk.gray('  Mode: Refinement check'));
+        console.log(chalk.gray('  Will analyze existing docs for missing information'));
+        console.log(chalk.gray('  Only regenerates sections that need improvement'));
+        console.log(chalk.gray('  Tip: Use --prompt "focus area" for targeted enhancements'));
+      }
+    } else {
+      // Clean output directory if it exists (unless --no-clean)
+      if (options.clean !== false) {
+        spinner.text = 'Cleaning output directory...';
+        if (
+          await fs
+            .access(outputDir)
+            .then(() => true)
+            .catch(() => false)
+        ) {
+          await fs.rm(outputDir, { recursive: true, force: true });
+          if (options.verbose) {
+            console.log(chalk.gray(`  Cleared: ${outputDir}`));
+          }
         }
       }
     }
@@ -167,7 +241,7 @@ export async function analyzeProject(
     }
 
     // Setup agent registry
-    spinner.start('Registering agents...');
+    spinner.start('Registering agents... \n');
     const agentRegistry = new AgentRegistry();
 
     // Register all available agents (order matters - foundational agents first)
@@ -182,25 +256,16 @@ export async function analyzeProject(
     const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
     spinner.succeed(`Registered ${availableAgents.length} agents: ${availableAgents.join(', ')}`);
 
-    // Determine which agents to run
-    let agentsToRun = availableAgents;
+    // Always run all agents - prompt is used to ENHANCE, not filter
+    const agentsToRun = availableAgents;
 
-    // Use prompt-based selection if provided
+    // Display prompt information if provided
     if (options.prompt) {
-      spinner.start('Analyzing prompt to select agents...');
-
-      const agentSelector = new AgentSelector();
-      const agentMetadata = agentRegistry.getAllAgents().map((a) => a.getMetadata());
-
-      const selectedAgents = await agentSelector.selectAgents(options.prompt, agentMetadata);
-      agentsToRun = selectedAgents.length > 0 ? selectedAgents : availableAgents;
-
       if (options.verbose) {
-        console.log(`🎯 Prompt: "${options.prompt}"`);
-        console.log(`Selected: ${agentsToRun.join(', ')}`);
+        console.log(chalk.cyan(`🎯 User focus: "${options.prompt}"`));
+        console.log(chalk.gray('  (All agents will consider this focus area in their analysis)'));
       }
-
-      spinner.succeed(`Selected ${agentsToRun.length} agents based on prompt`);
+      spinner.info(`Running all agents with focus on: "${options.prompt}"`);
     } else {
       // Default: comprehensive analysis with all agents
       if (options.verbose) {
@@ -215,9 +280,14 @@ export async function analyzeProject(
     // Determine depth mode configuration
     const depthMode = options.depth || 'normal';
     const depthConfigs = {
-      quick: { maxIterations: 2, clarityThreshold: 70, maxQuestions: 2 },
-      normal: { maxIterations: 5, clarityThreshold: 80, maxQuestions: 3 },
-      deep: { maxIterations: 10, clarityThreshold: 90, maxQuestions: 5 },
+      quick: { maxIterations: 2, clarityThreshold: 70, maxQuestions: 2, skipSelfRefinement: true }, // Skip refinement for speed
+      normal: {
+        maxIterations: 5,
+        clarityThreshold: 80,
+        maxQuestions: 3,
+        skipSelfRefinement: false,
+      },
+      deep: { maxIterations: 10, clarityThreshold: 90, maxQuestions: 5, skipSelfRefinement: false },
     };
     const depthConfig = depthConfigs[depthMode];
 
@@ -230,26 +300,51 @@ export async function analyzeProject(
     // Generate documentation
     spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)... \n`;
 
-    const documentation = await orchestrator.generateDocumentation(resolvedPath, {
-      maxTokens: 100000,
-      parallel: true,
-      iterativeRefinement: {
-        enabled: options.refinement !== false, // Default enabled
-        maxIterations: options.refinementIterations || depthConfig.maxIterations,
-        clarityThreshold: options.refinementThreshold || depthConfig.clarityThreshold,
-        minImprovement: options.refinementImprovement || 10,
-      },
-      runName: process.env.ARCHDOC_RUN_NAME, // Custom run name from config (supports {timestamp}, {agent}, {project})
-      agentOptions: {
-        runnableConfig: {
-          runName: 'DocumentationGeneration-Complete',
+    const generationStartTime = Date.now();
+
+    let documentation;
+    try {
+      documentation = await orchestrator.generateDocumentation(resolvedPath, {
+        maxTokens: 100000,
+        maxCostDollars: options.maxCost || 5.0, // Default $5 budget limit
+        parallel: true,
+        userPrompt: options.prompt, // Pass user prompt to enhance agent analysis
+        incrementalMode: isIncrementalMode || isRefinementCheckMode, // Skip full regeneration if docs exist (with or without prompt)
+        existingDocsPath: isIncrementalMode || isRefinementCheckMode ? outputDir : undefined, // Path to existing docs for refinement
+        iterativeRefinement: {
+          enabled: options.refinement !== false, // Default enabled
+          maxIterations: options.refinementIterations || depthConfig.maxIterations,
+          clarityThreshold: options.refinementThreshold || depthConfig.clarityThreshold,
+          minImprovement: options.refinementImprovement || 10,
         },
-        maxQuestionsPerIteration: depthConfig.maxQuestions,
-      },
-      onAgentProgress: (current: number, total: number, agentName: string) => {
-        spinner.text = `Running agent ${current}/${total}: ${agentName} (see progress logs below)... \n`;
-      },
-    });
+        runName: process.env.ARCHDOC_RUN_NAME, // Custom run name from config (supports {timestamp}, {agent}, {project})
+        agentOptions: {
+          runnableConfig: {
+            runName: 'DocumentationGeneration-Complete',
+          },
+          maxQuestionsPerIteration: depthConfig.maxQuestions,
+          skipSelfRefinement: depthConfig.skipSelfRefinement, // Skip refinement for quick mode
+        },
+        onAgentProgress: (current: number, total: number, agentName: string) => {
+          const elapsed = Math.floor((Date.now() - generationStartTime) / 1000);
+          const minutes = Math.floor(elapsed / 60);
+          const seconds = elapsed % 60;
+          const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+          spinner.text = `Running agent ${current}/${total}: ${agentName} [${timeStr}] (see progress logs below)... \n`;
+        },
+      });
+    } catch (error) {
+      // Handle special case: refinement check found no improvements needed
+      if (error instanceof Error && error.message === 'NO_IMPROVEMENTS_NEEDED') {
+        spinner.succeed(chalk.green('✅ Documentation is up-to-date - no regeneration needed!'));
+        console.log(chalk.gray('\n💡 Your documentation is comprehensive and current.'));
+        console.log(chalk.gray('💡 Use --prompt "your focus area" to add targeted enhancements.'));
+        console.log(chalk.gray(`📂 Documentation location: ${outputDir}`));
+        return;
+      }
+      // Re-throw other errors
+      throw error;
+    }
 
     spinner.succeed('Documentation generation completed!');
 
@@ -311,7 +406,32 @@ export async function analyzeProject(
       spinner.start('Generating multi-file documentation structure...');
 
       const multiFileFormatter = new MultiFileMarkdownFormatter();
-      await multiFileFormatter.format(documentation, { outputDir });
+
+      // Use formatIncremental for incremental/refinement modes to preserve changelog
+      const mode = (documentation.metadata.configuration as { mode?: string })?.mode;
+      if (mode === 'incremental' || mode === 'refinement') {
+        // Load existing docs for merge strategies
+        const existingDocsMap = new Map<string, string>();
+        try {
+          const files = await fs.readdir(outputDir);
+          for (const file of files) {
+            if (file.endsWith('.md')) {
+              const filePath = path.join(outputDir, file);
+              existingDocsMap.set(file, await fs.readFile(filePath, 'utf-8'));
+            }
+          }
+        } catch {
+          // Directory might not exist yet
+        }
+
+        await multiFileFormatter.formatIncremental(documentation, {
+          outputDir,
+          existingDocs: existingDocsMap,
+        });
+      } else {
+        // Initial generation - full format
+        await multiFileFormatter.format(documentation, { outputDir });
+      }
 
       const fileCount = (await fs.readdir(outputDir)).length;
       outputLocation = path.join(outputDir, 'index.md');

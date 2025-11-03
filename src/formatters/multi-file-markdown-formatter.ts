@@ -3,10 +3,6 @@ import * as fs from 'fs/promises';
 import type {
   DocumentationOutput,
   DirectoryDescription,
-  DependencyInfo,
-  PatternInstance,
-  QualityIssue,
-  ImprovementSuggestion,
   ComponentDescription,
 } from '../types/output.types';
 
@@ -30,6 +26,7 @@ export interface MultiFileFormatterOptions {
 export class MultiFileMarkdownFormatter {
   /**
    * Format and write documentation as multiple files
+   * NEW: Agents generate their own files, formatter only handles orchestrator-owned files
    */
   async format(output: DocumentationOutput, options: MultiFileFormatterOptions): Promise<string[]> {
     const opts = {
@@ -44,114 +41,138 @@ export class MultiFileMarkdownFormatter {
 
     const generatedFiles: string[] = [];
 
-    // Generate index file
-    const indexPath = path.join(opts.outputDir, 'index.md');
-    await fs.writeFile(indexPath, this.generateIndexFile(output, opts), 'utf-8');
+    // STEP 1: Write agent-generated files (agents own their file generation)
+    const agentFiles = await this.writeAgentFiles(output, opts);
+    generatedFiles.push(...agentFiles);
+
+    // STEP 2: Write orchestrator-owned files (generic/cross-cutting)
+    const orchestratorFiles = await this.writeOrchestratorFiles(output, opts);
+    generatedFiles.push(...orchestratorFiles);
+
+    return generatedFiles;
+  }
+
+  /**
+   * Write agent-generated files directly (agents own their file generation)
+   */
+  private async writeAgentFiles(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+  ): Promise<string[]> {
+    const generatedFiles: string[] = [];
+
+    const sectionsIterator =
+      output.customSections instanceof Map
+        ? output.customSections.entries()
+        : Object.entries(output.customSections as Record<string, any>);
+
+    for (const [agentName, section] of sectionsIterator) {
+      const customSection = section as {
+        files?: Array<{ filename: string; content: string; title: string; category?: string }>;
+        markdown?: string;
+        metadata?: Record<string, unknown>;
+      };
+
+      // Skip if agent was skipped or has no content
+      if (customSection.metadata?.skipped === true) {
+        continue;
+      }
+
+      // Use new files array if available, fallback to markdown (backwards compat)
+      const files = customSection.files || [];
+      if (files.length > 0) {
+        // NEW: Agent provides its own files
+        for (const file of files) {
+          const filePath = path.join(options.outputDir, file.filename);
+          await fs.writeFile(filePath, file.content, 'utf-8');
+          generatedFiles.push(filePath);
+        }
+      } else if (customSection.markdown) {
+        // FALLBACK: Use markdown field (deprecated pattern)
+        const fileMapping: Record<string, string> = {
+          'flow-visualization': 'flows.md',
+          'schema-generator': 'schemas.md',
+          'security-analyzer': 'security.md',
+          'file-structure': 'file-structure.md',
+          'dependency-analyzer': 'dependencies.md',
+          'pattern-detector': 'patterns.md',
+          'architecture-analyzer': 'architecture.md',
+        };
+        const filename = fileMapping[agentName] || `${agentName}.md`;
+        const filePath = path.join(options.outputDir, filename);
+        await fs.writeFile(filePath, customSection.markdown, 'utf-8');
+        generatedFiles.push(filePath);
+      }
+    }
+
+    return generatedFiles;
+  }
+
+  /**
+   * Write orchestrator-owned files (generic/cross-cutting concerns)
+   */
+  private async writeOrchestratorFiles(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+  ): Promise<string[]> {
+    const generatedFiles: string[] = [];
+
+    // Determine which files exist for navigation
+    const agentFilenames = new Set<string>();
+    const sectionsIterator =
+      output.customSections instanceof Map
+        ? output.customSections.entries()
+        : Object.entries(output.customSections as Record<string, any>);
+
+    for (const [_, section] of sectionsIterator) {
+      const customSection = section as { files?: Array<{ filename: string }> };
+      if (customSection.files) {
+        customSection.files.forEach((f) => agentFilenames.add(f.filename));
+      }
+    }
+
+    // Always generate: index, metadata, changelog
+    const indexPath = path.join(options.outputDir, 'index.md');
+    await fs.writeFile(indexPath, this.generateIndexFile(output, options, agentFilenames), 'utf-8');
     generatedFiles.push(indexPath);
 
-    // Generate architecture file (only if there's data)
-    if (output.architecture.components.length > 0) {
-      const archPath = path.join(opts.outputDir, 'architecture.md');
-      await fs.writeFile(archPath, this.generateArchitectureFile(output, opts), 'utf-8');
-      generatedFiles.push(archPath);
+    const metadataPath = path.join(options.outputDir, 'metadata.md');
+    await fs.writeFile(
+      metadataPath,
+      this.generateMetadataFile(output, options, agentFilenames),
+      'utf-8',
+    );
+    generatedFiles.push(metadataPath);
+
+    const changelogPath = path.join(options.outputDir, 'changelog.md');
+    await fs.writeFile(changelogPath, this.generateChangelogFile(output, options), 'utf-8');
+    generatedFiles.push(changelogPath);
+
+    // Conditionally generate: recommendations (if there are recommendations)
+    if (output.codeQuality.improvements.length > 0 || output.patterns.recommendations.length > 0) {
+      const recsPath = path.join(options.outputDir, 'recommendations.md');
+      await fs.writeFile(
+        recsPath,
+        this.generateRecommendationsFile(output, options, agentFilenames),
+        'utf-8',
+      );
+      generatedFiles.push(recsPath);
     }
 
-    // Generate file structure file
-    const structurePath = path.join(opts.outputDir, 'file-structure.md');
-    const fileStructureAgent = (output.customSections as any)['file-structure'];
-    if (fileStructureAgent?.markdown) {
-      // Use agent's markdown if available
-      await fs.writeFile(structurePath, fileStructureAgent.markdown, 'utf-8');
-    } else {
-      // Fallback to generated format
-      await fs.writeFile(structurePath, this.generateFileStructureFile(output, opts), 'utf-8');
-    }
-    generatedFiles.push(structurePath);
-
-    // Generate dependencies file
-    const depsPath = path.join(opts.outputDir, 'dependencies.md');
-    const dependencyAgent = (output.customSections as any)['dependency-analyzer'];
-    if (dependencyAgent?.markdown) {
-      await fs.writeFile(depsPath, dependencyAgent.markdown, 'utf-8');
-    } else {
-      await fs.writeFile(depsPath, this.generateDependenciesFile(output, opts), 'utf-8');
-    }
-    generatedFiles.push(depsPath);
-
-    // Generate patterns file
-    const patternsPath = path.join(opts.outputDir, 'patterns.md');
-    const patternAgent = (output.customSections as any)['pattern-detector'];
-    if (patternAgent?.markdown) {
-      await fs.writeFile(patternsPath, patternAgent.markdown, 'utf-8');
-    } else {
-      await fs.writeFile(patternsPath, this.generatePatternsFile(output, opts), 'utf-8');
-    }
-    generatedFiles.push(patternsPath);
-
-    // Generate code quality file (only if there's actual data)
+    // Conditionally generate: code-quality (if there's data)
     if (
       output.codeQuality.improvements.length > 0 ||
       output.codeQuality.issues.length > 0 ||
       output.codeQuality.overallScore > 0
     ) {
-      const qualityPath = path.join(opts.outputDir, 'code-quality.md');
-      await fs.writeFile(qualityPath, this.generateCodeQualityFile(output, opts), 'utf-8');
+      const qualityPath = path.join(options.outputDir, 'code-quality.md');
+      await fs.writeFile(
+        qualityPath,
+        this.generateCodeQualityFile(output, options, agentFilenames),
+        'utf-8',
+      );
       generatedFiles.push(qualityPath);
     }
-
-    // Generate recommendations file (only if there are recommendations)
-    if (output.codeQuality.improvements.length > 0 || output.patterns.recommendations.length > 0) {
-      const recsPath = path.join(opts.outputDir, 'recommendations.md');
-      await fs.writeFile(recsPath, this.generateRecommendationsFile(output, opts), 'utf-8');
-      generatedFiles.push(recsPath);
-    }
-
-    // Generate flows file (if flow-visualization agent ran)
-    const flowSection = output.customSections.get
-      ? output.customSections.get('flow-visualization')
-      : (output.customSections as any)['flow-visualization'];
-    if (flowSection) {
-      const flowsPath = path.join(opts.outputDir, 'flows.md');
-      await fs.writeFile(flowsPath, this.generateFlowsFile(flowSection, output, opts), 'utf-8');
-      generatedFiles.push(flowsPath);
-    }
-
-    // Generate schemas file (if schema-generator agent ran)
-    const schemaSection = output.customSections.get
-      ? output.customSections.get('schema-generator')
-      : (output.customSections as any)['schema-generator'];
-    if (schemaSection) {
-      const schemasPath = path.join(opts.outputDir, 'schemas.md');
-      await fs.writeFile(
-        schemasPath,
-        this.generateSchemasFile(schemaSection, output, opts),
-        'utf-8',
-      );
-      generatedFiles.push(schemasPath);
-    }
-
-    // Generate security file (if security-analyzer agent ran)
-    const securitySection = output.customSections.get
-      ? output.customSections.get('security-analyzer')
-      : (output.customSections as any)['security-analyzer'];
-    if (securitySection) {
-      const securityPath = path.join(opts.outputDir, 'security.md');
-      await fs.writeFile(
-        securityPath,
-        this.generateSecurityFile(securitySection, output, opts),
-        'utf-8',
-      );
-      generatedFiles.push(securityPath);
-    }
-
-    // Generate metadata file
-    const metaPath = path.join(opts.outputDir, 'metadata.md');
-    await fs.writeFile(metaPath, this.generateMetadataFile(output, opts), 'utf-8');
-    generatedFiles.push(metaPath);
-
-    // Generate agent-specific files
-    const agentFiles = await this.generateAgentFiles(output, opts);
-    generatedFiles.push(...agentFiles);
 
     return generatedFiles;
   }
@@ -162,8 +183,9 @@ export class MultiFileMarkdownFormatter {
   private generateIndexFile(
     output: DocumentationOutput,
     options: MultiFileFormatterOptions,
+    generatedFiles: Set<string>,
   ): string {
-    const nav = this.generateNavigation('index.md', options);
+    const nav = this.generateNavigation('index.md', options, generatedFiles);
     const { overview, architecture, codeQuality } = output;
 
     let content = `# ${output.projectName} - Architecture Documentation\n\n`;
@@ -186,7 +208,7 @@ export class MultiFileMarkdownFormatter {
     let docIndex = 1;
 
     // Architecture (only if components exist)
-    if (architecture.components.length > 0) {
+    if (generatedFiles.has('architecture.md')) {
       content += `${docIndex++}. **[Architecture](./architecture.md)** - System architecture, components, and patterns\n`;
     }
 
@@ -200,16 +222,12 @@ export class MultiFileMarkdownFormatter {
     content += `${docIndex++}. **[Patterns](./patterns.md)** - Design patterns and architectural patterns detected\n`;
 
     // Code Quality (only if there's data)
-    if (
-      output.codeQuality.improvements.length > 0 ||
-      output.codeQuality.issues.length > 0 ||
-      output.codeQuality.overallScore > 0
-    ) {
+    if (generatedFiles.has('code-quality.md')) {
       content += `${docIndex++}. **[Code Quality](./code-quality.md)** - Quality metrics, issues, and complexity analysis\n`;
     }
 
     // Recommendations (only if there are recommendations)
-    if (output.codeQuality.improvements.length > 0 || output.patterns.recommendations.length > 0) {
+    if (generatedFiles.has('recommendations.md')) {
       content += `${docIndex++}. **[Recommendations](./recommendations.md)** - Improvement suggestions and best practices\n`;
     }
 
@@ -235,7 +253,10 @@ export class MultiFileMarkdownFormatter {
     }
 
     // Metadata (always generated)
-    content += `${docIndex++}. **[Metadata](./metadata.md)** - Generation information and configuration\n\n`;
+    content += `${docIndex++}. **[Metadata](./metadata.md)** - Generation information and configuration\n`;
+
+    // Changelog (always generated)
+    content += `${docIndex++}. **[Changelog](./changelog.md)** - Documentation update history and version tracking\n\n`;
 
     if (overview.frameworks.length > 0) {
       content += `## 🛠 Technology Stack\n\n`;
@@ -270,623 +291,6 @@ export class MultiFileMarkdownFormatter {
   }
 
   /**
-   * Generate architecture documentation file
-   */
-  private generateArchitectureFile(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    const nav = this.generateNavigation('architecture.md', options);
-    const { architecture } = output;
-
-    let content = `# Architecture\n\n`;
-    content += `[← Back to Index](./index.md) | [Next: File Structure →](./file-structure.md)\n\n`;
-    content += `---\n\n`;
-
-    content += `## Architecture Style\n\n`;
-    content += `**Style**: ${architecture.style}\n\n`;
-
-    if (architecture.patterns.length > 0) {
-      content += `**Architecture Patterns**: ${architecture.patterns.join(', ')}\n\n`;
-    }
-
-    if (architecture.designPrinciples.length > 0) {
-      content += `## Design Principles\n\n`;
-      architecture.designPrinciples.forEach((principle: string) => {
-        content += `- ${principle}\n`;
-      });
-      content += `\n`;
-    }
-
-    if (architecture.components.length > 0) {
-      content += `## System Components\n\n`;
-      architecture.components.forEach((comp: ComponentDescription) => {
-        content += `### ${comp.name}\n\n`;
-        content += `**Type**: ${comp.type}\n\n`;
-        content += `${comp.description}\n\n`;
-
-        if (comp.responsibilities.length > 0) {
-          content += `**Responsibilities**:\n`;
-          comp.responsibilities.forEach((resp: string) => {
-            content += `- ${resp}\n`;
-          });
-          content += `\n`;
-        }
-
-        if (comp.dependencies.length > 0) {
-          content += `**Dependencies**: ${comp.dependencies.join(', ')}\n\n`;
-        }
-      });
-    }
-
-    if (architecture.dataFlow) {
-      content += `## Data Flow\n\n`;
-      content += `${architecture.dataFlow}\n\n`;
-    }
-
-    if (architecture.diagram) {
-      content += `## Architecture Diagram\n\n`;
-      content += `\`\`\`mermaid\n${architecture.diagram}\n\`\`\`\n\n`;
-    }
-
-    content += nav;
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate file structure documentation file
-   */
-  private generateFileStructureFile(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    const nav = this.generateNavigation('file-structure.md', options);
-    const { fileStructure } = output;
-
-    let content = `# File Structure\n\n`;
-    content += `[← Back: Architecture](./architecture.md) | [Next: Dependencies →](./dependencies.md)\n\n`;
-    content += `---\n\n`;
-
-    content += `## Organization Strategy\n\n`;
-    content += `${fileStructure.organizationStrategy}\n\n`;
-
-    if (fileStructure.namingConventions.length > 0) {
-      content += `## Naming Conventions\n\n`;
-      fileStructure.namingConventions.forEach((convention: string) => {
-        content += `- ${convention}\n`;
-      });
-      content += `\n`;
-    }
-
-    content += `## Directory Structure\n\n`;
-    content += `\`\`\`\n`;
-    content += this.renderDirectoryTree(fileStructure.rootStructure, 0, 4);
-    content += `\`\`\`\n\n`;
-
-    if (fileStructure.keyDirectories.size > 0) {
-      content += `## Key Directories\n\n`;
-      for (const [dirPath, purpose] of fileStructure.keyDirectories.entries()) {
-        content += `### \`${dirPath}\`\n\n`;
-        content += `${purpose}\n\n`;
-      }
-    }
-
-    if (fileStructure.diagram) {
-      content += `## Structure Diagram\n\n`;
-      content += `\`\`\`mermaid\n${fileStructure.diagram}\n\`\`\`\n\n`;
-    }
-
-    content += nav;
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate dependencies documentation file
-   */
-  private generateDependenciesFile(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    const nav = this.generateNavigation('dependencies.md', options);
-    const { dependencies } = output;
-
-    let content = `# Dependencies\n\n`;
-    content += `[← Back: File Structure](./file-structure.md) | [Next: Patterns →](./patterns.md)\n\n`;
-    content += `---\n\n`;
-
-    if (dependencies.productionDeps.length > 0) {
-      content += `## Production Dependencies\n\n`;
-      content += `Total: ${dependencies.productionDeps.length}\n\n`;
-      content += `| Package | Version | License | Description |\n`;
-      content += `|---------|---------|---------|-------------|\n`;
-
-      dependencies.productionDeps.slice(0, 50).forEach((dep: DependencyInfo) => {
-        const desc =
-          dep.description.length > 60 ? dep.description.substring(0, 57) + '...' : dep.description;
-        content += `| ${dep.name} | ${dep.version} | ${dep.license} | ${desc} |\n`;
-      });
-
-      if (dependencies.productionDeps.length > 50) {
-        content += `\n_Showing first 50 of ${dependencies.productionDeps.length} production dependencies._\n`;
-      }
-      content += `\n`;
-    }
-
-    if (dependencies.developmentDeps.length > 0) {
-      content += `## Development Dependencies\n\n`;
-      content += `Total: ${dependencies.developmentDeps.length}\n\n`;
-      content += `| Package | Version | License | Description |\n`;
-      content += `|---------|---------|---------|-------------|\n`;
-
-      dependencies.developmentDeps.slice(0, 30).forEach((dep: DependencyInfo) => {
-        const desc =
-          dep.description.length > 60 ? dep.description.substring(0, 57) + '...' : dep.description;
-        content += `| ${dep.name} | ${dep.version} | ${dep.license} | ${desc} |\n`;
-      });
-
-      if (dependencies.developmentDeps.length > 30) {
-        content += `\n_Showing first 30 of ${dependencies.developmentDeps.length} development dependencies._\n`;
-      }
-      content += `\n`;
-    }
-
-    if (dependencies.outdatedDeps.length > 0) {
-      content += `## Outdated Dependencies\n\n`;
-      content += `| Package | Current | Latest | License |\n`;
-      content += `|---------|---------|--------|----------|\n`;
-      dependencies.outdatedDeps.forEach((dep: DependencyInfo) => {
-        content += `| ${dep.name} | ${dep.version} | ${dep.latestVersion || 'N/A'} | ${dep.license} |\n`;
-      });
-      content += `\n`;
-    }
-
-    if (dependencies.vulnerabilities.length > 0) {
-      content += `## Security Vulnerabilities\n\n`;
-      dependencies.vulnerabilities.forEach((vuln) => {
-        content += `### ⚠️ ${vuln.dependency} - ${vuln.severity.toUpperCase()}\n\n`;
-        content += `${vuln.description}\n\n`;
-        content += `**Recommendation**: ${vuln.recommendation}\n\n`;
-      });
-    }
-
-    if (dependencies.insights.length > 0) {
-      content += `## Insights\n\n`;
-      dependencies.insights.forEach((insight: string) => {
-        content += `- ${insight}\n`;
-      });
-      content += `\n`;
-    }
-
-    content += nav;
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate patterns documentation file
-   */
-  private generatePatternsFile(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    const nav = this.generateNavigation('patterns.md', options);
-    const { patterns } = output;
-
-    let content = `# Design Patterns\n\n`;
-    content += `[← Back: Dependencies](./dependencies.md) | [Next: Code Quality →](./code-quality.md)\n\n`;
-    content += `---\n\n`;
-
-    if (patterns.designPatterns.length > 0) {
-      content += `## Design Patterns\n\n`;
-      patterns.designPatterns.forEach((pattern: PatternInstance) => {
-        content += `### ${pattern.name}\n\n`;
-        content += `**Type**: ${pattern.type}\n\n`;
-        content += `**Confidence**: ${(pattern.confidence * 100).toFixed(0)}%\n\n`;
-        content += `${pattern.description}\n\n`;
-
-        if (pattern.locations.length > 0) {
-          content += `**Locations**: ${pattern.locations.slice(0, 5).join(', ')}`;
-          if (pattern.locations.length > 5) {
-            content += ` (and ${pattern.locations.length - 5} more)`;
-          }
-          content += `\n\n`;
-        }
-
-        if (pattern.examples.length > 0 && pattern.examples[0]) {
-          content += `**Example**:\n\`\`\`typescript\n${pattern.examples[0]}\n\`\`\`\n\n`;
-        }
-      });
-    }
-
-    if (patterns.architecturalPatterns.length > 0) {
-      content += `## Architectural Patterns\n\n`;
-      patterns.architecturalPatterns.forEach((pattern: PatternInstance) => {
-        content += `### ${pattern.name}\n\n`;
-        content += `${pattern.description}\n\n`;
-        if (pattern.locations.length > 0) {
-          content += `**Used in**: ${pattern.locations.join(', ')}\n\n`;
-        }
-      });
-    }
-
-    if (patterns.codePatterns.length > 0) {
-      content += `## Code Patterns\n\n`;
-      patterns.codePatterns.forEach((pattern: PatternInstance) => {
-        content += `- **${pattern.name}**: ${pattern.description}\n`;
-      });
-      content += `\n`;
-    }
-
-    if (patterns.antiPatterns.length > 0) {
-      content += `## Anti-Patterns Detected\n\n`;
-      patterns.antiPatterns.forEach((pattern: PatternInstance) => {
-        content += `### ⚠️ ${pattern.name}\n\n`;
-        content += `${pattern.description}\n\n`;
-        if (pattern.locations.length > 0) {
-          content += `**Found in**: ${pattern.locations.join(', ')}\n\n`;
-        }
-      });
-    }
-
-    if (patterns.recommendations.length > 0) {
-      content += `## Pattern Recommendations\n\n`;
-      patterns.recommendations.forEach((rec: string) => {
-        content += `- ${rec}\n`;
-      });
-      content += `\n`;
-    }
-
-    content += nav;
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate code quality documentation file
-   */
-  private generateCodeQualityFile(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    const nav = this.generateNavigation('code-quality.md', options);
-    const { codeQuality } = output;
-
-    let content = `# Code Quality\n\n`;
-    content += `[← Back: Patterns](./patterns.md) | [Next: Recommendations →](./recommendations.md)\n\n`;
-    content += `---\n\n`;
-
-    content += `## Overall Quality Score\n\n`;
-    content += `**Score**: ${codeQuality.overallScore.toFixed(1)}/10\n\n`;
-
-    const { metrics } = codeQuality;
-    content += `## Quality Metrics\n\n`;
-    content += `| Metric | Score |\n`;
-    content += `|--------|-------|\n`;
-    content += `| Maintainability | ${metrics.maintainability.toFixed(1)}/10 |\n`;
-    content += `| Reliability | ${metrics.reliability.toFixed(1)}/10 |\n`;
-    content += `| Security | ${metrics.security.toFixed(1)}/10 |\n`;
-    if (metrics.testCoverage !== undefined) {
-      content += `| Test Coverage | ${metrics.testCoverage.toFixed(1)}% |\n`;
-    }
-    content += `| Code Smells | ${metrics.codeSmells} |\n`;
-    content += `| Technical Debt | ${metrics.technicalDebt} |\n\n`;
-
-    if (codeQuality.complexity.highComplexityFiles.length > 0) {
-      content += `## Complexity Analysis\n\n`;
-      content += `**Average Complexity**: ${codeQuality.complexity.averageComplexity.toFixed(2)}\n\n`;
-      content += `### High Complexity Files\n\n`;
-      content += `| File | Complexity | Functions | Recommendation |\n`;
-      content += `|------|------------|-----------|----------------|\n`;
-      codeQuality.complexity.highComplexityFiles.forEach((file) => {
-        const fileName = file.file.length > 40 ? '...' + file.file.slice(-37) : file.file;
-        const rec =
-          file.recommendation.length > 50
-            ? file.recommendation.substring(0, 47) + '...'
-            : file.recommendation;
-        content += `| ${fileName} | ${file.complexity.toFixed(1)} | ${file.functions} | ${rec} |\n`;
-      });
-      content += `\n`;
-    }
-
-    if (codeQuality.issues.length > 0) {
-      content += `## Issues Found\n\n`;
-
-      const criticalIssues = codeQuality.issues.filter(
-        (i: QualityIssue) => i.severity === 'critical',
-      );
-      const majorIssues = codeQuality.issues.filter((i: QualityIssue) => i.severity === 'major');
-      const minorIssues = codeQuality.issues.filter((i: QualityIssue) => i.severity === 'minor');
-
-      if (criticalIssues.length > 0) {
-        content += `### 🔴 Critical Issues (${criticalIssues.length})\n\n`;
-        criticalIssues.slice(0, 10).forEach((issue: QualityIssue) => {
-          content += `- **${issue.type}** in \`${issue.file}\`${issue.line ? `:${issue.line}` : ''}\n`;
-          content += `  ${issue.description}\n`;
-          content += `  _Suggestion: ${issue.suggestion}_\n\n`;
-        });
-      }
-
-      if (majorIssues.length > 0) {
-        content += `### 🟡 Major Issues (${majorIssues.length})\n\n`;
-        majorIssues.slice(0, 10).forEach((issue: QualityIssue) => {
-          content += `- **${issue.type}** in \`${issue.file}\`${issue.line ? `:${issue.line}` : ''}\n`;
-          content += `  ${issue.description}\n\n`;
-        });
-      }
-
-      if (minorIssues.length > 0) {
-        content += `### 🔵 Minor Issues (${minorIssues.length})\n\n`;
-        content += `_${minorIssues.length} minor issues detected. Review code quality report for details._\n\n`;
-      }
-    }
-
-    if (codeQuality.bestPractices.length > 0) {
-      content += `## Best Practices Observed\n\n`;
-      codeQuality.bestPractices.forEach((practice: string) => {
-        content += `- ✅ ${practice}\n`;
-      });
-      content += `\n`;
-    }
-
-    content += nav;
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate recommendations documentation file
-   */
-  private generateRecommendationsFile(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    const nav = this.generateNavigation('recommendations.md', options);
-    const { codeQuality, patterns, dependencies } = output;
-
-    let content = `# Recommendations\n\n`;
-    content += `[← Back: Code Quality](./code-quality.md) | [Next: Metadata →](./metadata.md)\n\n`;
-    content += `---\n\n`;
-
-    content += `## Improvement Suggestions\n\n`;
-
-    if (codeQuality.improvements.length > 0) {
-      const highPriority = codeQuality.improvements.filter(
-        (i: ImprovementSuggestion) => i.priority === 'high',
-      );
-      const mediumPriority = codeQuality.improvements.filter(
-        (i: ImprovementSuggestion) => i.priority === 'medium',
-      );
-      const lowPriority = codeQuality.improvements.filter(
-        (i: ImprovementSuggestion) => i.priority === 'low',
-      );
-
-      if (highPriority.length > 0) {
-        content += `### 🔴 High Priority\n\n`;
-        highPriority.forEach((imp: ImprovementSuggestion) => {
-          content += `#### ${imp.category}\n\n`;
-          content += `${imp.description}\n\n`;
-          content += `- **Impact**: ${imp.impact}\n`;
-          content += `- **Effort**: ${imp.effort}\n\n`;
-        });
-      }
-
-      if (mediumPriority.length > 0) {
-        content += `### 🟡 Medium Priority\n\n`;
-        mediumPriority.forEach((imp: ImprovementSuggestion) => {
-          content += `#### ${imp.category}\n\n`;
-          content += `${imp.description}\n\n`;
-          content += `- **Impact**: ${imp.impact}\n`;
-          content += `- **Effort**: ${imp.effort}\n\n`;
-        });
-      }
-
-      if (lowPriority.length > 0) {
-        content += `### 🔵 Low Priority\n\n`;
-        lowPriority.forEach((imp: ImprovementSuggestion) => {
-          content += `- **${imp.category}**: ${imp.description}\n`;
-        });
-        content += `\n`;
-      }
-    }
-
-    if (patterns.recommendations.length > 0) {
-      content += `## Pattern Recommendations\n\n`;
-      patterns.recommendations.forEach((rec: string) => {
-        content += `- ${rec}\n`;
-      });
-      content += `\n`;
-    }
-
-    if (dependencies.insights.length > 0) {
-      content += `## Dependency Insights\n\n`;
-      dependencies.insights.forEach((insight: string) => {
-        content += `- ${insight}\n`;
-      });
-      content += `\n`;
-    }
-
-    content += nav;
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate flows documentation file
-   */
-  private generateFlowsFile(
-    flowSection: any,
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    let content = `# Flow Visualizations\n\n`;
-    content += `[← Back: Recommendations](./recommendations.md) | [Next: Schemas →](./schemas.md)\n\n`;
-    content += `---\n\n`;
-
-    content += flowSection.content;
-    content += `\n`;
-
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate schemas documentation file
-   */
-  private generateSchemasFile(
-    schemaSection: any,
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    let content = `# Schema Documentation\n\n`;
-    content += `[← Back: Flows](./flows.md) | [Next: Security →](./security.md)\n\n`;
-    content += `---\n\n`;
-
-    content += schemaSection.content;
-    content += `\n`;
-
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate security documentation file
-   */
-  private generateSecurityFile(
-    securitySection: any,
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    let content = `# Security Analysis\n\n`;
-    content += `[← Back: Schemas](./schemas.md) | [Next: Metadata →](./metadata.md)\n\n`;
-    content += `---\n\n`;
-
-    content += securitySection.content;
-    content += `\n`;
-
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
-
-    return content;
-  }
-
-  /**
-   * Generate metadata documentation file
-   */
-  private generateMetadataFile(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): string {
-    const nav = this.generateNavigation('metadata.md', options);
-    const { metadata } = output;
-
-    let content = `# Generation Metadata\n\n`;
-    content += `[← Back: Recommendations](./recommendations.md) | [Back to Index →](./index.md)\n\n`;
-    content += `---\n\n`;
-
-    content += `## Generation Info\n\n`;
-    content += `- **Generator Version**: ${metadata.generatorVersion}\n`;
-    content += `- **Generated**: ${output.timestamp.toISOString()}\n`;
-    content += `- **Duration**: ${(metadata.generationDuration / 1000).toFixed(2)}s\n`;
-    content += `- **Total Tokens**: ${metadata.totalTokensUsed.toLocaleString()}\n\n`;
-
-    content += `## Agents Executed\n\n`;
-    metadata.agentsExecuted.forEach((agent: string) => {
-      content += `- ${agent}\n`;
-    });
-    content += `\n`;
-
-    if (Object.keys(metadata.configuration).length > 0) {
-      content += `## Configuration\n\n`;
-      content += `\`\`\`json\n${JSON.stringify(metadata.configuration, null, 2)}\n\`\`\`\n\n`;
-    }
-
-    if (metadata.warnings.length > 0) {
-      content += `## Warnings\n\n`;
-      metadata.warnings.forEach((warning: string) => {
-        content += `- ⚠️ ${warning}\n`;
-      });
-      content += `\n`;
-    }
-
-    content += nav;
-
-    return content;
-  }
-
-  /**
-   * Generate agent-specific files from custom sections
-   */
-  private async generateAgentFiles(
-    output: DocumentationOutput,
-    options: MultiFileFormatterOptions,
-  ): Promise<string[]> {
-    const generatedFiles: string[] = [];
-
-    // Handle both Map and plain object for customSections
-    const sectionsIterator =
-      output.customSections instanceof Map
-        ? output.customSections.entries()
-        : Object.entries(output.customSections as Record<string, any>);
-
-    for (const [agentName, section] of sectionsIterator) {
-      const customSection = section as {
-        title: string;
-        content: string;
-        metadata: Record<string, unknown>;
-      };
-
-      const fileName = `${agentName}.md`;
-      const filePath = path.join(options.outputDir, fileName);
-
-      let content = `# ${customSection.title}\n\n`;
-      content += `[← Back to Index](./index.md)\n\n`;
-      content += `---\n\n`;
-      content += `${customSection.content}\n\n`;
-
-      if (Object.keys(customSection.metadata || {}).length > 0) {
-        content += `## Metadata\n\n`;
-        content += `\`\`\`json\n${JSON.stringify(customSection.metadata, null, 2)}\n\`\`\`\n\n`;
-      }
-
-      if (options.includeMetadata) {
-        content += this.generateMetadataFooter(output);
-      }
-
-      await fs.writeFile(filePath, content, 'utf-8');
-      generatedFiles.push(filePath);
-    }
-
-    return generatedFiles;
-  }
-
-  /**
    * Render directory tree recursively
    */
   private renderDirectoryTree(node: DirectoryDescription, level: number, maxDepth: number): string {
@@ -916,57 +320,147 @@ export class MultiFileMarkdownFormatter {
   /**
    * Generate navigation links
    */
-  private generateNavigation(currentFile: string, options: MultiFileFormatterOptions): string {
+  private generateNavigation(
+    _currentFile: string,
+    options: MultiFileFormatterOptions,
+    _generatedFiles: Set<string>,
+  ): string {
     if (!options.includeNavigation) {
       return '';
     }
 
-    const files = [
-      'index.md',
-      'architecture.md',
-      'file-structure.md',
-      'dependencies.md',
-      'patterns.md',
-      'code-quality.md',
-      'recommendations.md',
-      'metadata.md',
-    ];
-
-    const currentIndex = files.indexOf(currentFile);
-    if (currentIndex === -1) {
-      return '\n---\n\n[← Back to Index](./index.md)\n';
-    }
-
+    // No hardcoded file list - navigation is contextual to current file
     let nav = '\n---\n\n';
-
-    if (currentIndex > 0) {
-      const prev = files[currentIndex - 1];
-      const prevName = this.formatFileName(prev);
-      nav += `[← ${prevName}](./${prev})`;
-    }
-
-    if (currentIndex < files.length - 1) {
-      const next = files[currentIndex + 1];
-      const nextName = this.formatFileName(next);
-      if (currentIndex > 0) {
-        nav += ' | ';
-      }
-      nav += `[${nextName} →](./${next})`;
-    }
-
-    nav += '\n';
+    nav += `[← Back to Index](./index.md)\n`;
     return nav;
   }
 
   /**
-   * Format file name for display
+   * Generate metadata file
    */
-  private formatFileName(fileName: string): string {
-    return fileName
-      .replace('.md', '')
-      .split('-')
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+  private generateMetadataFile(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+    generatedFiles: Set<string>,
+  ): string {
+    const nav = this.generateNavigation('metadata.md', options, generatedFiles);
+    const { metadata } = output;
+
+    let content = `# Metadata\n\n`;
+    content += `## Generation Information\n\n`;
+    content += `- **Generator Version**: ${metadata.generatorVersion}\n`;
+    content += `- **Generated**: ${output.timestamp.toISOString()}\n`;
+    content += `- **Project**: ${output.projectName}\n\n`;
+
+    content += nav;
+    if (options.includeMetadata) {
+      content += this.generateMetadataFooter(output);
+    }
+
+    return content;
+  }
+
+  /**
+   * Generate changelog file
+   */
+  private generateChangelogFile(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+  ): string {
+    let content = `# Changelog\n\n`;
+    content += `## ${output.timestamp.toISOString().split('T')[0]}\n\n`;
+    content += `- Documentation generated\n`;
+    content += `- Analyzed ${output.overview.statistics.totalFiles} files\n`;
+    content += `- Quality score: ${output.codeQuality.overallScore.toFixed(1)}/10\n\n`;
+
+    if (options.includeMetadata) {
+      content += this.generateMetadataFooter(output);
+    }
+
+    return content;
+  }
+
+  /**
+   * Generate recommendations file
+   */
+  private generateRecommendationsFile(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+    generatedFiles: Set<string>,
+  ): string {
+    const nav = this.generateNavigation('recommendations.md', options, generatedFiles);
+    let content = `# Recommendations\n\n`;
+
+    if (output.codeQuality.improvements.length > 0) {
+      content += `## Code Quality Improvements\n\n`;
+      output.codeQuality.improvements.forEach((imp: any) => {
+        content += `### ${imp.category}\n\n`;
+        content += `**Priority**: ${imp.priority}\n\n`;
+        content += `${imp.description}\n\n`;
+        if (imp.impact) {
+          content += `**Impact**: ${imp.impact}\n\n`;
+        }
+      });
+    }
+
+    if (output.patterns.recommendations.length > 0) {
+      content += `## Pattern Recommendations\n\n`;
+      output.patterns.recommendations.forEach((rec: string) => {
+        content += `- ${rec}\n`;
+      });
+      content += `\n`;
+    }
+
+    content += nav;
+    if (options.includeMetadata) {
+      content += this.generateMetadataFooter(output);
+    }
+
+    return content;
+  }
+
+  /**
+   * Generate code quality file
+   */
+  private generateCodeQualityFile(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+    generatedFiles: Set<string>,
+  ): string {
+    const nav = this.generateNavigation('code-quality.md', options, generatedFiles);
+    const { codeQuality } = output;
+
+    let content = `# Code Quality\n\n`;
+    content += `**Overall Score**: ${codeQuality.overallScore.toFixed(1)}/10\n\n`;
+
+    if (codeQuality.issues.length > 0) {
+      content += `## Issues\n\n`;
+      codeQuality.issues.forEach((issue: any) => {
+        content += `### ${issue.severity}: ${issue.message}\n\n`;
+        if (issue.file) {
+          content += `**File**: \`${issue.file}\`\n`;
+        }
+        if (issue.line) {
+          content += `**Line**: ${issue.line}\n`;
+        }
+        content += `\n`;
+      });
+    }
+
+    if (codeQuality.improvements.length > 0) {
+      content += `## Improvement Suggestions\n\n`;
+      codeQuality.improvements.forEach((imp: any) => {
+        content += `- ${imp.description}\n`;
+      });
+      content += `\n`;
+    }
+
+    content += nav;
+    if (options.includeMetadata) {
+      content += this.generateMetadataFooter(output);
+    }
+
+    return content;
   }
 
   /**
@@ -975,5 +469,211 @@ export class MultiFileMarkdownFormatter {
   private generateMetadataFooter(output: DocumentationOutput): string {
     const { metadata } = output;
     return `\n---\n\n_Generated by ${metadata.generatorVersion} on ${output.timestamp.toISOString()}_\n`;
+  }
+
+  /**
+   * Format and write incremental documentation updates
+   * Merges agent files with existing documentation based on merge strategies
+   */
+  async formatIncremental(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions & { existingDocs: Map<string, string> },
+  ): Promise<string[]> {
+    const opts = {
+      includeTOC: true,
+      includeMetadata: true,
+      includeNavigation: true,
+      ...options,
+    };
+
+    // Ensure output directory exists
+    await fs.mkdir(opts.outputDir, { recursive: true });
+
+    const updatedFiles: string[] = [];
+
+    // Process agent-generated files with merge strategies
+    for (const [_agentName, section] of output.customSections) {
+      const files = section.files || [];
+
+      for (const file of files) {
+        const filePath = path.join(opts.outputDir, file.filename);
+        const existingContent = opts.existingDocs.get(file.filename);
+        const mergeStrategy = file.mergeStrategy || 'replace';
+
+        let finalContent: string;
+
+        if (existingContent && mergeStrategy !== 'replace') {
+          // Merge with existing content
+          finalContent = await this.mergeContent(
+            existingContent,
+            file.content,
+            mergeStrategy,
+            file.sectionId,
+          );
+        } else {
+          // Replace or create new
+          finalContent = file.content;
+        }
+
+        await fs.writeFile(filePath, finalContent, 'utf-8');
+        updatedFiles.push(file.filename);
+      }
+    }
+
+    // Update orchestrator files (index, metadata, changelog)
+    await this.updateIndexForIncremental(opts.outputDir, output, opts.existingDocs);
+    await this.appendToChangelog(opts.outputDir, output);
+    await this.updateMetadata(opts.outputDir, output);
+
+    updatedFiles.push('index.md', 'changelog.md', 'metadata.md');
+
+    return updatedFiles;
+  }
+
+  /**
+   * Merge new content with existing content based on strategy
+   */
+  private async mergeContent(
+    existingContent: string,
+    newContent: string,
+    strategy: 'append' | 'section-update',
+    sectionId?: string,
+  ): Promise<string> {
+    if (strategy === 'append') {
+      // Append as new section
+      return `${existingContent}
+
+---
+
+## Update: ${new Date().toISOString()}
+
+${newContent}`;
+    }
+
+    if (strategy === 'section-update' && sectionId) {
+      // Replace specific section
+      const sectionRegex = new RegExp(
+        `(${sectionId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?)(?=\\n#{1,2}\\s|$)`,
+        'i',
+      );
+
+      if (sectionRegex.test(existingContent)) {
+        return existingContent.replace(sectionRegex, `${sectionId}\n\n${newContent}\n`);
+      }
+
+      // Section not found, append
+      return `${existingContent}\n\n${sectionId}\n\n${newContent}`;
+    }
+
+    // Default: append
+    return `${existingContent}\n\n${newContent}`;
+  }
+
+  /**
+   * Update index.md with new enhancements
+   */
+  private async updateIndexForIncremental(
+    outputDir: string,
+    output: DocumentationOutput,
+    existingDocs: Map<string, string>,
+  ): Promise<void> {
+    const indexPath = path.join(outputDir, 'index.md');
+    let indexContent = existingDocs.get('index.md') || '';
+
+    if (!indexContent) {
+      // No existing index, create new one
+      const generatedFiles = new Set(Array.from(existingDocs.keys()));
+      indexContent = this.generateIndexFile(output, { outputDir }, generatedFiles);
+      await fs.writeFile(indexPath, indexContent, 'utf-8');
+      return;
+    }
+
+    // Add link to new enhancement sections
+    const enhancementLinks: string[] = [];
+    for (const [_agentName, section] of output.customSections) {
+      const files = section.files || [];
+      for (const file of files) {
+        enhancementLinks.push(`- [${file.title}](./${file.filename})`);
+      }
+    }
+
+    if (enhancementLinks.length > 0) {
+      const enhancementSection = `\n\n## Latest Updates\n\n${enhancementLinks.join('\n')}`;
+
+      // Insert after main TOC
+      const tocEndIndex = indexContent.indexOf('\n\n##');
+      if (tocEndIndex !== -1) {
+        indexContent =
+          indexContent.substring(0, tocEndIndex) +
+          enhancementSection +
+          indexContent.substring(tocEndIndex);
+      } else {
+        indexContent += enhancementSection;
+      }
+
+      await fs.writeFile(indexPath, indexContent, 'utf-8');
+    }
+  }
+
+  /**
+   * Append entry to changelog.md
+   */
+  private async appendToChangelog(outputDir: string, output: DocumentationOutput): Promise<void> {
+    const changelogPath = path.join(outputDir, 'changelog.md');
+    const timestamp = new Date().toISOString().split('T')[0]; // Date only for readability
+    const time = new Date().toISOString().split('T')[1].split('.')[0]; // Time HH:MM:SS
+    const agentsExecuted = output.metadata.agentsExecuted.join(', ');
+    const config = output.metadata.configuration as { mode?: string; userPrompt?: string };
+    const mode = config.mode || 'generation';
+    const userPrompt = config.userPrompt;
+
+    // Build entry based on mode
+    const entryType =
+      mode === 'incremental'
+        ? '🔄 Incremental Enhancement'
+        : mode === 'refinement'
+          ? '✨ Refinement Update'
+          : '📝 Documentation Generated';
+
+    let entryText = `### ${timestamp} at ${time}\n\n`;
+    entryText += `- **Type**: ${entryType}\n`;
+    if (userPrompt) {
+      entryText += `- **Focus**: ${userPrompt}\n`;
+    }
+    entryText += `- **Agents**: ${agentsExecuted}\n`;
+    entryText += `- **Duration**: ${Math.round(output.metadata.generationDuration / 1000)}s\n`;
+    entryText += `- **Tokens**: ${output.metadata.totalTokensUsed.toLocaleString()}\n\n`;
+
+    let changelogContent: string;
+    try {
+      changelogContent = await fs.readFile(changelogPath, 'utf-8');
+      // Insert after "# Changelog" header
+      const headerMatch = changelogContent.match(/^#\s+(?:Documentation\s+)?Changelog\s*\n+/i);
+      if (headerMatch) {
+        const insertPos = headerMatch.index! + headerMatch[0].length;
+        changelogContent =
+          changelogContent.substring(0, insertPos) +
+          entryText +
+          changelogContent.substring(insertPos);
+      } else {
+        // No header found, prepend
+        changelogContent = `# Changelog\n\n${entryText}${changelogContent}`;
+      }
+    } catch {
+      // No changelog exists, create new
+      changelogContent = `# Changelog\n\n${entryText}`;
+    }
+
+    await fs.writeFile(changelogPath, changelogContent, 'utf-8');
+  }
+
+  /**
+   * Update metadata.md with latest generation info
+   */
+  private async updateMetadata(outputDir: string, output: DocumentationOutput): Promise<void> {
+    const metadataPath = path.join(outputDir, 'metadata.md');
+    const generatedFiles = new Set<string>();
+    const content = this.generateMetadataFile(output, { outputDir }, generatedFiles);
+    await fs.writeFile(metadataPath, content, 'utf-8');
   }
 }

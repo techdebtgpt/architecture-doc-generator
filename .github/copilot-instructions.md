@@ -62,126 +62,161 @@ src/agents/
 └── security-analyzer-agent.ts    # MEDIUM priority - Security vulnerabilities (NEW!)
 ```
 
-**Agent Implementation Template**:
+**Agent Implementation Pattern** (uses BaseAgentWorkflow with LangGraph):
+
+All agents extend `BaseAgentWorkflow` which provides:
+
+- ✅ LangGraph self-refinement workflow (analyzeInitial → evaluateClarity → generateQuestions → retrieveFiles → refineAnalysis)
+- ✅ Token tracking and budget management
+- ✅ LangSmith tracing with proper runNames
+- ✅ Agent-owned file generation via `generateFiles()`
+
+**Required implementations**:
 
 ```typescript
-export class MyAgent implements Agent {
-  private llmService: LLMService;
-
-  constructor() {
-    this.llmService = LLMService.getInstance();
-  }
-
+export class MyCustomAgent extends BaseAgentWorkflow implements Agent {
+  // 1. Agent metadata
   public getMetadata(): AgentMetadata {
     return {
-      name: 'my-agent',
+      name: 'my-custom-agent',
       version: '1.0.0',
-      description: 'Does X, Y, and Z',
+      description: 'What the agent does',
       priority: AgentPriority.MEDIUM,
       capabilities: {
-        /* ... */
+        supportsParallel: false,
+        requiresFileContents: true,
+        estimatedTokens: 3000,
       },
       tags: ['tag1', 'tag2'],
     };
   }
 
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    const chain = this.buildAnalysisChain(context, options);
-
-    // Pass config for unified LangSmith tracing
-    const result = await chain.invoke(input, options?.runnableConfig);
-
-    return {
-      agentName: this.getMetadata().name,
-      status: 'success',
-      data: {
-        /* ... */
-      },
-      summary: '...',
-      markdown: this.formatMarkdownReport(analysis),
-      confidence: 0.9,
-      tokenUsage: {
-        /* ... */
-      },
-      executionTime: Date.now() - startTime,
-      errors: [],
-      warnings: [],
-      metadata: {},
-    };
+  // 2. Execution checks
+  public async canExecute(context: AgentContext): Promise<boolean> {
+    return context.files.length > 0; // Your condition
   }
 
-  private buildAnalysisChain(_context: AgentContext, options?: AgentExecutionOptions) {
-    const model = this.llmService.getChatModel({ temperature: 0.2 });
+  public async estimateTokens(context: AgentContext): Promise<number> {
+    return 2000 + context.files.length * 5; // Your estimation
+  }
 
-    return RunnableSequence.from([
-      RunnableLambda.from(async (input) => {
-        // Prepare data
-        return processedInput;
-      }).withConfig({ runName: 'PrepareData' }),
+  // 3. Agent name (for tracing)
+  protected getAgentName(): string {
+    return this.getMetadata().name;
+  }
 
-      RunnableLambda.from(async (input) => {
-        // Build prompt
-        return [systemPrompt, humanPrompt];
-      }).withConfig({ runName: 'BuildPrompt' }),
+  // 4. Prompts for LLM
+  protected async buildSystemPrompt(context: AgentContext): Promise<string> {
+    return `You are analyzing ${context.projectPath}...`;
+  }
 
-      model.withConfig({ runName: 'LLMAnalysis' }),
+  protected async buildHumanPrompt(context: AgentContext): Promise<string> {
+    return `Analyze these files:\n${context.files.join('\n')}`;
+  }
 
-      new StringOutputParser(),
-    ]);
-    // NOTE: No .withConfig() on the sequence itself - config passed via invoke()
+  // 5. Parse LLM output
+  protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {
+    // Parse JSON or structured output
+    return JSON.parse(analysis);
+  }
+
+  // 6. Generate summary
+  protected generateSummary(data: Record<string, unknown>): string {
+    return `Found ${Object.keys(data).length} insights`;
+  }
+
+  // 7. Format markdown (backwards compat)
+  protected async formatMarkdown(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<string> {
+    return `# Analysis\n\n${JSON.stringify(data, null, 2)}`;
+  }
+
+  // 8. Generate files (NEW: agent-owned file generation)
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+
+    return [
+      {
+        filename: 'my-analysis.md',
+        content: markdown,
+        title: 'My Analysis',
+        category: 'analysis',
+        order: this.getMetadata().priority,
+      },
+      // Can return multiple files!
+      // { filename: 'my-details.md', content: '...', title: 'Details' }
+    ];
   }
 }
 ```
 
-**Key Rules**:
+**Key Benefits**:
 
-1. **NO `.withConfig()` on the agent's `RunnableSequence`** - This creates separate traces
-2. **Pass `options?.runnableConfig` to `.invoke()`** - Enables unified tracing
-3. **Use `.withConfig()` on individual steps** - For granular trace visibility
-4. **Return formatted markdown in `result.markdown`** - Used by multi-file formatter
-5. **Always log errors with context** - Use `this.logger.debug()` or `this.logger.warn()` with error details
-6. **Never use `_error` prefix** - All errors should be logged with proper context
+- Self-refinement workflow handles iterative improvement automatically
+- Token budget enforcement prevents runaway costs
+- LangSmith traces show: `Agent-{name}` → `{name}-InitialAnalysis` → `{name}-EvaluateClarity` → `{name}-Refinement-{N}`
+- Agent controls its own file generation (can produce multiple files)
+- Backwards compatible via `markdown` field
 
-### LangSmith Unified Tracing
+### LangSmith Tracing (LangGraph Workflow)
 
-**CRITICAL**: All agent chains MUST inherit the parent runnable's config for unified tracing.
+**Architecture**: Agents use LangGraph self-refinement workflow with proper trace naming.
 
 **Pattern**:
 
 ```typescript
-// In orchestrator
-const agentRunnable = RunnableLambda.from(
-  async (ctx: AgentContext, config?: RunnableConfig): Promise<AgentResult> => {
-    const agentOptions = {
-      ...options.agentOptions,
-      runnableConfig: config, // Pass config down
-    };
-    return await agent.execute(ctx, agentOptions);
+// In orchestrator - passes runName to agent
+const agentOptions: AgentExecutionOptions = {
+  runnableConfig: {
+    runName: `Agent-${agentName}`,
   },
-).withConfig({ runName: `Agent-${agentName}` });
+};
+const result = await agent.execute(context, agentOptions);
 
-// In agent
-const result = await analysisChain.invoke(input, options?.runnableConfig);
+// In BaseAgentWorkflow - workflow inherits runName
+const workflowConfig = {
+  configurable: { thread_id, maxIterations, clarityThreshold },
+  recursionLimit: 150,
+  runName: runnableConfig?.runName || `Agent-${agentName}`,
+  ...runnableConfig,
+};
+for await (const state of await this.workflow.stream(initialState, workflowConfig)) {
+  // Process workflow states
+}
+
+// In workflow nodes - LLM calls have descriptive names
+const result = await model.invoke([systemPrompt, humanPrompt], {
+  runName: `${agentName}-InitialAnalysis`,
+});
 ```
 
 **Expected Trace Hierarchy**:
 
 ```
-DocumentationGeneration-Complete
-├── ScanProjectStructure
-├── CreateExecutionContext
-├── ExecuteAgents
-│   ├── Agent-file-structure
-│   │   ├── PrepareData
-│   │   ├── BuildPrompt
-│   │   └── LLMAnalysis
-│   ├── Agent-dependency-analyzer
-│   └── ...
-└── AggregateResults
+Agent-file-structure
+├── file-structure-InitialAnalysis (LLM call)
+├── file-structure-EvaluateClarity (LLM call)
+├── file-structure-GenerateQuestions (LLM call, if refining)
+├── file-structure-Refinement-1 (LLM call, if iterating)
+└── file-structure-Refinement-2 (LLM call, if iterating)
+
+Agent-dependency-analyzer
+├── dependency-analyzer-InitialAnalysis
+├── dependency-analyzer-EvaluateClarity
+└── ...
 ```
+
+**Key Points**:
+
+- Top-level trace: `Agent-{agentName}` (from orchestrator)
+- Node traces: `{agentName}-{NodeName}` (from LLM invocations)
+- LangGraph workflow automatically manages state transitions
+- All traces visible in LangSmith with proper hierarchy
 
 ### LLM Service Usage
 
@@ -199,33 +234,69 @@ const tokens = LLMService.countTokens(text);
 LLMService.configureLangSmith(); // Called automatically in constructor
 ```
 
-## Multi-File Formatter
+## Multi-File Formatter (Agent-Owned File Generation)
 
-Generates documentation files conditionally:
+**Architecture Change**: Agents now own their file generation. Formatter has two responsibilities:
+
+### 1. Agent Files (writeAgentFiles)
+
+Agents control their own files via `generateFiles()` method:
+
+```typescript
+// In agent
+protected async generateFiles(data, state): Promise<AgentFile[]> {
+  return [
+    { filename: 'file-structure.md', content: markdown, title: 'File Structure' },
+    // Can generate multiple files per agent!
+  ];
+}
+
+// In formatter
+for (const [agentName, section] of output.customSections) {
+  const files = section.files || [];  // NEW: From agent
+  for (const file of files) {
+    await fs.writeFile(path.join(dir, file.filename), file.content);
+  }
+}
+```
+
+**Agent Files Generated** (if agent runs and has content):
+
+- `file-structure.md` - from file-structure agent
+- `dependencies.md` - from dependency-analyzer agent
+- `architecture.md` - from architecture-analyzer agent
+- `patterns.md` - from pattern-detector agent
+- `flows.md` - from flow-visualization agent
+- `schemas.md` - from schema-generator agent (only if schemas found)
+- `security.md` - from security-analyzer agent
+
+### 2. Orchestrator Files (writeOrchestratorFiles)
+
+Cross-cutting/generic files owned by orchestrator:
 
 **Always Generated**:
 
-- `index.md` - Table of contents
-- `metadata.md` - Generation metadata
-- Agent-specific files (if agent runs): `file-structure.md`, `dependencies.md`, `patterns.md`, `flows.md`, `schemas.md`
+- `index.md` - Dynamic TOC based on generated files
+- `metadata.md` - Generation information
+- `changelog.md` - Update history
 
 **Conditionally Generated** (only if data exists):
 
-- `architecture.md` - Only if `output.architecture.components.length > 0`
-- `security.md` - Only if `output.security.findings.length > 0` (NEW!)
-- `code-quality.md` - Only if there are quality issues or scores > 0
-- `recommendations.md` - Only if there are recommendations
-
-**Pattern**:
+- `recommendations.md` - Only if improvements or recommendations exist
+- `code-quality.md` - Only if quality issues/scores present
 
 ```typescript
-// Only generate if there's data
+// Orchestrator owns generic files
 if (output.codeQuality.improvements.length > 0) {
-  const qualityPath = path.join(opts.outputDir, 'code-quality.md');
-  await fs.writeFile(qualityPath, this.generateCodeQualityFile(output, opts), 'utf-8');
-  generatedFiles.push(qualityPath);
+  await fs.writeFile(path.join(dir, 'code-quality.md'), this.generateCodeQualityFile(output, opts));
 }
 ```
+
+**Key Benefits**:
+
+- Agents control their output (can generate multiple files)
+- Clear separation: agents = specific analysis, orchestrator = generic/cross-cutting
+- Dynamic index generation (adapts to agent files)
 
 ## Error Handling Patterns
 
@@ -287,14 +358,15 @@ jest.mock('../llm/llm-service', () => ({
 
 ## Common Pitfalls to Avoid
 
-1. ❌ **Don't add `.withConfig()` to agent's main RunnableSequence** - Creates separate traces
-2. ❌ **Don't forget to pass `options?.runnableConfig` to `.invoke()`** - Breaks unified tracing
-3. ❌ **Don't generate empty markdown files** - Check for data before writing
+1. ❌ **Don't forget to implement all abstract methods in BaseAgentWorkflow** - Missing `getAgentName()`, `buildSystemPrompt()`, etc. will cause errors
+2. ❌ **Don't forget `generateFiles()` returns an array** - Even for single file, return `[{ filename, content, title }]`
+3. ❌ **Don't generate empty files** - Check for data before returning files
 4. ❌ **Don't create documentation files without user request** - Keep responses in chat
 5. ❌ **Don't use relative imports** - Use path aliases (configured in tsconfig)
 6. ❌ **Don't hardcode API keys** - Use `.archdoc.config.json` or environment variables
 7. ❌ **Don't use `_error` prefix** - All errors should be logged with proper context
 8. ❌ **Don't ignore caught errors** - Always log with `this.logger.debug()` or `this.logger.warn()`
+9. ❌ **Don't forget to set runName in LLM invocations** - Needed for LangSmith trace hierarchy
 
 ## Key Files to Reference
 
