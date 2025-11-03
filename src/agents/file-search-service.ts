@@ -1,6 +1,11 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
+import {
+  getLanguageRegistry,
+  getExcludePatterns,
+  getTestPatterns,
+} from '../config/language-config';
 
 /**
  * Scored file match result
@@ -89,11 +94,12 @@ export class FileSearchService {
     availableFiles: string[],
     config: SearchConfig = {},
   ): ScoredFile[] {
-    const {
-      topK = 5,
-      includeExtensions = ['.ts', '.js', '.tsx', '.jsx', '.py', '.java', '.go', '.cs'],
-      excludePatterns = ['node_modules', 'dist', 'build', '.test.', '.spec.', '__tests__'],
-    } = config;
+    // Get all code file extensions from language registry
+    const defaultExtensions = getLanguageRegistry().getAllExtensions();
+
+    const topK = config.topK ?? 5;
+    const includeExtensions = config.includeExtensions ?? defaultExtensions;
+    const excludePatterns = config.excludePatterns ?? getExcludePatterns(); // Use centralized exclude patterns
 
     // Extract keywords from question
     const keywords = this.extractKeywords(question);
@@ -403,6 +409,15 @@ export class FileSearchService {
   }
 
   /**
+   * Check if a file is a test file based on centralized test patterns
+   */
+  private isTestFile(filePath: string): boolean {
+    const fileName = filePath.toLowerCase();
+    const testPatterns = getTestPatterns();
+    return testPatterns.some((pattern) => fileName.includes(pattern.toLowerCase()));
+  }
+
+  /**
    * Score a file path based on keywords and question context
    * Returns score and reasons for transparency
    */
@@ -505,19 +520,13 @@ export class FileSearchService {
     }
 
     // Testing questions
-    if (
-      lowerQuestion.includes('test') &&
-      (fileName.includes('.test.') || fileName.includes('.spec.') || dirName.includes('test'))
-    ) {
+    if (lowerQuestion.includes('test') && this.isTestFile(filePath)) {
       score += 10;
       reasons.push('test file for testing-related question');
     }
 
     // 4. Penalize test files for non-testing questions
-    if (
-      !lowerQuestion.includes('test') &&
-      (fileName.includes('.test.') || fileName.includes('.spec.'))
-    ) {
+    if (!lowerQuestion.includes('test') && this.isTestFile(filePath)) {
       score = Math.max(0, score - 5);
       reasons.push('test file (penalty for non-testing question)');
     }

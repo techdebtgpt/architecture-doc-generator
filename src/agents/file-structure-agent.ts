@@ -1,12 +1,8 @@
 import { Agent } from './agent.interface';
-import {
-  AgentContext,
-  AgentResult,
-  AgentMetadata,
-  AgentPriority,
-  AgentExecutionOptions,
-} from '../types/agent.types';
-import { BaseAgentWorkflow } from './base-agent-workflow';
+import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { LLMJsonParser } from '../utils/json-parser';
+import { getTestPatterns } from '../config/language-config';
 
 /**
  * Agent that analyzes project file structure and organization
@@ -29,6 +25,7 @@ export class FileStructureAgent extends BaseAgentWorkflow implements Agent {
         supportedLanguages: [], // Language agnostic
       },
       tags: ['structure', 'organization', 'files', 'directories'],
+      outputFilename: 'file-structure.md',
     };
   }
 
@@ -45,30 +42,6 @@ export class FileStructureAgent extends BaseAgentWorkflow implements Agent {
     return 2000 + fileCount * 2 + directoryCount * 10;
   }
 
-  // Override execute to customize workflow configuration
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    // Adaptive configuration - agent decides when analysis is complete
-    const workflowConfig = {
-      maxIterations: 4, // Reduced from 10 - file structure is straightforward to analyze
-      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
-      minImprovement: 3, // Accept small incremental improvements
-      enableSelfQuestioning: true,
-      skipSelfRefinement: false,
-      maxQuestionsPerIteration: 2, // Focused questions for targeted improvements
-      evaluationTimeout: 15000,
-    };
-
-    // Execute with adaptive self-refinement
-    return this.executeWorkflow(
-      context,
-      workflowConfig,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
-  }
-
   // Abstract method implementations for BaseAgentWorkflow
 
   protected getAgentName(): string {
@@ -78,57 +51,49 @@ export class FileStructureAgent extends BaseAgentWorkflow implements Agent {
   protected async buildSystemPrompt(_context: AgentContext): Promise<string> {
     return `You are an expert software architect analyzing project file structures and organization patterns.
 
-Your task is to analyze a project's file and directory structure and provide COMPREHENSIVE, DETAILED insights about:
+Your task is to analyze a project's file and directory structure and provide insights about:
 
-1. **Organization Strategy**: How files and directories are organized - provide extensive analysis
-2. **Naming Conventions**: Patterns in file and directory naming - be thorough
-3. **Structure Patterns**: Common architectural patterns evident from structure - list ALL patterns found
-4. **Recommendations**: Improvements for better organization - provide actionable, detailed recommendations
+1. **Organization Strategy**: How files and directories are organized
+2. **Naming Conventions**: Patterns in file and directory naming
+3. **Structure Patterns**: Common architectural patterns evident from structure
+4. **Recommendations**: Improvements for better organization
 
 Analyze the structure for:
-- Clarity and logical grouping - explain in detail
-- Consistency in naming - provide specific examples
-- Separation of concerns - identify each concern
-- Scalability of the organization - discuss growth potential
-- Framework/platform conventions - identify all conventions used
+- Clarity and logical grouping
+- Consistency in naming
+- Separation of concerns
+- Scalability of the organization
+- Framework/platform conventions
 
-**IMPORTANT**: Be EXTREMELY DETAILED and COMPREHENSIVE. Do not limit your response. Include:
-- Detailed explanations for each finding
-- Specific file and directory examples
-- Multiple patterns if detected
-- Extensive recommendations with reasoning
-- Detailed warnings with context
+Be concise but informative. Focus on key patterns and actionable recommendations.
 
 Provide your analysis in this JSON format:
 {
-  "summary": "Comprehensive overview of the project structure with detailed insights (4-6 sentences minimum)",
+  "summary": "Brief overview of the project structure (2-3 sentences)",
   "structure": {
-    "organizationStrategy": "Detailed description of how project is organized, including philosophy and approach (multiple paragraphs if needed)",
-    "keyDirectories": ["dir1", "dir2", "dir3", ...],
-    "directoryPurposes": {"dir1": "detailed purpose description", "dir2": "detailed purpose description", ...}
+    "organizationStrategy": "How the project is organized (1-2 sentences)",
+    "keyDirectories": ["dir1", "dir2", "dir3"],
+    "directoryPurposes": {"dir1": "purpose", "dir2": "purpose"}
   },
   "patterns": {
-    "architectural": ["pattern1 with detailed explanation", "pattern2 with context", "pattern3...", ...],
-    "organizational": ["pattern1 with examples", "pattern2 with reasoning", ...]
+    "architectural": ["pattern1", "pattern2"],
+    "organizational": ["pattern1", "pattern2"]
   },
   "conventions": {
-    "naming": ["convention1 with examples from the codebase", "convention2 with rationale", ...],
-    "grouping": ["convention1 with specific examples", "convention2 with reasoning", ...]
+    "naming": ["convention1", "convention2"],
+    "grouping": ["convention1", "convention2"]
   },
   "recommendations": [
-    "recommendation1 with detailed reasoning and expected benefits",
-    "recommendation2 with specific steps and examples",
-    "recommendation3 with trade-offs and considerations",
-    ...
+    "actionable recommendation 1",
+    "actionable recommendation 2"
   ],
   "warnings": [
-    "warning1 with specific locations and severity explanation",
-    "warning2 with context and potential impact",
-    ...
+    "warning1 if any structural issues found",
+    "warning2 if applicable"
   ]
 }
 
-Be thorough, detailed, and comprehensive. Focus on actionable insights with extensive context and reasoning.`;
+Focus on key insights and actionable recommendations. Be concise.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
@@ -277,8 +242,9 @@ Please analyze this structure and provide insights about organization, patterns,
   private getFileCategory(filename: string, extension: string): string {
     const name = filename.toLowerCase();
 
-    // Test files
-    if (name.includes('test') || name.includes('spec') || name.includes('__tests__')) {
+    // Test files - use centralized test patterns
+    const testPatterns = getTestPatterns();
+    if (testPatterns.some((pattern) => name.includes(pattern.toLowerCase()))) {
       return 'test';
     }
 
@@ -318,35 +284,18 @@ Please analyze this structure and provide insights about organization, patterns,
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
-    try {
-      // Try to parse as JSON
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      // Fallback parsing
-      return {
-        summary: 'Failed to parse structured analysis',
-        structure: {},
-        patterns: { architectural: [], organizational: [] },
-        conventions: { naming: [], grouping: [] },
-        recommendations: [],
-        warnings: ['Failed to parse LLM response as JSON'],
-      };
-    } catch (error) {
-      this.logger.warn('Failed to parse file structure analysis result', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
+    return LLMJsonParser.parse(result, {
+      contextName: 'file-structure',
+      logErrors: true,
+      fallback: {
         summary: 'Error parsing analysis result',
         structure: {},
         patterns: { architectural: [], organizational: [] },
         conventions: { naming: [], grouping: [] },
         recommendations: [],
-        warnings: [`Parse error: ${(error as Error).message}`],
-      };
-    }
+        warnings: ['Failed to parse LLM response as JSON'],
+      },
+    });
   }
 
   private formatMarkdownReport(analysis: Record<string, unknown>, context: AgentContext): string {
@@ -413,5 +362,23 @@ ${warnings.map((warning: string) => `- ${warning}`).join('\n')}
 
 ---
 *Analysis completed in ${Date.now() - Date.parse(context.executionId)}ms*`;
+  }
+
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+    const metadata = this.getMetadata();
+
+    return [
+      {
+        filename: 'file-structure.md',
+        content: markdown,
+        title: 'File Structure & Organization',
+        category: 'structure',
+        order: metadata.priority,
+      },
+    ];
   }
 }

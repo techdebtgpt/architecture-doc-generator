@@ -1,12 +1,12 @@
 import { Agent } from './agent.interface';
+import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { LLMJsonParser } from '../utils/json-parser';
 import {
-  AgentContext,
-  AgentResult,
-  AgentMetadata,
-  AgentPriority,
-  AgentExecutionOptions,
-} from '../types/agent.types';
-import { BaseAgentWorkflow } from './base-agent-workflow';
+  getSupportedLanguages,
+  getSecurityKeywords,
+  getLanguageFromExtension,
+} from '../config/language-config';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
@@ -45,17 +45,7 @@ export class SecurityAnalyzerAgent extends BaseAgentWorkflow implements Agent {
         dependencies: ['dependency-analyzer'], // Can use dependency vulnerability info
         supportsIncremental: true,
         estimatedTokens: 5000,
-        supportedLanguages: [
-          'javascript',
-          'typescript',
-          'python',
-          'java',
-          'csharp',
-          'go',
-          'rust',
-          'php',
-          'ruby',
-        ],
+        supportedLanguages: getSupportedLanguages(),
       },
       tags: [
         'security',
@@ -66,26 +56,14 @@ export class SecurityAnalyzerAgent extends BaseAgentWorkflow implements Agent {
         'crypto',
         'best-practices',
       ],
+      outputFilename: 'security.md',
     };
   }
 
   public async canExecute(context: AgentContext): Promise<boolean> {
     // Always can execute for security analysis
     // But prioritize if security-related files are detected
-    const securityIndicators = [
-      'auth',
-      'jwt',
-      'passport',
-      'oauth',
-      'security',
-      'crypto',
-      'bcrypt',
-      'hash',
-      'token',
-      'session',
-      'login',
-      'password',
-    ];
+    const securityIndicators = getSecurityKeywords();
 
     const hasSecurityFiles = context.files.some((file) =>
       securityIndicators.some((indicator) => file.toLowerCase().includes(indicator)),
@@ -97,28 +75,6 @@ export class SecurityAnalyzerAgent extends BaseAgentWorkflow implements Agent {
   public async estimateTokens(context: AgentContext): Promise<number> {
     // Base cost + file count estimation
     return 4000 + Math.min(context.files.length * 10, 10000);
-  }
-
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    // Adaptive configuration - agent decides when analysis is complete
-    const workflowConfig = {
-      maxIterations: 5, // Reduced from 10 - security patterns are identifiable quickly
-      clarityThreshold: 80, // Security analysis is complex, balanced threshold
-      minImprovement: 3,
-      enableSelfQuestioning: true,
-      skipSelfRefinement: false,
-      maxQuestionsPerIteration: 3, // Allow more questions for security
-      evaluationTimeout: 15000,
-    };
-
-    return this.executeWorkflow(
-      context,
-      workflowConfig,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
   }
 
   // Abstract method implementations for BaseAgentWorkflow
@@ -167,24 +123,16 @@ Be specific about file locations when identifying issues. Focus on actionable re
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const securityData = await this.extractSecurityData(context);
 
-    // Sample file contents for security analysis
+    // Discover project-specific security patterns using LLM
+    const projectSecurityPatterns = await this.discoverSecurityPatterns(context);
+
+    // Combine base keywords with discovered patterns
+    const baseKeywords = getSecurityKeywords();
+    const allSecurityKeywords = [...new Set([...baseKeywords, ...projectSecurityPatterns])];
+
     const securityRelevantFiles = context.files.filter((file) => {
       const lower = file.toLowerCase();
-      return (
-        lower.includes('auth') ||
-        lower.includes('security') ||
-        lower.includes('crypto') ||
-        lower.includes('jwt') ||
-        lower.includes('passport') ||
-        lower.includes('login') ||
-        lower.includes('password') ||
-        lower.includes('token') ||
-        lower.includes('session') ||
-        lower.includes('middleware') ||
-        lower.includes('guard') ||
-        lower.includes('config') ||
-        lower.includes('.env')
-      );
+      return allSecurityKeywords.some((keyword) => lower.includes(keyword));
     });
 
     const fileContents = await this.readSecurityFiles(
@@ -253,28 +201,72 @@ Please perform a comprehensive security analysis:
 
   // Helper methods
 
-  private parseAnalysisResult(result: string): Record<string, unknown> {
+  /**
+   * Uses LLM to discover project-specific security patterns based on:
+   * - Project type (web, mobile, blockchain, IoT, etc.)
+   * - Detected frameworks and libraries
+   * - File structure patterns
+   * Returns additional keywords to look for in security-relevant files
+   */
+  private async discoverSecurityPatterns(context: AgentContext): Promise<string[]> {
     try {
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
+      const model = this.llmService.getChatModel({ temperature: 0.1, maxTokens: 500 });
 
-      return {
-        summary: 'Failed to parse structured security analysis',
-        insights: [],
-        securityIssues: [],
-        authenticationMechanisms: [],
-        strengths: [],
-        recommendations: [],
-        complianceNotes: [],
-        warnings: ['Failed to parse LLM response as JSON'],
-      };
+      // Sample a few representative files to understand project type
+      const sampleFiles = context.files
+        .slice(0, 30)
+        .map((f) => path.relative(context.projectPath, f))
+        .join('\n');
+
+      const frameworks = context.languageHints.map((hint) => hint.framework).join(', ');
+
+      const prompt = `Given this project structure, identify security-relevant keywords specific to this project type:
+
+**Languages**: ${context.languageHints.map((h) => h.language).join(', ')}
+**Frameworks**: ${frameworks || 'Unknown'}
+**Sample Files** (first 30):
+${sampleFiles}
+
+Based on the project type (web app, API, mobile, blockchain, IoT, desktop, etc.), what additional security-related file/folder naming patterns should we look for?
+
+Examples:
+- Web apps: "cors", "helmet", "csrf", "xss", "sanitize"
+- Blockchain: "wallet", "contract", "transaction", "signature"
+- Mobile: "keychain", "biometric", "permission"
+- IoT: "device", "mqtt", "certificate"
+
+Return ONLY a JSON array of 5-10 lowercase keywords/patterns specific to this project:
+["keyword1", "keyword2", ...]`;
+
+      const response = await model.invoke(prompt);
+      const content = typeof response.content === 'string' ? response.content : '';
+
+      // Parse JSON array from response
+      const parsed = LLMJsonParser.parse<string[]>(content, {
+        contextName: 'security-pattern-discovery',
+        logErrors: false,
+        fallback: [],
+      });
+
+      this.logger.debug('Discovered project-specific security patterns', {
+        patterns: parsed,
+      });
+
+      return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
-      this.logger.warn('Failed to parse security analysis result', {
+      // Fallback: return empty array if discovery fails
+      this.logger.debug('Failed to discover security patterns, using base keywords only', {
         error: error instanceof Error ? error.message : String(error),
       });
-      return {
+      return [];
+    }
+  }
+
+  private parseAnalysisResult(result: string): Record<string, unknown> {
+    return LLMJsonParser.parse(result, {
+      contextName: 'security-analyzer',
+      logErrors: true,
+      fallback: {
         summary: 'Error parsing security analysis result',
         insights: [],
         securityIssues: [],
@@ -282,9 +274,9 @@ Please perform a comprehensive security analysis:
         strengths: [],
         recommendations: [],
         complianceNotes: [],
-        warnings: [`Parse error: ${(error as Error).message}`],
-      };
-    }
+        warnings: ['Failed to parse LLM response as JSON'],
+      },
+    });
   }
 
   private formatMarkdownReport(data: Record<string, unknown>): string {
@@ -347,10 +339,10 @@ Please perform a comprehensive security analysis:
                   : severity === 'low'
                     ? '🟢'
                     : 'ℹ️';
-          markdown += `### ${icon} ${severity.charAt(0).toUpperCase() + severity.slice(1)} Severity\n\n`;
+          markdown += `#### ${icon} ${severity.charAt(0).toUpperCase() + severity.slice(1)} Severity\n\n`;
 
           issues.forEach((issue, idx) => {
-            markdown += `#### ${idx + 1}. ${issue.type}\n\n`;
+            markdown += `##### ${idx + 1}. ${issue.type}\n\n`;
             markdown += `**Description**: ${issue.description}\n\n`;
             if (issue.file) {
               markdown += `**File**: \`${issue.file}\`\n\n`;
@@ -412,56 +404,41 @@ Please perform a comprehensive security analysis:
     const secretFiles: string[] = [];
     const databaseFiles: string[] = [];
 
+    // Get centralized keywords
+    const authKeywords = ['auth', 'jwt', 'passport', 'oauth', 'login', 'session', 'token'];
+    const configKeywords = ['config', '.env', 'settings', '.yaml', '.yml', '.toml'];
+    const secretKeywords = ['secret', 'key', 'credential', 'password', '.pem'];
+    const databaseKeywords = [
+      'database',
+      'db',
+      'repository',
+      'dao',
+      'model',
+      'entity',
+      'migration',
+      'schema',
+    ];
+
     context.files.forEach((file) => {
       const lower = file.toLowerCase();
 
       // Authentication files
-      if (
-        lower.includes('auth') ||
-        lower.includes('jwt') ||
-        lower.includes('passport') ||
-        lower.includes('oauth') ||
-        lower.includes('login') ||
-        lower.includes('session')
-      ) {
+      if (authKeywords.some((keyword) => lower.includes(keyword))) {
         authFiles.push(file);
       }
 
       // Configuration files
-      if (
-        lower.includes('config') ||
-        lower.includes('.env') ||
-        lower.includes('settings') ||
-        lower.endsWith('.yaml') ||
-        lower.endsWith('.yml') ||
-        lower.endsWith('.toml')
-      ) {
+      if (configKeywords.some((keyword) => lower.includes(keyword) || lower.endsWith(keyword))) {
         configFiles.push(file);
       }
 
       // Potential secret files
-      if (
-        lower.includes('secret') ||
-        lower.includes('key') ||
-        lower.includes('credential') ||
-        lower.includes('password') ||
-        lower.includes('.pem') ||
-        lower.includes('.key')
-      ) {
+      if (secretKeywords.some((keyword) => lower.includes(keyword))) {
         secretFiles.push(file);
       }
 
       // Database files
-      if (
-        lower.includes('database') ||
-        lower.includes('db') ||
-        lower.includes('repository') ||
-        lower.includes('dao') ||
-        lower.includes('model') ||
-        lower.includes('entity') ||
-        lower.includes('migration') ||
-        lower.includes('schema')
-      ) {
+      if (databaseKeywords.some((keyword) => lower.includes(keyword))) {
         databaseFiles.push(file);
       }
     });
@@ -500,24 +477,24 @@ Please perform a comprehensive security analysis:
   }
 
   private getFileExtension(filePath: string): string {
-    const ext = path.extname(filePath).slice(1);
-    const extensionMap: Record<string, string> = {
-      ts: 'typescript',
-      js: 'javascript',
-      jsx: 'javascript',
-      tsx: 'typescript',
-      py: 'python',
-      java: 'java',
-      cs: 'csharp',
-      go: 'go',
-      rs: 'rust',
-      php: 'php',
-      rb: 'ruby',
-      yml: 'yaml',
-      yaml: 'yaml',
-      json: 'json',
-      toml: 'toml',
-    };
-    return extensionMap[ext] || ext;
+    return getLanguageFromExtension(filePath);
+  }
+
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+    const metadata = this.getMetadata();
+
+    return [
+      {
+        filename: 'security.md',
+        content: markdown,
+        title: 'Security Analysis',
+        category: 'security',
+        order: metadata.priority,
+      },
+    ];
   }
 }

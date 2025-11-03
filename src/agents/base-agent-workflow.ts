@@ -1,6 +1,6 @@
 import { StateGraph, Annotation, END } from '@langchain/langgraph';
 import { MemorySaver } from '@langchain/langgraph';
-import type { AgentContext, AgentResult } from '../types/agent.types';
+import type { AgentContext, AgentResult, AgentFile } from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
 import { FileSearchService } from './file-search-service';
@@ -80,14 +80,21 @@ export const AgentWorkflowState = Annotation.Root({
       }
       return newSet;
     },
-    default: () => new Set(),
+    default: () => new Set<string>(),
   }),
 
-  // Track token usage across all LLM calls
+  // Force stop flag (e.g., when schema-generator finds no schemas)
+  forceStop: Annotation<boolean>({
+    reducer: (_, update) => update,
+    default: () => false,
+  }),
+
+  // Token tracking
   totalInputTokens: Annotation<number>({
     reducer: (current, update) => current + update,
     default: () => 0,
   }),
+
   totalOutputTokens: Annotation<number>({
     reducer: (current, update) => current + update,
     default: () => 0,
@@ -119,7 +126,8 @@ export abstract class BaseAgentWorkflow {
 
   constructor() {
     this.llmService = LLMService.getInstance();
-    this.logger = new Logger(this.constructor.name);
+    // Use agent metadata name for consistent logging (e.g., 'architecture-analyzer' not 'ArchitectureAnalyzerAgent')
+    this.logger = new Logger(this.getAgentName());
     this.workflow = this.buildWorkflow();
   }
 
@@ -182,13 +190,13 @@ export abstract class BaseAgentWorkflow {
       clarityThreshold,
       minImprovement: 3, // Small improvements still valuable
       enableSelfQuestioning: true,
-      skipSelfRefinement: false,
-      maxQuestionsPerIteration: 3, // 3 focused questions per iteration
+      skipSelfRefinement: options?.skipSelfRefinement || false, // Quick mode skips refinement
+      maxQuestionsPerIteration: options?.maxQuestionsPerIteration || 3, // 3 focused questions per iteration
       evaluationTimeout: 15000,
     };
 
     this.logger.info(
-      `Configuration: maxIterations=${maxIterations}, clarityThreshold=${clarityThreshold}, questionsPerIteration=3`,
+      `Configuration: maxIterations=${maxIterations}, clarityThreshold=${clarityThreshold}, questionsPerIteration=3, skipSelfRefinement=${config.skipSelfRefinement}`,
       '⚙️',
     );
 
@@ -246,6 +254,8 @@ export abstract class BaseAgentWorkflow {
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
 
+    // Note: LangSmith trace name comes from individual node LLM calls (e.g., "{agent}-InitialAnalysis")
+    // The LangGraph wrapper itself will show as "LangGraph" in traces
     for await (const state of await this.workflow.stream(initialState, workflowConfig)) {
       // Get the last node's state
       const nodeNames = Object.keys(state);
@@ -270,15 +280,18 @@ export abstract class BaseAgentWorkflow {
 
     // Parse final analysis into structured data
     const analysisData = await this.parseAnalysis(finalState.finalAnalysis);
+
+    // Generate files (agents can override to generate multiple files)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const markdown = await this.formatMarkdown(analysisData, finalState as any);
+    const files = await this.generateFiles(analysisData, finalState as any);
 
     return {
       agentName: this.getAgentName(),
       status: 'success',
       data: analysisData,
       summary: this.generateSummary(analysisData),
-      markdown,
+      markdown: files[0]?.content || '', // Backwards compatibility
+      files,
       confidence: finalState.clarityScore / 100,
       tokenUsage: {
         inputTokens: totalInputTokens,
@@ -319,12 +332,31 @@ export abstract class BaseAgentWorkflow {
       this.getAgentName(),
     );
 
+    this.logger.info(`Calling LLM for fast path analysis...`, '⚡');
+    const llmStartTime = Date.now();
+
     const result = await model.invoke([systemPrompt, humanPrompt], {
       ...runnableConfig,
       runName: `${this.getAgentName()}-FastPath`,
     });
 
+    const llmDuration = ((Date.now() - llmStartTime) / 1000).toFixed(1);
+    this.logger.info(`LLM call completed in ${llmDuration}s`, '✅');
+
     const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
+
+    // Count tokens from LLM result
+    const inputTokens = result?.response_metadata?.usage?.input_tokens || 0;
+    const outputTokens = result?.response_metadata?.usage?.output_tokens || 0;
+    const totalTokens = inputTokens + outputTokens;
+
+    // Log token usage
+    if (totalTokens > 0) {
+      this.logger.debug(
+        `Token usage: ${inputTokens} input + ${outputTokens} output = ${totalTokens} total`,
+        '💰',
+      );
+    }
 
     const executionTime = Date.now() - execStartTime;
     const analysisData = await this.parseAnalysis(analysisText);
@@ -340,23 +372,26 @@ export abstract class BaseAgentWorkflow {
       previousGapCount: 0,
       gapReductionRate: 0,
       allSeenGaps: new Set<string>(),
-      totalInputTokens: 0,
-      totalOutputTokens: 0,
+      totalInputTokens: inputTokens,
+      totalOutputTokens: outputTokens,
     };
+
+    // Generate files (agents can override to generate multiple files)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const markdown = await this.formatMarkdown(analysisData, stateForMarkdown as any);
+    const files = await this.generateFiles(analysisData, stateForMarkdown as any);
 
     return {
       agentName: this.getAgentName(),
       status: 'success',
       data: analysisData,
       summary: this.generateSummary(analysisData),
-      markdown,
+      markdown: files[0]?.content || '', // Backwards compatibility
+      files,
       confidence: 0.8, // Reasonable default without evaluation
       tokenUsage: {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
+        inputTokens,
+        outputTokens,
+        totalTokens,
       },
       executionTime,
       errors: [],
@@ -381,9 +416,18 @@ export abstract class BaseAgentWorkflow {
     const baseHumanPrompt = await this.buildHumanPrompt(context);
     const humanPrompt = await this.enhancePromptWithUserQuery(baseHumanPrompt, context);
 
+    // Determine maxTokens based on depth mode
+    // Quick mode (maxQuestionsPerIteration <= 2): 8000 tokens
+    // Normal/Deep mode: 16000 tokens
+    const config = state as unknown as {
+      configurable?: { maxQuestionsPerIteration?: number };
+    };
+    const maxQuestionsPerIteration = config.configurable?.maxQuestionsPerIteration || 3;
+    const isQuickMode = maxQuestionsPerIteration <= 2;
+
     const modelOptions = {
       temperature: 0.3,
-      maxTokens: 16000,
+      maxTokens: isQuickMode ? 8000 : 16000,
     };
 
     // Calculate input token count
@@ -415,9 +459,15 @@ export abstract class BaseAgentWorkflow {
       },
     ];
 
+    this.logger.info(`Calling LLM for initial analysis...`, '⚡');
+    const llmStartTime = Date.now();
+
     const result = await model.invoke([systemPrompt, humanPrompt], {
       runName: `${agentName}-InitialAnalysis`,
     });
+
+    const llmDuration = ((Date.now() - llmStartTime) / 1000).toFixed(1);
+    this.logger.info(`LLM call completed in ${llmDuration}s`, '✅');
 
     const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
 
@@ -451,12 +501,17 @@ export abstract class BaseAgentWorkflow {
       '✅',
     );
 
+    // Check if agent output indicates "no data found" - generic detection for all agents
+    const parsedData = await this.parseAnalysis(analysisText);
+    const shouldForceStop = this.shouldForceStopFromOutput(parsedData);
+
     return {
       ...state,
       currentAnalysis: analysisText,
       iteration: 1,
-      totalInputTokens: state.totalInputTokens + actualInputTokens,
-      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
+      forceStop: shouldForceStop,
+      totalInputTokens: actualInputTokens, // FIXED: Let reducer handle accumulation
+      totalOutputTokens: actualOutputTokens, // FIXED: Let reducer handle accumulation
     };
   }
 
@@ -470,8 +525,41 @@ export abstract class BaseAgentWorkflow {
       missingInformation: previousMissingInfo,
       allSeenGaps,
       previousGapCount,
+      forceStop,
     } = state;
     const agentName = this.getAgentName();
+
+    // CRITICAL: If forceStop is set (e.g., schema-generator found NO schemas), force-stop immediately
+    if (forceStop) {
+      this.logger.info('Force stop triggered - skipping to finalization', '⏹️');
+      const config = state as unknown as {
+        configurable?: { maxIterations?: number };
+      };
+      const maxIterations = config.configurable?.maxIterations || 5;
+      return {
+        ...state,
+        clarityScore: 100, // High score to pass threshold
+        missingInformation: [], // No gaps
+        previousGapCount: 0,
+        gapReductionRate: 100,
+        iteration: maxIterations, // Force to max to trigger finalization
+      };
+    }
+
+    // EARLY RETURN: If analysis is empty or too short, skip evaluation
+    if (!currentAnalysis || currentAnalysis.trim().length < 100) {
+      this.logger.warn(
+        `Iteration ${iteration}: Analysis too short (${currentAnalysis.trim().length} chars), skipping evaluation`,
+        '⚠️',
+      );
+      return {
+        ...state,
+        clarityScore: 0,
+        missingInformation: ['Analysis generation failed - insufficient content'],
+        previousGapCount: 1,
+        gapReductionRate: 0,
+      };
+    }
 
     this.logger.info(`Iteration ${iteration}: Evaluating clarity...`, '🔍');
 
@@ -532,9 +620,15 @@ MISSING_INFORMATION:
       },
     ];
 
+    this.logger.info(`Calling LLM for clarity evaluation...`, '⚡');
+    const evalStartTime = Date.now();
+
     const result = await model.invoke([evaluationPrompt], {
       runName: `${agentName}-EvaluateClarity`,
     });
+
+    const evalDuration = ((Date.now() - evalStartTime) / 1000).toFixed(1);
+    this.logger.info(`Evaluation completed in ${evalDuration}s`, '✅');
 
     const evaluationText = typeof result === 'string' ? result : result.content?.toString() || '';
 
@@ -616,8 +710,8 @@ MISSING_INFORMATION:
       previousGapCount: currentGapCount,
       gapReductionRate,
       allSeenGaps: updatedSeenGaps,
-      totalInputTokens: state.totalInputTokens + actualInputTokens,
-      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
+      totalInputTokens: actualInputTokens, // FIXED: Let reducer handle accumulation
+      totalOutputTokens: actualOutputTokens, // FIXED: Let reducer handle accumulation
     };
   }
 
@@ -700,6 +794,39 @@ MISSING_INFORMATION:
   private async generateQuestionsNode(state: typeof AgentWorkflowState.State) {
     const { currentAnalysis, missingInformation, context, iteration } = state;
     const agentName = this.getAgentName();
+
+    // EARLY RETURN: If no gaps, skip question generation
+    if (missingInformation.length === 0) {
+      this.logger.info(
+        `Iteration ${iteration}: No gaps to address - skipping question generation`,
+        '✅',
+      );
+      return {
+        ...state,
+        selfQuestions: [],
+      };
+    }
+
+    // EARLY RETURN: If all gaps are too vague or generic, skip questions
+    const meaningfulGaps = missingInformation.filter(
+      (gap) =>
+        gap.length > 10 &&
+        !gap.toLowerCase().includes('none') &&
+        !gap.toLowerCase().includes('n/a') &&
+        !gap.toLowerCase().includes('not applicable'),
+    );
+
+    if (meaningfulGaps.length === 0) {
+      this.logger.warn(
+        `Iteration ${iteration}: All ${missingInformation.length} gap(s) are too vague - skipping question generation`,
+        '⚠️',
+      );
+      return {
+        ...state,
+        selfQuestions: [],
+        missingInformation: [], // Clear vague gaps to prevent repeated attempts
+      };
+    }
 
     this.logger.info(`Iteration ${iteration}: Generating refinement questions...`, '❓');
 
@@ -801,8 +928,8 @@ Example good questions:
     return {
       ...state,
       selfQuestions: questions,
-      totalInputTokens: state.totalInputTokens + actualInputTokens,
-      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
+      totalInputTokens: actualInputTokens, // FIXED: Let reducer handle accumulation
+      totalOutputTokens: actualOutputTokens, // FIXED: Let reducer handle accumulation
     };
   }
 
@@ -856,6 +983,19 @@ Example good questions:
 
     // Deduplicate files by path
     const uniqueFiles = Array.from(new Map(allRetrievedFiles.map((f) => [f.path, f])).values());
+
+    // EARLY RETURN: If no relevant files found after searching, skip refinement
+    if (uniqueFiles.length === 0) {
+      this.logger.warn(
+        `Iteration ${iteration}: No relevant files found for ${selfQuestions.length} question(s) - cannot refine further`,
+        '⚠️',
+      );
+      return {
+        ...state,
+        retrievedFiles: [],
+        missingInformation: [], // Clear gaps to prevent retrying same questions
+      };
+    }
 
     this.logger.info(
       `Retrieved ${uniqueFiles.length} unique file(s) (${allRetrievedFiles.length} total matches)`,
@@ -929,6 +1069,12 @@ Example good questions:
       retrievedFiles,
     } = state;
 
+    // Get config to access maxIterations
+    const config = state as unknown as {
+      configurable?: { maxIterations?: number };
+    };
+    const maxIterations = config.configurable?.maxIterations || 5;
+
     this.logger.info(
       `Iteration ${iteration}: Refining analysis (${selfQuestions.length} questions, ${missingInformation.length} gaps, ${retrievedFiles.length} files)...`,
       '🔧',
@@ -979,10 +1125,18 @@ Goal: Produce an ENHANCED version that keeps all previous good content AND addre
 IMPORTANT: If a gap cannot be addressed from static code analysis (e.g., runtime behavior, deployment details),
 explicitly state "Not determinable from static analysis" rather than leaving it unaddressed.`;
 
+    // Determine maxTokens based on depth mode
+    // Quick mode: smaller output for faster iteration
+    const refinementConfig = state as unknown as {
+      configurable?: { maxQuestionsPerIteration?: number };
+    };
+    const maxQuestionsPerIteration = refinementConfig.configurable?.maxQuestionsPerIteration || 3;
+    const isQuickMode = maxQuestionsPerIteration <= 2;
+
     const model = this.llmService.getChatModel(
       {
         temperature: 0.3,
-        maxTokens: 16000,
+        maxTokens: isQuickMode ? 8000 : 16000,
       },
       this.getAgentName(),
     );
@@ -1002,9 +1156,20 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       },
     ];
 
+    this.logger.info(
+      `Generating refinement (${selfQuestions.length} questions, ${Math.min(5, missingInformation.length)} gaps)...`,
+      '🔄',
+    );
+
+    this.logger.info('Calling LLM for refinement...', '⚡');
+    const refinementStartTime = Date.now();
+
     const result = await model.invoke([systemPrompt, humanPrompt, refinementPrompt], {
       runName: `${this.getAgentName()}-Refinement-${iteration}`,
     });
+
+    const refinementDuration = ((Date.now() - refinementStartTime) / 1000).toFixed(1);
+    this.logger.info(`Refinement LLM call completed in ${refinementDuration}s`, '⚡');
 
     const refinedAnalysis = typeof result === 'string' ? result : result.content?.toString() || '';
 
@@ -1021,6 +1186,41 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       }
     }
 
+    // EARLY RETURN: If LLM returned no meaningful content, stop refinement
+    if (!refinedAnalysis || refinedAnalysis.trim().length < 100) {
+      this.logger.error(
+        `Iteration ${iteration}: Refinement failed - LLM returned insufficient content (${refinedAnalysis.trim().length} chars)`,
+        '❌',
+      );
+      return {
+        ...state,
+        missingInformation: [], // Clear gaps to stop iteration
+        totalInputTokens: actualInputTokens,
+        totalOutputTokens: actualOutputTokens,
+      };
+    }
+
+    // EARLY RETURN: If refinement didn't add meaningful content (< 10% growth)
+    const growthRate =
+      currentAnalysis.length > 0
+        ? ((refinedAnalysis.length - currentAnalysis.length) / currentAnalysis.length) * 100
+        : 100;
+
+    if (growthRate < 1 && iteration > 1) {
+      this.logger.warn(
+        `Iteration ${iteration}: Refinement added minimal content (${growthRate.toFixed(1)}% growth) - stopping iteration`,
+        '⚠️',
+      );
+      return {
+        ...state,
+        currentAnalysis: refinedAnalysis,
+        iteration: maxIterations, // Force max iterations to trigger finalization
+        missingInformation: [], // Clear gaps to stop iteration
+        totalInputTokens: actualInputTokens,
+        totalOutputTokens: actualOutputTokens,
+      };
+    }
+
     const targetedGaps = Math.min(5, missingInformation.length);
     this.logger.info(
       `Refinement complete - targeted ${selfQuestions.length} question(s) and ${targetedGaps} gap(s)`,
@@ -1034,8 +1234,8 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       refinementNotes: [
         `Iteration ${iteration}: Addressed ${selfQuestions.length} questions targeting ${targetedGaps} gap(s)`,
       ],
-      totalInputTokens: state.totalInputTokens + actualInputTokens,
-      totalOutputTokens: state.totalOutputTokens + actualOutputTokens,
+      totalInputTokens: actualInputTokens, // FIXED: Let reducer handle accumulation
+      totalOutputTokens: actualOutputTokens, // FIXED: Let reducer handle accumulation
     };
   }
 
@@ -1068,6 +1268,12 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     const clarityThreshold = config.configurable?.clarityThreshold || 80;
 
     const hasMissingInfo = state.missingInformation && state.missingInformation.length > 0;
+
+    // EARLY RETURN: If current analysis is too short, stop immediately
+    if (state.currentAnalysis && state.currentAnalysis.trim().length < 100) {
+      this.logger.error('Stopping: Analysis content too short or empty - cannot refine', '❌');
+      return 'finalize';
+    }
 
     // Check if we've reached max iterations
     if (state.iteration >= maxIterations) {
@@ -1125,6 +1331,76 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
   }
 
   /**
+   * Detect if agent output indicates "no data found" to prevent unnecessary refinement
+   * Checks for common patterns in parsed output that indicate empty/missing data
+   */
+  protected shouldForceStopFromOutput(parsedData: Record<string, unknown>): boolean {
+    // Check for explicit __FORCE_STOP__ flag (used by schema-generator)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((parsedData as any).__FORCE_STOP__ === true) {
+      return true;
+    }
+
+    // Generic pattern detection: Check common array/collection fields
+    // If ALL primary data fields are empty, it's likely "no data found"
+    const commonDataFields = [
+      'schemas',
+      'components',
+      'patterns',
+      'flows',
+      'dependencies',
+      'vulnerabilities',
+      'findings',
+      'issues',
+      'results',
+      'items',
+      'entities',
+    ];
+
+    const dataFieldValues = commonDataFields
+      .filter((field) => field in parsedData)
+      .map((field) => parsedData[field]);
+
+    // If we found data fields and ALL are empty arrays, force stop
+    if (dataFieldValues.length > 0) {
+      const allEmpty = dataFieldValues.every((value) => Array.isArray(value) && value.length === 0);
+      if (allEmpty) {
+        this.logger.info(
+          'All data fields empty - agent found no relevant data, stopping refinement',
+          '⏹️',
+        );
+        return true;
+      }
+    }
+
+    // Check summary text for "no data" indicators
+    const summary = (parsedData.summary as string | undefined)?.toLowerCase() || '';
+    const noDataIndicators = [
+      'no .* found',
+      'not found',
+      'no data',
+      'not detected',
+      'no .* detected',
+      'appears to be',
+      'does not contain',
+      'no explicit',
+    ];
+
+    const hasNoDataIndicator = noDataIndicators.some((pattern) => {
+      const regex = new RegExp(pattern, 'i');
+      return regex.test(summary);
+    });
+
+    if (hasNoDataIndicator && summary.length > 50) {
+      // Only trigger if summary is substantial (not just a fallback)
+      this.logger.info('Summary indicates no relevant data found, stopping refinement', '⏹️');
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
    * Enhance human prompt with user's focus area if provided
    * This allows the --prompt flag to guide analysis without replacing standard analysis
    */
@@ -1132,20 +1408,80 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     basePrompt: string,
     context: AgentContext,
   ): Promise<string> {
-    if (!context.query) {
-      return basePrompt;
+    let enhancements = '';
+
+    // Add refinement gaps if present (from previous quality evaluation)
+    if (context.refinementGaps && context.refinementGaps.needsUpdate) {
+      enhancements += `**PREVIOUS QUALITY EVALUATION**:
+- Quality Score: ${context.refinementGaps.qualityScore}/100
+- Priority: ${context.refinementGaps.priority.toUpperCase()}
+- Last Evaluated: ${context.refinementGaps.lastEvaluated}
+
+**IDENTIFIED GAPS TO ADDRESS**:
+${context.refinementGaps.improvements.map((imp, idx) => `${idx + 1}. ${imp}`).join('\n')}
+
+⚠️ IMPORTANT: Focus your analysis on addressing these specific gaps. Ensure your updated documentation resolves these identified issues while maintaining comprehensive coverage of all relevant areas.
+
+---
+
+`;
     }
 
-    // Add user's focus area at the beginning to make it prominent
-    const enhancedPrompt = `**USER'S FOCUS AREA**: ${context.query}
+    // Add user's focus area if provided
+    if (context.query) {
+      enhancements += `**USER'S FOCUS AREA**: ${context.query}
 
 Please pay special attention to the above focus area in your analysis. While you should still provide comprehensive documentation across all relevant areas, ensure that topics related to the user's focus are analyzed in extra detail and highlighted prominently in your response.
 
 ---
 
-${basePrompt}`;
+`;
+    }
 
-    return enhancedPrompt;
+    if (!enhancements) {
+      return basePrompt;
+    }
+
+    return enhancements + basePrompt;
+  }
+
+  /**
+   * Evaluate if this agent should run in incremental mode based on PR context.
+   * Default: always run if query provided.
+   * Override to add agent-specific relevance checks.
+   */
+  protected async shouldRunIncrementalMode(context: AgentContext): Promise<boolean> {
+    if (!context.isIncrementalMode || !context.query) {
+      return false;
+    }
+
+    // Default: if user query provided in incremental mode, agent should run
+    // Agents can override to add specific relevance checks
+    return true;
+  }
+
+  /**
+   * Determine merge strategy for existing documentation files.
+   * Returns map of filename → merge strategy.
+   * Override for agent-specific merge logic.
+   */
+  protected async determineMergeStrategy(
+    context: AgentContext,
+    _data: Record<string, unknown>,
+  ): Promise<Map<string, 'replace' | 'append' | 'section-update'>> {
+    const strategies = new Map<string, 'replace' | 'append' | 'section-update'>();
+
+    // Default strategy: if file exists, append new section; otherwise replace
+    if (context.existingDocs && context.isIncrementalMode) {
+      const agentName = this.getAgentName();
+      const agentFilename = `${agentName}.md`;
+
+      if (context.existingDocs.has(agentFilename)) {
+        strategies.set(agentFilename, 'append');
+      }
+    }
+
+    return strategies;
   }
 
   // Abstract methods that subclasses must implement
@@ -1158,4 +1494,19 @@ ${basePrompt}`;
     state: typeof AgentWorkflowState.State,
   ): Promise<string>;
   protected abstract generateSummary(data: Record<string, unknown>): string;
+
+  /**
+   * Generate documentation files for this agent
+   * Default: single file with agent name
+   * Override to generate multiple files (e.g., flows.md + detail files)
+   *
+   * In incremental mode:
+   * - Check context.existingDocs to see what files exist
+   * - Set mergeStrategy on AgentFile (replace/append/section-update)
+   * - Set sectionId for section-update strategy
+   */
+  protected abstract generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]>;
 }

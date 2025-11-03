@@ -73,15 +73,19 @@ program
     'Analyze project and generate comprehensive documentation (default: all agents, multi-file)',
   )
   .argument('[path]', 'Path to the project directory (default: current directory)', '.')
-  .option('--prompt <text>', 'Natural language prompt to select specific agents')
+  .option(
+    '--prompt <text>',
+    'Focus area to enhance all agent analyses (e.g., "security vulnerabilities" or "database design"). With existing docs, creates new enhancement file; without, enhances full generation.',
+  )
   .option('-o, --output <dir>', 'Output directory (default: <project>/.arch-docs)')
   .option('--provider <provider>', 'LLM provider (anthropic|openai|google|xai)', 'anthropic')
   .option('--model <model>', 'LLM model to use')
   .option('--no-clean', 'Do not clean output directory before generation')
+  .option('--max-cost <dollars>', 'Maximum cost in dollars before halting execution', '5.0')
   // Depth mode (simple)
   .option(
     '--depth <mode>',
-    'Analysis depth mode: quick (2 iterations, 70% clarity), normal (5 iterations, 80%), deep (10 iterations, 90%)',
+    'Analysis depth mode: quick (no refinement, fast), normal (5 iterations, 80%), deep (10 iterations, 90%)',
     'normal',
   )
   // Granular refinement options (advanced)

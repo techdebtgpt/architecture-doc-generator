@@ -1,12 +1,8 @@
 import { Agent } from './agent.interface';
-import {
-  AgentContext,
-  AgentResult,
-  AgentMetadata,
-  AgentPriority,
-  AgentExecutionOptions,
-} from '../types/agent.types';
-import { BaseAgentWorkflow } from './base-agent-workflow';
+import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { LLMJsonParser } from '../utils/json-parser';
+import { getSupportedLanguages, getCodeFiles, getComponentFiles } from '../config/language-config';
 
 /**
  * Flow types that can be visualized
@@ -45,23 +41,24 @@ export class FlowVisualizationAgent extends BaseAgentWorkflow implements Agent {
       capabilities: {
         supportsParallel: true,
         requiresFileContents: true,
-        dependencies: ['file-structure'],
+        dependencies: ['file-structure', 'dependency-analyzer'], // Needs structure + dependency graph to trace flows
         supportsIncremental: false,
-        estimatedTokens: 8000,
-        supportedLanguages: ['typescript', 'javascript', 'java', 'python', 'csharp'],
+        estimatedTokens: 10000,
+        supportedLanguages: getSupportedLanguages(),
       },
-      tags: ['flow', 'visualization', 'mermaid', 'architecture', 'diagrams'],
+      tags: ['flow', 'control-flow', 'data-flow', 'execution', 'sequence'],
+      outputFilename: 'flows.md',
     };
   }
 
   public async canExecute(context: AgentContext): Promise<boolean> {
     // Can execute if there are code files to analyze
-    const codeFiles = context.files.filter((f) => /\.(ts|js|tsx|jsx|java|py|cs)$/.test(f));
+    const codeFiles = getCodeFiles(context.files);
     return codeFiles.length > 0;
   }
 
   public async estimateTokens(context: AgentContext): Promise<number> {
-    const codeFiles = context.files.filter((f) => /\.(ts|js|tsx|jsx|java|py|cs)$/.test(f));
+    const codeFiles = getCodeFiles(context.files);
 
     // Estimate tokens based on files that might contain flows
     const flowRelevantFiles = codeFiles.filter(
@@ -78,31 +75,6 @@ export class FlowVisualizationAgent extends BaseAgentWorkflow implements Agent {
 
     // Base cost + per flow analysis
     return 3000 + Math.min(flowRelevantFiles.length, 20) * 400;
-  }
-
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    // Configure adaptive refinement workflow
-    // Flow visualization benefits from focused analysis rather than excessive refinement
-    // Mermaid diagrams are either correct or not - excessive iterations don't help
-
-    // Use context.config if provided (from CLI depth mode), otherwise use agent defaults
-    const workflowConfig = {
-      maxIterations: (context.config?.maxIterations as number) || 3, // Default: 3 (or from CLI depth mode)
-      clarityThreshold: (context.config?.clarityThreshold as number) || 75, // Default: 75 (or from CLI depth mode)
-      minImprovement: 3, // Accept small incremental improvements
-      enableSelfQuestioning: true,
-      maxQuestionsPerIteration: (context.config?.maxQuestionsPerIteration as number) || 2, // Focused, specific questions
-      skipSelfRefinement: false, // Keep refinement for quality, but with lower thresholds
-    };
-
-    return this.executeWorkflow(
-      context,
-      workflowConfig,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
   }
 
   // Abstract method implementations
@@ -149,8 +121,8 @@ Provide **actionable, visual insights** with valid Mermaid syntax.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
-    const flowFiles = this.identifyFlowFiles(context.files);
-    const fileCategories = this.categorizeFlowFiles(flowFiles);
+    const codeFiles = getCodeFiles(context.files);
+    const fileCategories = this.categorizeFlowFiles(codeFiles);
 
     return `Analyze flows in this project:
 
@@ -189,25 +161,7 @@ Create Mermaid diagrams for the most important flows in this system.`;
     return summary || 'Flow visualization completed';
   }
 
-  private identifyFlowFiles(files: string[]): string[] {
-    return files.filter((f) => {
-      const lower = f.toLowerCase();
-      return (
-        /\.(ts|js|tsx|jsx)$/.test(f) &&
-        (lower.includes('controller') ||
-          lower.includes('service') ||
-          lower.includes('repository') ||
-          lower.includes('processor') ||
-          lower.includes('handler') ||
-          lower.includes('guard') ||
-          lower.includes('auth') ||
-          lower.includes('middleware') ||
-          lower.includes('module') ||
-          lower.includes('gateway') ||
-          lower.includes('worker'))
-      );
-    });
-  }
+  // Removed: identifyFlowFiles - now using getCodeFiles() and getComponentFiles() from language-config
 
   private categorizeFlowFiles(files: string[]): {
     controllers: string[];
@@ -218,40 +172,29 @@ Create Mermaid diagrams for the most important flows in this system.`;
     modules: string[];
   } {
     return {
-      controllers: files.filter((f) => f.toLowerCase().includes('controller')),
-      services: files.filter((f) => f.toLowerCase().includes('service')),
-      repositories: files.filter((f) => f.toLowerCase().includes('repository')),
+      controllers: getComponentFiles(files, 'controllers'),
+      services: getComponentFiles(files, 'services'),
+      repositories: getComponentFiles(files, 'repositories'),
       auth: files.filter(
         (f) => f.toLowerCase().includes('auth') || f.toLowerCase().includes('guard'),
       ),
       processors: files.filter(
         (f) => f.toLowerCase().includes('processor') || f.toLowerCase().includes('worker'),
       ),
-      modules: files.filter((f) => f.toLowerCase().includes('module')),
+      modules: getComponentFiles(files, 'modules'),
     };
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
-    try {
-      // Try to extract JSON from markdown code blocks
-      const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]);
-      }
-
-      // Try to parse as direct JSON
-      return JSON.parse(result);
-    } catch (error) {
-      // Fallback: return a basic structure
-      this.logger.warn('Failed to parse flow analysis result', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
+    return LLMJsonParser.parse(result, {
+      contextName: 'flow-visualization',
+      logErrors: true,
+      fallback: {
         flows: [],
         summary: 'Failed to parse flow analysis results',
         warnings: ['Could not parse LLM response as valid JSON'],
-      };
-    }
+      },
+    });
   }
 
   private formatMarkdownReport(analysis: Record<string, unknown>): string {
@@ -295,5 +238,23 @@ Create Mermaid diagrams for the most important flows in this system.`;
     }
 
     return markdown;
+  }
+
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+    const metadata = this.getMetadata();
+
+    return [
+      {
+        filename: 'flows.md',
+        content: markdown,
+        title: 'Flow Visualizations',
+        category: 'visualization',
+        order: metadata.priority,
+      },
+    ];
   }
 }

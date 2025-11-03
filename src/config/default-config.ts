@@ -15,7 +15,7 @@ export const defaultConfig: AppConfig = {
 
   scan: {
     maxFileSize: 1048576, // 1MB
-    maxFiles: 1000,
+    maxFiles: 10000,
     maxDepth: 10,
     includeHidden: false,
     followSymlinks: false,

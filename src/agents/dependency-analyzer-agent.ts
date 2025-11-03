@@ -1,12 +1,12 @@
 import { Agent } from './agent.interface';
+import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { LLMJsonParser } from '../utils/json-parser';
 import {
-  AgentContext,
-  AgentResult,
-  AgentMetadata,
-  AgentPriority,
-  AgentExecutionOptions,
-} from '../types/agent.types';
-import { BaseAgentWorkflow } from './base-agent-workflow';
+  getSupportedLanguages,
+  extractImportsFromCode,
+  getPackageManagersFromLanguages,
+} from '../config/language-config';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 
@@ -43,50 +43,21 @@ export class DependencyAnalyzerAgent extends BaseAgentWorkflow implements Agent 
         dependencies: [],
         supportsIncremental: true,
         estimatedTokens: 4000,
-        supportedLanguages: ['javascript', 'typescript', 'python', 'java', 'csharp', 'go', 'rust'],
+        supportedLanguages: getSupportedLanguages(),
       },
       tags: ['dependencies', 'packages', 'npm', 'yarn', 'pip', 'maven', 'nuget'],
+      outputFilename: 'dependencies.md',
     };
   }
 
   public async canExecute(context: AgentContext): Promise<boolean> {
-    // Check if package manager files exist
-    const packageFiles = [
-      'package.json',
-      'requirements.txt',
-      'pom.xml',
-      'build.gradle',
-      'Cargo.toml',
-      'go.mod',
-    ];
-    return context.files.some((file) => packageFiles.some((pkg) => file.endsWith(pkg)));
+    // Always execute if there are source files - we'll extract dependencies from imports
+    return context.files.length > 0;
   }
 
   public async estimateTokens(context: AgentContext): Promise<number> {
     // Base cost + dependencies count estimation
     return 3000 + context.files.length * 5;
-  }
-
-  public async execute(
-    context: AgentContext,
-    options?: AgentExecutionOptions,
-  ): Promise<AgentResult> {
-    // Adaptive configuration - agent decides when analysis is complete
-    const workflowConfig = {
-      maxIterations: 4, // Reduced from 10 - dependencies are straightforward to analyze
-      clarityThreshold: 80, // Reduced from 85 - balanced quality vs. speed
-      minImprovement: 3,
-      enableSelfQuestioning: true,
-      skipSelfRefinement: false,
-      maxQuestionsPerIteration: 2,
-      evaluationTimeout: 15000,
-    };
-
-    return this.executeWorkflow(
-      context,
-      workflowConfig,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
   }
 
   // Abstract method implementations for BaseAgentWorkflow
@@ -165,7 +136,7 @@ Please analyze dependency health, security, and provide recommendations.`;
     return analysis.summary || 'Dependency analysis completed';
   }
 
-  // Helper methods (unchanged)
+  // Helper methods
 
   private async extractDependencies(context: AgentContext): Promise<DependencyData> {
     const dependencies: DependencyData = {
@@ -176,91 +147,59 @@ Please analyze dependency health, security, and provide recommendations.`;
       total: 0,
     };
 
-    // Check for package.json (Node.js)
-    const packageJsonPath = path.join(context.projectPath, 'package.json');
-    try {
-      const content = await fs.readFile(packageJsonPath, 'utf-8');
-      const pkg = JSON.parse(content);
+    // Extract dependencies from source code imports (language-agnostic)
+    const importMap = new Map<string, Set<string>>(); // package -> files using it
 
-      dependencies.hasDependencies = true;
-      dependencies.packageManagers.push('npm/yarn');
-      dependencies.projectName = pkg.name;
-      dependencies.projectVersion = pkg.version;
+    for (const file of context.files) {
+      const filePath = path.join(context.projectPath, file);
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        // Use centralized language-agnostic import extraction
+        const imports = extractImportsFromCode(content, file);
 
-      if (pkg.dependencies) {
-        dependencies.production = Object.entries(pkg.dependencies).map(([name, version]) => ({
-          name,
-          version: version as string,
-        }));
+        imports.forEach((importName) => {
+          if (!importMap.has(importName)) {
+            importMap.set(importName, new Set());
+          }
+          importMap.get(importName)!.add(file);
+        });
+      } catch (error) {
+        this.logger.debug(`Failed to read file: ${file}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      if (pkg.devDependencies) {
-        dependencies.development = Object.entries(pkg.devDependencies).map(([name, version]) => ({
-          name,
-          version: version as string,
-        }));
-      }
-
-      dependencies.total = dependencies.production.length + dependencies.development.length;
-      dependencies.scripts = pkg.scripts ? Object.keys(pkg.scripts) : [];
-    } catch (error) {
-      // Package.json not found or invalid, continue checking other formats
-      this.logger.debug('Package.json not found or invalid', {
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
 
-    // Check for requirements.txt (Python)
-    const requirementsPath = path.join(context.projectPath, 'requirements.txt');
-    try {
-      const content = await fs.readFile(requirementsPath, 'utf-8');
-      const lines = content.split('\n').filter((line) => line.trim() && !line.startsWith('#'));
-
+    // Convert import map to dependency list
+    if (importMap.size > 0) {
       dependencies.hasDependencies = true;
-      dependencies.packageManagers.push('pip');
-      dependencies.production = lines.map((line) => {
-        const [name, version] = line.split('==');
-        return { name: name.trim(), version: version?.trim() || 'latest' };
-      });
-      dependencies.total = dependencies.production.length;
-    } catch (error) {
-      // requirements.txt not found, continue
-      this.logger.debug('requirements.txt not found', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      dependencies.production = Array.from(importMap.entries()).map(([name, files]) => ({
+        name,
+        version: `used in ${files.size} file(s)`,
+      }));
+      dependencies.total = importMap.size;
+
+      // Detect package managers from language hints using centralized config
+      const languages = context.languageHints.map((h) => h.language);
+      dependencies.packageManagers = getPackageManagersFromLanguages(languages);
     }
 
     return dependencies;
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
-    try {
-      const jsonMatch = result.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      return {
-        summary: 'Failed to parse structured analysis',
-        insights: [],
-        vulnerabilities: [],
-        recommendations: [],
-        metrics: {},
-        warnings: ['Failed to parse LLM response as JSON'],
-      };
-    } catch (error) {
-      this.logger.warn('Failed to parse dependency analysis result', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return {
+    return LLMJsonParser.parse(result, {
+      contextName: 'dependency-analyzer',
+      logErrors: true,
+      fallback: {
         summary: 'Error parsing analysis result',
         insights: [],
         vulnerabilities: [],
         recommendations: [],
         metrics: {},
-        warnings: [`Parse error: ${(error as Error).message}`],
-      };
-    }
+        warnings: ['Failed to parse LLM response as JSON'],
+      },
+    });
   }
 
   private formatMarkdownReport(
@@ -319,5 +258,23 @@ ${warnings.map((warning: string) => `- ${warning}`).join('\n')}
 `
     : ''
 }`;
+  }
+
+  protected async generateFiles(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<AgentFile[]> {
+    const markdown = await this.formatMarkdown(data, state);
+    const metadata = this.getMetadata();
+
+    return [
+      {
+        filename: 'dependencies.md',
+        content: markdown,
+        title: 'Dependency Analysis',
+        category: 'analysis',
+        order: metadata.priority,
+      },
+    ];
   }
 }

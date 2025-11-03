@@ -261,6 +261,17 @@ export interface CustomSection {
 
   /** Section metadata */
   metadata: Record<string, unknown>;
+
+  /** Generated files from agent (for agent-owned file generation) */
+  files?: Array<{
+    filename: string;
+    content: string;
+    title: string;
+    category?: string;
+    order?: number;
+    mergeStrategy?: 'replace' | 'append' | 'section-update';
+    sectionId?: string;
+  }>;
 }
 
 /**

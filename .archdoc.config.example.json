@@ -60,31 +60,39 @@
   },
   "languages": {
     "custom": {
-      "rust": {
-        "displayName": "Rust",
+      "elixir": {
+        "displayName": "Elixir",
         "filePatterns": {
-          "extensions": [".rs"],
-          "excludePatterns": ["target", "Cargo.lock"]
+          "extensions": [".ex", ".exs"],
+          "excludePatterns": ["_build", "deps"]
         },
         "importPatterns": {
-          "rustUse": "use\\s+([^;]+);"
+          "elixirImport": "import\\s+([^\\n]+)",
+          "elixirAlias": "alias\\s+([^\\n]+)"
         },
         "componentPatterns": {
-          "modules": ["mod\\.rs$", "lib\\.rs$", "main\\.rs$"],
-          "tests": ["_test\\.rs$", "tests/"]
+          "controllers": ["_controller\\.ex$"],
+          "services": ["_service\\.ex$", "_context\\.ex$"],
+          "models": ["_schema\\.ex$"],
+          "tests": ["_test\\.exs$", "test/"]
         },
         "keywords": {
-          "service": ["service", "handler", "processor"],
-          "model": ["struct", "enum", "trait"],
-          "test": ["test", "mock"]
-        }
+          "service": ["context", "service", "handler"],
+          "model": ["schema", "struct"],
+          "test": ["test", "mock", "exunit"]
+        },
+        "frameworks": ["phoenix", "ecto"],
+        "packageManager": "hex",
+        "packageFiles": ["mix.exs", "mix.lock"],
+        "testPatterns": ["_test.exs", "/test/"]
       }
     },
     "overrides": {
       "typescript": {
         "keywords": {
           "service": ["service", "provider", "use-case", "interactor"]
-        }
+        },
+        "packageManager": "pnpm"
       }
     }
   }
