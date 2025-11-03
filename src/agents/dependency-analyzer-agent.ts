@@ -83,7 +83,11 @@ Provide your analysis in this JSON format:
   "vulnerabilities": [{"package": "...", "severity": "...", "description": "..."}],
   "recommendations": ["recommendation1", "recommendation2", ...],
   "warnings": ["warning1", "warning2", ...]
-}`;
+}
+
+${this.getResponseLengthGuidance(_context)}
+
+CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
@@ -147,7 +151,13 @@ Please analyze dependency health, security, and provide recommendations.`;
       total: 0,
     };
 
-    // Extract dependencies from source code imports (language-agnostic)
+    // FIRST: Try to extract from package manager manifest files (preferred)
+    const manifestData = await this.extractFromManifestFiles(context);
+    if (manifestData.hasDependencies) {
+      return manifestData; // Use manifest data if available
+    }
+
+    // FALLBACK: Extract dependencies from source code imports (language-agnostic)
     const importMap = new Map<string, Set<string>>(); // package -> files using it
 
     for (const file of context.files) {
@@ -182,6 +192,76 @@ Please analyze dependency health, security, and provide recommendations.`;
       // Detect package managers from language hints using centralized config
       const languages = context.languageHints.map((h) => h.language);
       dependencies.packageManagers = getPackageManagersFromLanguages(languages);
+    }
+
+    return dependencies;
+  }
+
+  private async extractFromManifestFiles(context: AgentContext): Promise<DependencyData> {
+    const dependencies: DependencyData = {
+      hasDependencies: false,
+      packageManagers: [],
+      production: [],
+      development: [],
+      total: 0,
+    };
+
+    // Look for package manager manifest files
+    const manifestFiles = {
+      'package.json': 'npm/yarn/pnpm',
+      'requirements.txt': 'pip',
+      Pipfile: 'pipenv',
+      'pyproject.toml': 'poetry',
+      Gemfile: 'bundler',
+      'go.mod': 'go modules',
+      'Cargo.toml': 'cargo',
+      'composer.json': 'composer',
+      'pom.xml': 'maven',
+      'build.gradle': 'gradle',
+    };
+
+    for (const [filename, manager] of Object.entries(manifestFiles)) {
+      const manifestPath = path.join(context.projectPath, filename);
+      try {
+        const content = await fs.readFile(manifestPath, 'utf-8');
+
+        if (filename === 'package.json') {
+          const pkg = JSON.parse(content);
+          dependencies.packageManagers.push(manager);
+          dependencies.hasDependencies = true;
+
+          if (pkg.dependencies) {
+            Object.entries(pkg.dependencies).forEach(([name, version]) => {
+              dependencies.production!.push({ name, version: String(version) });
+            });
+          }
+
+          if (pkg.devDependencies) {
+            Object.entries(pkg.devDependencies).forEach(([name, version]) => {
+              dependencies.development!.push({ name, version: String(version) });
+            });
+          }
+
+          dependencies.total =
+            (dependencies.production?.length || 0) + (dependencies.development?.length || 0);
+        } else if (filename === 'requirements.txt') {
+          dependencies.packageManagers.push(manager);
+          dependencies.hasDependencies = true;
+
+          const lines = content.split('\n').filter((l) => l.trim() && !l.startsWith('#'));
+          dependencies.production = lines.map((line) => {
+            const [name, version] = line.split(/[=<>~]/);
+            return { name: name.trim(), version: version?.trim() || 'latest' };
+          });
+          dependencies.total = dependencies.production.length;
+        }
+        // Add more parsers for other package managers as needed
+
+        break; // Use first found manifest
+      } catch (_error) {
+        // File doesn't exist or couldn't be parsed, continue to next
+        continue;
+      }
     }
 
     return dependencies;

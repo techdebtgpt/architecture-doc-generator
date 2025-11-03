@@ -117,7 +117,11 @@ Provide your analysis in this JSON format:
   "complianceNotes": ["GDPR considerations", "OWASP alignment", ...]
 }
 
-Be specific about file locations when identifying issues. Focus on actionable recommendations.`;
+Be specific about file locations when identifying issues. Focus on actionable recommendations.
+
+${this.getResponseLengthGuidance(_context)}
+
+CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {

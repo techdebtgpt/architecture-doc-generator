@@ -117,7 +117,11 @@ Analyze the provided codebase and create **Mermaid diagrams** for:
 - Keep diagrams focused and readable (max 10-15 nodes per diagram)
 - Use descriptive node labels
 
-Provide **actionable, visual insights** with valid Mermaid syntax.`;
+Provide **actionable, visual insights** with valid Mermaid syntax.
+
+${this.getResponseLengthGuidance(_context)}
+
+CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
@@ -215,7 +219,13 @@ Create Mermaid diagrams for the most important flows in this system.`;
         markdown += `${flow.description}\n\n`;
 
         markdown += `#### Diagram\n\n`;
+        markdown += `> 💡 **Tip**: View this diagram with a Mermaid renderer:\n`;
+        markdown += `> - VS Code: Install "Markdown Preview Mermaid Support" extension\n`;
+        markdown += `> - GitHub/GitLab: Automatic rendering in markdown preview\n`;
+        markdown += `> - Online: Copy to [mermaid.live](https://mermaid.live)\n\n`;
+        markdown += `<details>\n<summary>📊 Click to view ${flow.type} diagram</summary>\n\n`;
         markdown += `\`\`\`mermaid\n${flow.diagram}\n\`\`\`\n\n`;
+        markdown += `</details>\n\n`;
 
         if (flow.insights && flow.insights.length > 0) {
           markdown += `#### Key Insights\n\n`;

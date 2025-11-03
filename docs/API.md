@@ -46,9 +46,29 @@ generateDocs();
 
 ## Core Classes
 
+### BaseOrchestrator
+
+The `BaseOrchestrator` is an abstract base class that provides common functionality for all orchestrators.
+
+```typescript
+abstract class BaseOrchestrator {
+  constructor(
+    protected readonly agentRegistry: AgentRegistry,
+    protected readonly scanner: FileSystemScanner,
+    loggerName: string
+  );
+
+  protected async scanProject(projectPath: string): Promise<ScanResult>;
+  protected getRegisteredAgents(): string[];
+  abstract execute(projectPath: string, options?: any): Promise<any>;
+}
+```
+
+All orchestrators extend this base class to ensure consistent behavior and shared utilities.
+
 ### DocumentationOrchestrator
 
-The `DocumentationOrchestrator` is the main class for coordinating the documentation generation process.
+The `DocumentationOrchestrator` extends `BaseOrchestrator` and is the main class for coordinating comprehensive documentation generation.
 
 #### `generateDocumentation`
 
@@ -63,6 +83,43 @@ async generateDocumentation(
 
 - **`projectPath`**: The absolute path to the project you want to analyze.
 - **`options`**: An optional configuration object to customize the generation process.
+
+### C4ModelOrchestrator
+
+The `C4ModelOrchestrator` extends `BaseOrchestrator` and specializes in generating C4 architecture models.
+
+#### `generateC4Model`
+
+Generates a C4 architecture model for a given project path.
+
+```typescript
+async generateC4Model(
+  projectPath: string,
+  options?: OrchestratorOptions
+): Promise<C4ModelOutput>
+```
+
+- **`projectPath`**: The absolute path to the project you want to analyze.
+- **`options`**: An optional configuration object to customize the generation process.
+
+Returns a C4 model with:
+
+- `c4Model`: JSON representation of the C4 architecture (Context, Containers, Components)
+- `plantUMLModel`: PlantUML diagrams for each C4 level
+
+**Example:**
+
+```typescript
+import { C4ModelOrchestrator, AgentRegistry, FileSystemScanner } from '@archdoc/generator';
+
+const scanner = new FileSystemScanner();
+const registry = new AgentRegistry();
+const orchestrator = new C4ModelOrchestrator(registry, scanner);
+
+const result = await orchestrator.generateC4Model('./my-project');
+console.log('C4 Context:', result.c4Model.context);
+console.log('PlantUML Context:', result.plantUMLModel.context);
+```
 
 ### AgentRegistry
 

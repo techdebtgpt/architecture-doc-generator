@@ -3,6 +3,7 @@ import { MemorySaver } from '@langchain/langgraph';
 import type { AgentContext, AgentResult, AgentFile } from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
+import { Retry } from '../utils/retry';
 import { FileSearchService } from './file-search-service';
 
 /**
@@ -332,34 +333,71 @@ export abstract class BaseAgentWorkflow {
       this.getAgentName(),
     );
 
-    this.logger.info(`Calling LLM for fast path analysis...`, '⚡');
-    const llmStartTime = Date.now();
+    // Wrap LLM call with retry logic for JSON parsing failures
+    const { analysisData, inputTokens, outputTokens } = await Retry.executeWithJsonRetry(
+      async (attempt: number) => {
+        this.logger.info(
+          `Calling LLM for fast path analysis... ${attempt > 1 ? `(retry ${attempt})` : ''}`,
+          '⚡',
+        );
+        const llmStartTime = Date.now();
 
-    const result = await model.invoke([systemPrompt, humanPrompt], {
-      ...runnableConfig,
-      runName: `${this.getAgentName()}-FastPath`,
-    });
+        // Add stricter JSON instructions on retry
+        const enhancedHumanPrompt =
+          attempt > 1
+            ? humanPrompt +
+              '\n\nIMPORTANT: Your response MUST be valid JSON. Do NOT wrap it in markdown code blocks. Start with { and end with }.'
+            : humanPrompt;
 
-    const llmDuration = ((Date.now() - llmStartTime) / 1000).toFixed(1);
-    this.logger.info(`LLM call completed in ${llmDuration}s`, '✅');
+        const result = await model.invoke([systemPrompt, enhancedHumanPrompt], {
+          ...runnableConfig,
+          runName: `${this.getAgentName()}-FastPath${attempt > 1 ? `-Retry${attempt}` : ''}`,
+        });
 
-    const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
+        const llmDuration = ((Date.now() - llmStartTime) / 1000).toFixed(1);
+        this.logger.info(`LLM call completed in ${llmDuration}s`, '✅');
 
-    // Count tokens from LLM result
-    const inputTokens = result?.response_metadata?.usage?.input_tokens || 0;
-    const outputTokens = result?.response_metadata?.usage?.output_tokens || 0;
-    const totalTokens = inputTokens + outputTokens;
+        const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
 
-    // Log token usage
-    if (totalTokens > 0) {
-      this.logger.debug(
-        `Token usage: ${inputTokens} input + ${outputTokens} output = ${totalTokens} total`,
-        '💰',
-      );
-    }
+        // Count tokens from LLM result
+        const inputTokens = result?.response_metadata?.usage?.input_tokens || 0;
+        const outputTokens = result?.response_metadata?.usage?.output_tokens || 0;
+        const totalTokens = inputTokens + outputTokens;
+
+        // Log token usage
+        if (totalTokens > 0) {
+          this.logger.debug(
+            `Token usage: ${inputTokens} input + ${outputTokens} output = ${totalTokens} total`,
+            '💰',
+          );
+        }
+
+        // Try to parse analysis - will throw if invalid JSON
+        const analysisData = await this.parseAnalysis(analysisText);
+
+        return { result, analysisData, inputTokens, outputTokens };
+      },
+      ({ analysisData }) => {
+        // Validate JSON structure (check if it has expected properties)
+        return analysisData && typeof analysisData === 'object';
+      },
+      {
+        ...Retry.configs.jsonParsing,
+        onRetry: (attempt, error) => {
+          this.logger.warn(
+            `Attempt ${attempt} returned invalid JSON, retrying with stricter prompt...`,
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
+        },
+      },
+    );
 
     const executionTime = Date.now() - execStartTime;
-    const analysisData = await this.parseAnalysis(analysisText);
+    const totalTokens = inputTokens + outputTokens;
+    const analysisText = ''; // Fast path doesn't need full analysis text stored
+
     const stateForMarkdown = {
       context,
       finalAnalysis: analysisText,
@@ -1482,6 +1520,74 @@ Please pay special attention to the above focus area in your analysis. While you
     }
 
     return strategies;
+  }
+
+  /**
+   * Generate response length guidance based on depth mode
+   * Override this method to customize for specific agents
+   */
+  protected getResponseLengthGuidance(context: AgentContext): string {
+    const maxIterations = (context.config?.maxIterations as number) || 5;
+
+    // Determine depth mode based on maxIterations
+    // quick: 1-2, normal: 3-5, deep: 6-8, exhaustive: 9+
+    let mode: 'quick' | 'normal' | 'deep' | 'exhaustive';
+    if (maxIterations <= 2) {
+      mode = 'quick';
+    } else if (maxIterations <= 5) {
+      mode = 'normal';
+    } else if (maxIterations <= 8) {
+      mode = 'deep';
+    } else {
+      mode = 'exhaustive';
+    }
+
+    const maxTokens = mode === 'quick' ? 8000 : 16000;
+
+    // Get agent-specific target ranges (override this for custom ranges)
+    const ranges = this.getTargetTokenRanges();
+
+    const targetMin = ranges[mode].min;
+    const targetMax = ranges[mode].max;
+
+    return `**Response Length Guidance** (${mode} mode):
+- Target: ${targetMin.toLocaleString()}-${targetMax.toLocaleString()} tokens
+- Maximum: ${maxTokens.toLocaleString()} tokens
+- Scale response based on project complexity
+${this.getDepthSpecificGuidance(mode)}`;
+  }
+
+  /**
+   * Get target token ranges for each depth mode
+   * Override this in subclasses to customize per agent
+   */
+  protected getTargetTokenRanges(): Record<
+    'quick' | 'normal' | 'deep' | 'exhaustive',
+    { min: number; max: number }
+  > {
+    // Default ranges - agents can override
+    return {
+      quick: { min: 500, max: 2000 },
+      normal: { min: 2000, max: 6000 },
+      deep: { min: 6000, max: 12000 },
+      exhaustive: { min: 12000, max: 16000 },
+    };
+  }
+
+  /**
+   * Get depth-specific guidance for the LLM
+   * Override this in subclasses for agent-specific guidance
+   */
+  protected getDepthSpecificGuidance(mode: 'quick' | 'normal' | 'deep' | 'exhaustive'): string {
+    const guidance = {
+      quick: '- Focus on key insights only\n- Provide 3-5 main points',
+      normal: '- Provide comprehensive analysis\n- Include 5-10 insights and recommendations',
+      deep: '- Provide detailed, thorough analysis\n- Include 10-20 insights with evidence\n- Add specific file locations and examples',
+      exhaustive:
+        '- Provide exhaustive, comprehensive documentation\n- Include 20+ insights with detailed evidence\n- Add extensive examples and cross-references',
+    };
+
+    return guidance[mode];
   }
 
   // Abstract methods that subclasses must implement

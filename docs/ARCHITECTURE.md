@@ -35,9 +35,24 @@ The ArchDoc Generator is built on a modular, multi-agent architecture that lever
 
 ## 🧩 Core Components
 
+### Base Orchestrator
+
+The `BaseOrchestrator` is an abstract base class that provides common functionality for all orchestrators in the system. It includes:
+
+- **Shared logging infrastructure**: Consistent logging across all orchestrator types
+- **Project scanning logic**: Common file system scanning capabilities
+- **Agent management**: Unified agent registration and discovery
+- **Abstract execution interface**: Enforces a consistent contract for all orchestrator implementations
+
+This design allows for easy extension with new orchestrator types (e.g., C4 model generation, Mermaid diagrams) while maintaining consistency.
+
 ### Documentation Orchestrator
 
-The `DocumentationOrchestrator` is the central coordinator of the system. It manages the entire workflow, from scanning the file system to executing agents and aggregating their results.
+The `DocumentationOrchestrator` extends `BaseOrchestrator` and is the central coordinator for generating comprehensive documentation. It manages the entire workflow, from scanning the file system to executing agents and aggregating their results.
+
+### C4 Model Orchestrator
+
+The `C4ModelOrchestrator` extends `BaseOrchestrator` and specializes in generating C4 architecture models. It coordinates agents to produce Context, Container, and Component diagrams in both JSON and PlantUML formats.
 
 ### Agent Registry
 
@@ -49,7 +64,7 @@ The `FileSystemScanner` efficiently scans the project directory, respects `.giti
 
 ### LLM Service
 
-The `LLMService` provides a unified interface for interacting with multiple LLM providers, including Anthropic, OpenAI, and Google. It handles model selection, token counting, and other LLM-related tasks.
+The `LLMService` provides a unified interface for interacting with multiple LLM providers, including Anthropic, OpenAI, XAI, and Google. It handles model selection, token counting, and other LLM-related tasks.
 
 ## 🤖 Multi-Agent System
 
@@ -76,10 +91,12 @@ The core of the generator is its multi-agent system, where specialized agents an
 
 ## 🎨 Design Patterns
 
+- **Template Method Pattern**: The `BaseOrchestrator` defines the workflow structure, while subclasses implement specific behavior. This allows for consistent orchestrator behavior while supporting different output types.
 - **Registry Pattern**: Used by the `AgentRegistry` for dynamic agent management.
 - **Strategy Pattern**: Each agent implements a different analysis strategy under a common interface.
 - **Singleton Pattern**: The `LLMService` uses a singleton to provide a single, shared instance.
 - **Builder Pattern**: Formatters use a builder-style approach to construct the final documentation.
+- **Dependency Injection**: Orchestrators receive their dependencies (AgentRegistry, FileSystemScanner) via constructor injection, improving testability and flexibility.
 
 ## 💻 Technology Stack
 

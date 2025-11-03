@@ -806,15 +806,19 @@ export function getSchemaFiles(files: string[]): {
   // Additional schema-specific patterns (Prisma, GraphQL, OpenAPI)
   // Note: .d.ts files are TypeScript definitions, not database schemas
   // Only include actual schema files: Prisma, GraphQL, OpenAPI
-  const schemaSpecific = files.filter(
-    (f) =>
-      f.endsWith('.prisma') ||
-      f.endsWith('.graphql') ||
-      f.endsWith('.gql') ||
-      (f.toLowerCase().includes('schema') && !f.endsWith('.d.ts')) || // Exclude .d.ts
-      f.toLowerCase().includes('openapi') ||
-      f.toLowerCase().includes('swagger'),
-  );
+  const schemaSpecific = files.filter((f) => {
+    const lowerPath = f.toLowerCase();
+    return (
+      lowerPath.endsWith('.prisma') ||
+      lowerPath.includes('/prisma/schema.prisma') ||
+      lowerPath.includes('\\prisma\\schema.prisma') ||
+      lowerPath.endsWith('.graphql') ||
+      lowerPath.endsWith('.gql') ||
+      (lowerPath.includes('schema') && !lowerPath.endsWith('.d.ts')) || // Exclude .d.ts
+      lowerPath.includes('openapi') ||
+      lowerPath.includes('swagger')
+    );
+  });
 
   const all = [...new Set([...models, ...configs, ...schemaSpecific])];
 
@@ -848,6 +852,143 @@ export function isCodeFile(filePath: string): boolean {
  */
 export function getCodeFiles(files: string[]): string[] {
   return files.filter((file) => isCodeFile(file));
+}
+
+/**
+ * Check if a file is a test file based on path patterns and naming conventions
+ * @param filePath - File path to check
+ * @returns True if the file is a test file
+ */
+export function isTestFile(filePath: string): boolean {
+  const lowerPath = filePath.toLowerCase();
+
+  // Check directory patterns
+  if (
+    lowerPath.includes('/test/') ||
+    lowerPath.includes('\\test\\') ||
+    lowerPath.includes('/__tests__/') ||
+    lowerPath.includes('\\__tests__\\') ||
+    lowerPath.includes('/tests/') ||
+    lowerPath.includes('\\tests\\') ||
+    lowerPath.includes('/spec/') ||
+    lowerPath.includes('\\spec\\')
+  ) {
+    return true;
+  }
+
+  // Check file name patterns
+  if (
+    lowerPath.endsWith('.test.ts') ||
+    lowerPath.endsWith('.test.js') ||
+    lowerPath.endsWith('.test.tsx') ||
+    lowerPath.endsWith('.test.jsx') ||
+    lowerPath.endsWith('.spec.ts') ||
+    lowerPath.endsWith('.spec.js') ||
+    lowerPath.endsWith('.spec.tsx') ||
+    lowerPath.endsWith('.spec.jsx') ||
+    lowerPath.endsWith('_test.py') ||
+    lowerPath.endsWith('_test.go') ||
+    lowerPath.endsWith('test.java') ||
+    lowerPath.endsWith('tests.java')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if a file is a configuration file
+ * @param filePath - File path to check
+ * @returns True if the file is a configuration file
+ */
+export function isConfigFile(filePath: string): boolean {
+  const lowerPath = filePath.toLowerCase();
+  const basename = filePath.split(/[/\\]/).pop()?.toLowerCase() || '';
+
+  // Check file extensions
+  if (
+    lowerPath.endsWith('.json') ||
+    lowerPath.endsWith('.yaml') ||
+    lowerPath.endsWith('.yml') ||
+    lowerPath.endsWith('.toml') ||
+    lowerPath.endsWith('.ini') ||
+    lowerPath.endsWith('.env') ||
+    lowerPath.endsWith('.config.js') ||
+    lowerPath.endsWith('.config.ts') ||
+    lowerPath.endsWith('.config.mjs') ||
+    lowerPath.endsWith('.config.cjs')
+  ) {
+    return true;
+  }
+
+  // Check specific config file names
+  const configFileNames = [
+    'package.json',
+    'package-lock.json',
+    'yarn.lock',
+    'pnpm-lock.yaml',
+    'tsconfig.json',
+    'jsconfig.json',
+    'jest.config.js',
+    'jest.config.ts',
+    'vitest.config.js',
+    'vitest.config.ts',
+    'webpack.config.js',
+    'vite.config.js',
+    'vite.config.ts',
+    'rollup.config.js',
+    '.eslintrc',
+    '.eslintrc.js',
+    '.eslintrc.json',
+    '.prettierrc',
+    '.prettierrc.js',
+    '.prettierrc.json',
+    'babel.config.js',
+    '.babelrc',
+    '.gitignore',
+    '.dockerignore',
+    'dockerfile',
+    'docker-compose.yml',
+    'docker-compose.yaml',
+    'makefile',
+    'rakefile',
+    'gemfile',
+    'gemfile.lock',
+    'requirements.txt',
+    'pipfile',
+    'pipfile.lock',
+    'poetry.lock',
+    'pyproject.toml',
+    'setup.py',
+    'pom.xml',
+    'build.gradle',
+    'settings.gradle',
+    'cargo.toml',
+    'cargo.lock',
+    'go.mod',
+    'go.sum',
+  ];
+
+  return configFileNames.includes(basename);
+}
+
+/**
+ * Get all test files from a list
+ * @param files - Array of file paths
+ * @returns Array of test files
+ */
+export function getTestFiles(files: string[]): string[] {
+  return files.filter((file) => isTestFile(file));
+}
+
+/**
+ * Get all configuration files from a list
+ * @param files - Array of file paths
+ * @returns Array of configuration files
+ */
+export function getConfigFiles(files: string[]): string[] {
+  return files.filter((file) => isConfigFile(file));
 }
 
 /**

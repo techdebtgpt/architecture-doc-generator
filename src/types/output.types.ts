@@ -295,6 +295,14 @@ export interface DocumentationMetadata {
 
   /** Warnings generated */
   warnings: string[];
+
+  /** Agent gap analysis (missing information per agent) */
+  agentGaps?: Array<{
+    agentName: string;
+    gapCount: number;
+    clarityScore: number;
+    missingInformation: string[];
+  }>;
 }
 
 // Supporting types

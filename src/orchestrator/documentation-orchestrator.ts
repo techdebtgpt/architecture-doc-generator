@@ -13,6 +13,7 @@ import type {
   DocumentationOutput,
   ComponentDescription,
   CustomSection,
+  ProjectStatistics,
 } from '../types/output.types';
 import { StateGraph, Annotation, END } from '@langchain/langgraph';
 import { MemorySaver } from '@langchain/langgraph';
@@ -21,6 +22,7 @@ import { Logger } from '../utils/logger';
 import { version } from '../../package.json';
 import { ImportScanner } from '../scanners/import-scanner';
 import type { DependencyGraph, ImportInfo, ModuleInfo } from '../scanners/import-scanner';
+import { isTestFile, isConfigFile } from '../config/language-config';
 
 /**
  * Documentation generation state with LangGraph
@@ -1194,6 +1196,9 @@ ${enhancementText}
       totalTokenUsage.totalTokens += result.tokenUsage.totalTokens;
     }
 
+    // Extract accurate statistics from agent results and scan data
+    const statistics = this.calculateProjectStatistics(scanResult, agentResults);
+
     // Create output
     const output: DocumentationOutput = {
       projectName: scanResult.projectPath.split(/[/\\]/).pop() || 'Unknown Project',
@@ -1206,14 +1211,7 @@ ${enhancementText}
         frameworks: [],
         projectType: 'Unknown',
         keyFeatures: [],
-        statistics: {
-          totalFiles: scanResult.totalFiles,
-          totalLines: 0,
-          totalSize: scanResult.totalSize,
-          codeFiles: scanResult.totalFiles,
-          testFiles: 0,
-          configFiles: 0,
-        },
+        statistics,
       },
       architecture: {
         style: this.extractArchitectureStyle(agentResults),
@@ -1281,6 +1279,7 @@ ${enhancementText}
         agentsExecuted: Array.from(agentResults.keys()),
         configuration: {},
         warnings: this.collectWarnings(agentResults),
+        agentGaps: this.collectAgentGaps(agentResults),
       },
     };
 
@@ -1794,6 +1793,65 @@ Needs Update: ${evaluation.needsUpdate}
   }
 
   /**
+   * Calculate accurate project statistics from scan results and agent data
+   */
+  private calculateProjectStatistics(
+    scanResult: ScanResult,
+    agentResults: Map<string, AgentResult>,
+  ): ProjectStatistics {
+    // Start with scan data
+    let totalLines = 0;
+    let testFiles = 0;
+    let configFiles = 0;
+
+    // Extract from file-structure agent if available
+    const fileStructureAgent = agentResults.get('file-structure');
+    if (fileStructureAgent?.data) {
+      const data = fileStructureAgent.data as Record<string, unknown>;
+      if (typeof data.totalLines === 'number') {
+        totalLines = data.totalLines;
+      }
+      if (typeof data.testFiles === 'number') {
+        testFiles = data.testFiles;
+      }
+      if (typeof data.configFiles === 'number') {
+        configFiles = data.configFiles;
+      }
+    }
+
+    // If still zero, calculate from scan result using centralized detection
+    if (totalLines === 0 || testFiles === 0) {
+      for (const file of scanResult.files) {
+        // Use centralized test file detection
+        if (isTestFile(file.relativePath)) {
+          testFiles++;
+        }
+
+        // Use centralized config file detection
+        if (isConfigFile(file.relativePath)) {
+          configFiles++;
+        }
+      }
+    }
+
+    // Estimate lines if not provided (rough estimate: ~50 lines per file)
+    if (totalLines === 0) {
+      totalLines = scanResult.totalFiles * 50;
+    }
+
+    const codeFiles = scanResult.totalFiles - testFiles - configFiles;
+
+    return {
+      totalFiles: scanResult.totalFiles,
+      totalLines,
+      totalSize: scanResult.totalSize,
+      codeFiles: Math.max(0, codeFiles),
+      testFiles,
+      configFiles,
+    };
+  }
+
+  /**
    * Collect all warnings from agent results
    */
   private collectWarnings(agentResults: Map<string, AgentResult>): string[] {
@@ -1809,5 +1867,37 @@ Needs Update: ${evaluation.needsUpdate}
     }
 
     return warnings;
+  }
+
+  /**
+   * Collect gap analysis from all agents
+   */
+  private collectAgentGaps(agentResults: Map<string, AgentResult>): Array<{
+    agentName: string;
+    gapCount: number;
+    clarityScore: number;
+    missingInformation: string[];
+  }> {
+    const gaps: Array<{
+      agentName: string;
+      gapCount: number;
+      clarityScore: number;
+      missingInformation: string[];
+    }> = [];
+
+    for (const [agentName, result] of agentResults.entries()) {
+      const missingInfo = (result.metadata?.missingInformation as string[]) || [];
+
+      if (missingInfo.length > 0 || result.confidence < 1.0) {
+        gaps.push({
+          agentName,
+          gapCount: missingInfo.length,
+          clarityScore: result.confidence * 100,
+          missingInformation: missingInfo.slice(0, 10), // Limit to top 10 gaps
+        });
+      }
+    }
+
+    return gaps;
   }
 }

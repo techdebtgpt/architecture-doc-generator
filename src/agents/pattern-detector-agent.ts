@@ -7,14 +7,16 @@ import { getSupportedLanguages } from '../config/language-config';
 interface DesignPattern {
   pattern: string;
   usage?: string;
+  description?: string;
   files?: string[];
   confidence: number;
 }
 
 interface ArchitecturalPattern {
   pattern: string;
-  description: string;
+  description?: string;
   evidence?: string[];
+  impact?: string;
 }
 
 interface AntiPattern {
@@ -110,7 +112,11 @@ Analyze the provided codebase and identify:
 }
 \`\`\`
 
-Focus on providing **evidence-based analysis** with specific file locations and code examples.`;
+Focus on providing **evidence-based analysis** with specific file locations and code examples.
+
+${this.getResponseLengthGuidance(_context)}
+
+CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
@@ -231,77 +237,161 @@ Detect design patterns, architectural patterns, and anti-patterns with specific 
       | undefined;
     const antiPatterns = analysis.antiPatterns as AntiPattern[] | undefined;
     const recommendations = analysis.recommendations as string[] | undefined;
-    const indicators = patternData.indicators as Record<string, unknown> | undefined;
+    const patternCounts = patternData.patterns as Record<string, number> | undefined;
 
-    return `# 🎨 Pattern Detection Analysis
+    let markdown = `# 🎨 Design Pattern Analysis
 
 ## Overview
 ${summary || 'Pattern detection analysis completed'}
 
-## Design Patterns Detected
+`;
 
-${
-  designPatterns && designPatterns.length > 0
-    ? designPatterns
-        .map(
-          (p) => `### ${p.pattern}
-**Usage**: ${p.usage}
-**Confidence**: ${(p.confidence * 100).toFixed(0)}%
-**Files**: ${p.files?.join(', ') || 'Multiple files'}
-`,
-        )
-        .join('\n')
-    : '_No specific design patterns detected_'
-}
+    // Design Patterns Section
+    markdown += `## 🔹 Design Patterns Detected\n\n`;
 
-## Architectural Patterns
+    if (designPatterns && designPatterns.length > 0) {
+      // Group patterns by confidence level
+      const highConfidence = designPatterns.filter((p) => p.confidence >= 0.8);
+      const mediumConfidence = designPatterns.filter(
+        (p) => p.confidence >= 0.5 && p.confidence < 0.8,
+      );
+      const lowConfidence = designPatterns.filter((p) => p.confidence < 0.5);
 
-${
-  architecturalPatterns && architecturalPatterns.length > 0
-    ? architecturalPatterns
-        .map(
-          (p) => `### ${p.pattern}
-${p.description}
+      if (highConfidence.length > 0) {
+        markdown += `### High Confidence (80%+)\n\n`;
+        markdown += this.formatDesignPatternTable(highConfidence);
+        markdown += '\n\n';
+      }
 
-**Evidence**:
-${p.evidence?.map((e: string) => `- ${e}`).join('\n') || ''}
-`,
-        )
-        .join('\n')
-    : '_No architectural patterns identified_'
-}
+      if (mediumConfidence.length > 0) {
+        markdown += `### Medium Confidence (50-79%)\n\n`;
+        markdown += this.formatDesignPatternTable(mediumConfidence);
+        markdown += '\n\n';
+      }
 
-${
-  antiPatterns && antiPatterns.length > 0
-    ? `
-## ⚠️ Anti-Patterns & Code Smells
+      if (lowConfidence.length > 0) {
+        markdown += `### Possible Patterns (<50%)\n\n`;
+        markdown += this.formatDesignPatternTable(lowConfidence);
+        markdown += '\n\n';
+      }
+    } else {
+      markdown += `_No specific design patterns detected in the analysis._\n\n`;
+    }
 
-${antiPatterns
-  .map(
-    (ap) => `### ${ap.pattern} (${ap.severity.toUpperCase()})
-**Description**: ${ap.description}
-**Location**: ${ap.location}
-**Recommendation**: ${ap.recommendation}
-`,
-  )
-  .join('\n')}
-`
-    : ''
-}
+    // Architectural Patterns Section
+    markdown += `## 🏗️ Architectural Patterns\n\n`;
 
-## 💡 Recommendations
+    if (architecturalPatterns && architecturalPatterns.length > 0) {
+      architecturalPatterns.forEach((p) => {
+        markdown += `### ${p.pattern}\n\n`;
 
-${(recommendations || []).map((rec: string, index: number) => `${index + 1}. ${rec}`).join('\n')}
+        if (p.description) {
+          markdown += `**Description**: ${p.description}\n\n`;
+        }
 
----
-**Pattern Indicators Found**: ${
-      indicators
-        ? Object.entries(indicators)
-            .filter(([, v]) => v)
-            .map(([k]) => k)
-            .join(', ')
-        : 'None'
-    }`;
+        if (p.evidence && p.evidence.length > 0) {
+          markdown += `**Evidence**:\n`;
+          p.evidence.forEach((e: string) => {
+            markdown += `- ${e}\n`;
+          });
+          markdown += '\n';
+        }
+
+        if (p.impact) {
+          markdown += `**Impact**: ${p.impact}\n\n`;
+        }
+
+        markdown += '---\n\n';
+      });
+    } else {
+      markdown += `_No architectural patterns identified._\n\n`;
+    }
+
+    // Anti-Patterns Section
+    if (antiPatterns && antiPatterns.length > 0) {
+      markdown += `## ⚠️ Anti-Patterns & Code Smells\n\n`;
+
+      // Group by severity
+      const critical = antiPatterns.filter((ap) => ap.severity === 'high');
+      const moderate = antiPatterns.filter((ap) => ap.severity === 'medium');
+      const minor = antiPatterns.filter((ap) => ap.severity === 'low');
+
+      const formatAntiPatterns = (patterns: AntiPattern[], title: string) => {
+        if (patterns.length === 0) return '';
+
+        let section = `### ${title}\n\n`;
+        section += `| Pattern | Location | Recommendation |\n`;
+        section += `|---------|----------|----------------|\n`;
+
+        patterns.forEach((ap) => {
+          const location =
+            ap.location && ap.location !== 'Multiple locations' ? ap.location : 'See description';
+          const rec =
+            ap.recommendation && ap.recommendation !== 'Review and refactor'
+              ? ap.recommendation.substring(0, 80) + (ap.recommendation.length > 80 ? '...' : '')
+              : 'Refactor affected code';
+
+          section += `| **${ap.pattern}** | ${location} | ${rec} |\n`;
+        });
+
+        return section + '\n';
+      };
+
+      if (critical.length > 0) {
+        markdown += formatAntiPatterns(critical, '🔴 High Severity');
+      }
+      if (moderate.length > 0) {
+        markdown += formatAntiPatterns(moderate, '🟡 Medium Severity');
+      }
+      if (minor.length > 0) {
+        markdown += formatAntiPatterns(minor, '🟢 Low Severity');
+      }
+    }
+
+    // Recommendations Section
+    markdown += `## 💡 Recommendations\n\n`;
+
+    if (recommendations && recommendations.length > 0) {
+      recommendations.forEach((rec: string, index: number) => {
+        markdown += `${index + 1}. ${rec}\n`;
+      });
+    } else {
+      markdown += `_No specific recommendations provided._\n`;
+    }
+
+    // Pattern Statistics
+    if (patternCounts) {
+      markdown += `\n## 📊 Pattern Statistics\n\n`;
+      markdown += `| Pattern Type | File Count |\n`;
+      markdown += `|--------------|------------|\n`;
+
+      Object.entries(patternCounts)
+        .filter(([, count]) => count > 0)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .forEach(([pattern, count]) => {
+          markdown += `| ${pattern.charAt(0).toUpperCase() + pattern.slice(1)} | ${count} |\n`;
+        });
+    }
+
+    return markdown;
+  }
+
+  /**
+   * Format design patterns as a clean table
+   */
+  private formatDesignPatternTable(patterns: DesignPattern[]): string {
+    let table = `| Pattern | Confidence | Implementation Details |\n`;
+    table += `|---------|------------|------------------------|\n`;
+
+    patterns.forEach((p) => {
+      const confidence = `${(p.confidence * 100).toFixed(0)}%`;
+      const details = p.description || p.usage || 'Detected in codebase structure';
+      const shortDetails = details.length > 60 ? details.substring(0, 57) + '...' : details;
+
+      table += `| **${p.pattern}** | ${confidence} | ${shortDetails} |\n`;
+    });
+
+    return table;
   }
 
   protected async generateFiles(

@@ -4,6 +4,8 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-red.svg)](SECURITY.md)
 [![Website](https://img.shields.io/badge/Website-techdebtgpt.com-blue)](https://techdebtgpt.com)
 [![GitHub stars](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator)](https://github.com/techdebtgpt/architecture-doc-generator)
 
@@ -70,6 +72,18 @@ This will:
 
 ### Basic Usage
 
+#### Available Commands
+
+| Command                 | Description                          | Example                                   |
+| ----------------------- | ------------------------------------ | ----------------------------------------- |
+| `archdoc analyze`       | Generate comprehensive documentation | `archdoc analyze /path/to/project`        |
+| `archdoc analyze --c4`  | Generate C4 architecture model       | `archdoc analyze --c4`                    |
+| `archdoc config --init` | Interactive configuration setup      | `archdoc config --init`                   |
+| `archdoc config --list` | Show current configuration           | `archdoc config --list`                   |
+| `archdoc export`        | Export docs to different formats     | `archdoc export .arch-docs --format html` |
+
+#### Documentation Generation
+
 ```bash
 # Analyze current directory
 archdoc analyze
@@ -77,15 +91,106 @@ archdoc analyze
 # Analyze specific project
 archdoc analyze /path/to/your/project
 
+# Custom output location
+archdoc analyze --output ./docs
+
 # Enhanced analysis with user focus (runs all agents with extra attention to specified topics)
 archdoc analyze --prompt "security vulnerabilities and authentication patterns"
 archdoc analyze --prompt "database schema design and API architecture"
 
-# Custom output location
-archdoc analyze --output ./docs
+# Analysis depth modes
+archdoc analyze --depth quick    # Fast, less detailed (2 iterations, 70% threshold)
+archdoc analyze --depth normal   # Balanced (5 iterations, 80% threshold) - default
+archdoc analyze --depth deep     # Thorough, most detailed (10 iterations, 90% threshold)
 
-# Quick analysis (faster, less detailed)
-archdoc analyze --depth quick
+# Disable iterative refinement for faster results
+archdoc analyze --no-refinement
+
+# Verbose output for debugging
+archdoc analyze --verbose
+```
+
+#### C4 Architecture Model Generation
+
+```bash
+# Generate C4 model for current directory
+archdoc analyze --c4
+
+# Generate C4 model for specific project
+archdoc analyze /path/to/project --c4
+
+# Custom output location for C4 model
+archdoc analyze --c4 --output ./architecture-docs
+
+# C4 model with verbose output
+archdoc analyze --c4 --verbose
+```
+
+#### Configuration Management
+
+```bash
+# Interactive configuration wizard (recommended for first-time setup)
+archdoc config --init
+
+# List current configuration
+archdoc config --list
+
+# Get specific configuration value
+archdoc config --get llmProvider
+archdoc config --get anthropicApiKey
+
+# Set configuration value
+archdoc config --set llmProvider=anthropic
+archdoc config --set anthropicApiKey=your-api-key
+
+# Reset configuration to defaults
+archdoc config --reset
+```
+
+#### Export and Format Options
+
+```bash
+# Single-file output (default: multi-file)
+archdoc analyze --single-file
+
+# Export as JSON
+archdoc analyze --single-file --format json
+
+# Export as HTML
+archdoc analyze --single-file --format html
+
+# Export as Markdown (default)
+archdoc analyze --single-file --format markdown
+
+# Export existing documentation to different formats
+archdoc export .arch-docs --format html --output ./docs.html
+archdoc export .arch-docs --format json --output ./docs.json
+archdoc export .arch-docs --format confluence --output ./confluence.md
+
+# Export with custom template
+archdoc export .arch-docs --format html --template ./my-template.html --output ./custom-docs.html
+```
+
+#### Advanced Usage
+
+```bash
+# Incremental updates (preserves existing docs, adds new analysis)
+archdoc analyze --prompt "new feature area to document"
+# (Automatically detects existing docs and runs in incremental mode)
+
+# Full regeneration even if docs exist
+archdoc analyze --clean
+
+# Specify LLM provider and model
+archdoc analyze --provider anthropic --model claude-sonnet-4-5-20250929
+archdoc analyze --provider openai --model gpt-4o
+archdoc analyze --provider google --model gemini-2.0-flash-exp
+
+# Budget control (halt if cost exceeds limit)
+archdoc analyze --max-cost 10.0  # Stop if cost exceeds $10
+
+# Custom refinement settings
+archdoc analyze --refinement-iterations 10 --refinement-threshold 90 --refinement-improvement 15
 ```
 
 ## CLI Usage
@@ -96,22 +201,43 @@ archdoc analyze [path] [options]
 
 **Options:**
 
-| Option                        | Description                                             | Default      |
-| ----------------------------- | ------------------------------------------------------- | ------------ |
-| `--output <dir>`              | Output directory                                        | `.arch-docs` |
-| `--prompt <text>`             | Enhance analysis with focus area (all agents still run) |              |
-| `--depth <level>`             | Analysis depth: `quick`, `normal`, `deep`               | `normal`     |
-| `--provider <name>`           | LLM provider: `anthropic`, `openai`, `google`           |              |
-| `--model <name>`              | Specific model to use                                   |              |
-| `--refinement`                | Enable iterative refinement                             | `true`       |
-| `--refinement-iterations <n>` | Max refinement iterations                               | `5`          |
-| `--refinement-threshold <n>`  | Clarity threshold %                                     | `80`         |
-| `--no-clean`                  | Don't clear output directory                            |              |
-| `--verbose`                   | Show detailed progress                                  |              |
+| Option                        | Description                                                    | Default      |
+| ----------------------------- | -------------------------------------------------------------- | ------------ |
+| `--output <dir>`              | Output directory                                               | `.arch-docs` |
+| `--c4`                        | Generate C4 architecture model (Context/Containers/Components) | `false`      |
+| `--prompt <text>`             | Enhance analysis with focus area (all agents still run)        |              |
+| `--depth <level>`             | Analysis depth: `quick`, `normal`, `deep`                      | `normal`     |
+| `--provider <name>`           | LLM provider: `anthropic`, `openai`, `xai`, `google`           |              |
+| `--model <name>`              | Specific model to use                                          |              |
+| `--refinement`                | Enable iterative refinement                                    | `true`       |
+| `--refinement-iterations <n>` | Max refinement iterations                                      | `5`          |
+| `--refinement-threshold <n>`  | Clarity threshold %                                            | `80`         |
+| `--no-clean`                  | Don't clear output directory                                   |              |
+| `--verbose`                   | Show detailed progress                                         |              |
+
+### C4 Model Generation
+
+Generate structured C4 architecture diagrams with PlantUML output:
+
+```bash
+# Generate C4 model
+archdoc analyze --c4
+
+# Generate for specific project
+archdoc analyze /path/to/project --c4 --output ./architecture
+
+# Output includes:
+# - c4-model.json (structured data)
+# - context.puml (system context diagram)
+# - containers.puml (container diagram)
+# - components.puml (component diagram)
+```
 
 ## 🔧 Programmatic Usage
 
 Use the library in your Node.js applications:
+
+### Standard Documentation
 
 ```typescript
 import {
@@ -139,6 +265,30 @@ const docs = await orchestrator.generateDocumentation('/path/to/project', {
 console.log('Generated:', docs.summary);
 ```
 
+### C4 Architecture Model
+
+```typescript
+import {
+  C4ModelOrchestrator,
+  AgentRegistry,
+  FileSystemScanner,
+} from '@techdebtgpt/archdoc-generator';
+
+// Setup registry with agents
+const registry = new AgentRegistry();
+const scanner = new FileSystemScanner();
+const orchestrator = new C4ModelOrchestrator(registry, scanner);
+
+// Generate C4 model
+const result = await orchestrator.generateC4Model('/path/to/project');
+
+console.log('C4 Context:', result.c4Model.context);
+console.log('Containers:', result.c4Model.containers);
+console.log('Components:', result.c4Model.components);
+
+// PlantUML diagrams available in result.plantUMLModel
+```
+
 See the **[API Reference](./docs/API.md)** for complete programmatic documentation.
 
 ## ⚙️ Configuration
@@ -161,21 +311,41 @@ See the **[Configuration Guide](./docs/CONFIGURATION_GUIDE.md)** for detailed op
 
 ## 🎨 What Gets Generated
 
+### Standard Documentation
+
 The tool generates a multi-file documentation structure:
 
 ```
-docs/
-├── index.md
-├── metadata.md
-├── file-structure.md
-├── dependencies.md
-├── patterns.md
-├── flows.md
-├── schemas.md
-├── architecture.md
-├── security.md
-└── recommendations.md
+.arch-docs/
+├── index.md              # Table of contents
+├── metadata.md           # Generation metadata
+├── file-structure.md     # Project organization
+├── dependencies.md       # External & internal deps
+├── patterns.md           # Design patterns
+├── flows.md              # Data & control flows
+├── schemas.md            # Data models
+├── architecture.md       # High-level design
+├── security.md           # Security analysis
+└── recommendations.md    # Improvement suggestions
 ```
+
+### C4 Architecture Model
+
+When using `--c4`, generates structured architecture diagrams:
+
+```
+.arch-docs-c4/
+├── c4-model.json         # Complete C4 model (JSON)
+├── context.puml          # System Context (Level 1)
+├── containers.puml       # Container Diagram (Level 2)
+└── components.puml       # Component Diagram (Level 3)
+```
+
+**C4 Model Levels:**
+
+- **Context**: Shows the system boundary, actors (users), and external systems
+- **Containers**: Shows deployable units (APIs, web apps, databases, microservices)
+- **Components**: Shows internal modules and their relationships within containers
 
 ## 🤖 Available Agents
 
@@ -308,6 +478,13 @@ We welcome contributions! See the **[Contributing Guide](./docs/CONTRIBUTING.md)
 - Testing guidelines
 - Code style and standards
 - Pull request process
+
+### Community Guidelines
+
+- **[Code of Conduct](./CODE_OF_CONDUCT.md)** - Our pledge to foster an open and welcoming environment
+- **[Security Policy](./SECURITY.md)** - How to report security vulnerabilities responsibly
+- **[Issue Templates](./.github/ISSUE_TEMPLATE/)** - Bug reports, feature requests, and more
+- **[Pull Request Template](./.github/PULL_REQUEST_TEMPLATE.md)** - Guidelines for submitting changes
 
 ## � Resources
 

@@ -3,6 +3,8 @@ import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/
 import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
 import { LLMJsonParser } from '../utils/json-parser';
 import { getSupportedLanguages, getSchemaFiles } from '../config/language-config';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 /**
  * Schema types that can be extracted
@@ -147,12 +149,23 @@ Analyze the provided codebase and extract **schema information** for:
 - Use \`classDiagram\` for type definitions
 - Include cardinality (||--o{, }o--||, etc.)
 
-Provide **comprehensive schema documentation** with valid Mermaid syntax.`;
+Provide **comprehensive schema documentation** with valid Mermaid syntax.
+
+${this.getResponseLengthGuidance(_context)}
+
+CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const schemaDetection = getSchemaFiles(context.files);
     const fileCategories = this.categorizeSchemaFiles(schemaDetection.all);
+
+    // Read actual file contents for schema analysis (with token budget management)
+    const schemaContents = await this.readSchemaContents(
+      context,
+      fileCategories,
+      10000, // Max 10K tokens per file type
+    );
 
     return `Extract schema information from this project:
 
@@ -166,13 +179,9 @@ Provide **comprehensive schema documentation** with valid Mermaid syntax.`;
 - GraphQL: ${fileCategories.graphql.length}
 - Types: ${fileCategories.types.length}
 
-**Sample Files**:
-${Object.entries(fileCategories)
-  .filter(([, files]) => files.length > 0)
-  .map(([category, files]) => `${category}: ${files.slice(0, 3).join(', ')}`)
-  .join('\n')}
+${schemaContents}
 
-Extract and document all schema definitions with Mermaid diagrams.`;
+Extract and document all schema definitions with Mermaid diagrams. Respond with ONLY valid JSON - no markdown, no code blocks.`;
   }
 
   protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {
@@ -202,6 +211,31 @@ Extract and document all schema definitions with Mermaid diagrams.`;
     return summary || 'Schema documentation completed';
   }
 
+  protected getTargetTokenRanges(): Record<
+    'quick' | 'normal' | 'deep' | 'exhaustive',
+    { min: number; max: number }
+  > {
+    return {
+      quick: { min: 1000, max: 3000 },
+      normal: { min: 3000, max: 8000 },
+      deep: { min: 8000, max: 14000 },
+      exhaustive: { min: 14000, max: 16000 },
+    };
+  }
+
+  protected getDepthSpecificGuidance(mode: 'quick' | 'normal' | 'deep' | 'exhaustive'): string {
+    const guidance = {
+      quick: '- Focus on primary schemas only\n- Include basic entity relationships',
+      normal:
+        '- Include detailed entity descriptions and relationships\n- Provide full Mermaid diagrams',
+      deep: '- Provide exhaustive schema documentation\n- Include all entity fields with detailed descriptions\n- Add comprehensive relationship diagrams',
+      exhaustive:
+        '- Document every schema, entity, field, and relationship\n- Include validation rules and constraints\n- Add cross-schema dependencies and integration points',
+    };
+
+    return guidance[mode];
+  }
+
   // Removed: identifySchemaFiles - now using getSchemaFiles() from language-config
 
   private categorizeSchemaFiles(files: string[]): {
@@ -224,6 +258,75 @@ Extract and document all schema definitions with Mermaid diagrams.`;
         (f) => f.toLowerCase().includes('swagger') || f.toLowerCase().includes('openapi'),
       ),
     };
+  }
+
+  private async readSchemaContents(
+    context: AgentContext,
+    fileCategories: ReturnType<typeof this.categorizeSchemaFiles>,
+    maxTokensPerCategory: number,
+  ): Promise<string> {
+    let content = '';
+
+    // Priority order: Prisma > GraphQL > DTOs > TypeORM > Types
+    const priorityCategories = [
+      { name: 'Prisma', files: fileCategories.prisma, limit: 2 },
+      { name: 'GraphQL', files: fileCategories.graphql, limit: 3 },
+      { name: 'DTOs', files: fileCategories.dtos, limit: 5 },
+      { name: 'TypeORM', files: fileCategories.typeorm, limit: 3 },
+      { name: 'OpenAPI', files: fileCategories.openapi, limit: 2 },
+    ];
+
+    for (const category of priorityCategories) {
+      if (category.files.length === 0) continue;
+
+      content += `\n**${category.name} Schema Files (${category.files.length} found)**:\n`;
+
+      const filesToRead = category.files.slice(0, category.limit);
+      for (const file of filesToRead) {
+        try {
+          // Files in context.files are already absolute paths, don't join with projectPath
+          const filePath = file;
+
+          // Check if file exists before reading
+          try {
+            await fs.access(filePath);
+          } catch {
+            this.logger.warn(`Schema file does not exist: ${filePath}`, {
+              originalPath: file,
+              projectPath: context.projectPath,
+            });
+            content += `\n\`${file}\`: (File not found at: ${filePath})\n`;
+            continue;
+          }
+
+          const fileContent = await fs.readFile(filePath, 'utf-8');
+
+          // Truncate to stay within token budget (~4 chars per token)
+          const maxChars = maxTokensPerCategory * 4;
+          const truncated =
+            fileContent.length > maxChars
+              ? fileContent.slice(0, maxChars) + '\n... (truncated)'
+              : fileContent;
+
+          // Use relative path for display
+          const relativePath = path.relative(context.projectPath, filePath);
+          content += `\n\`${relativePath}\`:\n\`\`\`\n${truncated}\n\`\`\`\n`;
+        } catch (error) {
+          const relativePath = path.relative(context.projectPath, file);
+          this.logger.warn(`Failed to read schema file: ${relativePath}`, {
+            error: error instanceof Error ? error.message : String(error),
+            path: file,
+          });
+          content += `\n\`${relativePath}\`: (Unable to read file - ${error instanceof Error ? error.message : 'unknown error'})\n`;
+        }
+      }
+
+      if (category.files.length > category.limit) {
+        content += `... and ${category.files.length - category.limit} more ${category.name} files\n`;
+      }
+    }
+
+    return content || '\n**No schema file contents available**\n';
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
@@ -257,7 +360,13 @@ Extract and document all schema definitions with Mermaid diagrams.`;
         markdown += `${schema.description}\n\n`;
 
         markdown += `#### Diagram\n\n`;
+        markdown += `> 💡 **Tip**: View this diagram with a Mermaid renderer:\n`;
+        markdown += `> - VS Code: Install "Markdown Preview Mermaid Support" extension\n`;
+        markdown += `> - GitHub/GitLab: Automatic rendering in markdown preview\n`;
+        markdown += `> - Online: Copy to [mermaid.live](https://mermaid.live)\n\n`;
+        markdown += `<details>\n<summary>📊 Click to view ${schema.type} diagram</summary>\n\n`;
         markdown += `\`\`\`mermaid\n${schema.diagram}\n\`\`\`\n\n`;
+        markdown += `</details>\n\n`;
 
         if (schema.entities && schema.entities.length > 0) {
           markdown += `#### Entities\n\n`;

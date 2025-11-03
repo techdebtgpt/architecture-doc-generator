@@ -3,17 +3,16 @@ import * as fs from 'fs/promises';
 import chalk from 'chalk';
 import ora from 'ora';
 import { DocumentationOrchestrator } from '../../src/orchestrator/documentation-orchestrator';
-import { FileSystemScanner } from '../../src/scanners/file-system-scanner';
-import { AgentRegistry } from '../../src/agents/agent-registry';
-import { ArchitectureAnalyzerAgent } from '../../src/agents/architecture-analyzer-agent';
-import { FileStructureAgent } from '../../src/agents/file-structure-agent';
-import { DependencyAnalyzerAgent } from '../../src/agents/dependency-analyzer-agent';
-import { PatternDetectorAgent } from '../../src/agents/pattern-detector-agent';
-import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agent';
-import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
-import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
+import { C4ModelOrchestrator } from '../../src/orchestrator/c4-model-orchestrator';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
 import { MarkdownFormatter } from '../../src/formatters/markdown-formatter';
+import {
+  checkConfiguration,
+  validateProjectPath,
+  setupOutputDirectory,
+  registerAgents,
+  createScanner,
+} from '../utils/orchestrator-setup';
 
 /**
  * Check if existing documentation exists in output directory
@@ -43,38 +42,6 @@ async function checkExistingDocumentation(outputDir: string): Promise<boolean> {
   }
 }
 
-/**
- * Check if API keys are configured
- */
-async function checkConfiguration(): Promise<boolean> {
-  const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-  const hasXAIKey = !!process.env.XAI_API_KEY;
-  const hasGoogleKey = !!process.env.GOOGLE_API_KEY;
-
-  if (!hasAnthropicKey && !hasOpenAIKey && !hasXAIKey && !hasGoogleKey) {
-    console.log(chalk.red('\n❌ No LLM API keys configured!\n'));
-    console.log(chalk.yellow('You need at least one API key to use ArchDoc:'));
-    console.log(chalk.gray('  • Anthropic Claude (recommended): https://console.anthropic.com/'));
-    console.log(chalk.gray('  • OpenAI GPT-4: https://platform.openai.com/'));
-    console.log(chalk.gray('  • xAI Grok: https://x.ai/api'));
-    console.log(chalk.gray('  • Google Gemini: https://ai.google.dev/\n'));
-
-    console.log(chalk.cyan('Quick setup:'));
-    console.log(chalk.white('  1. Run: ') + chalk.green('archdoc config --init'));
-    console.log(chalk.white('  2. Follow the interactive setup\n'));
-
-    console.log(chalk.cyan('Manual setup:'));
-    console.log(chalk.white('  1. Copy .archdoc.config.example.json to .archdoc.config.json'));
-    console.log(chalk.white('  2. Add your API key(s) to .archdoc.config.json'));
-    console.log(chalk.white('  3. Run analyze again\n'));
-
-    return false;
-  }
-
-  return true;
-}
-
 interface AnalyzeOptions {
   prompt?: string;
   output?: string;
@@ -93,6 +60,7 @@ interface AnalyzeOptions {
   // Output format options
   format?: 'markdown' | 'json' | 'html';
   singleFile?: boolean;
+  c4?: boolean;
 }
 
 /**
@@ -130,22 +98,15 @@ export async function analyzeProject(
     process.exit(1);
   }
 
+  if (options.c4) {
+    return await generateC4Model(projectPath, options);
+  }
+
   const spinner = ora('Initializing project analysis...').start();
 
   try {
-    // Resolve project path (use current directory if not provided)
-    const resolvedPath = projectPath ? path.resolve(projectPath) : process.cwd();
-
-    // Validate project path
-    const exists = await fs
-      .access(resolvedPath)
-      .then(() => true)
-      .catch(() => false);
-
-    if (!exists) {
-      spinner.fail(`Project path does not exist: ${resolvedPath}`);
-      process.exit(1);
-    }
+    // Validate and resolve project path
+    const resolvedPath = await validateProjectPath(projectPath, spinner);
 
     // Validate prompt if provided
     if (options.prompt !== undefined && options.prompt.trim().length < 3) {
@@ -154,10 +115,8 @@ export async function analyzeProject(
       process.exit(1);
     }
 
-    // Determine output directory (default: <project>/.arch-docs)
-    const outputDir = options.output
-      ? path.resolve(options.output)
-      : path.join(resolvedPath, '.arch-docs');
+    // Setup output directory (default: <project>/.arch-docs)
+    const outputDir = await setupOutputDirectory(resolvedPath, options.output, '.arch-docs');
 
     // Check if documentation already exists
     const hasExistingDocs = await checkExistingDocumentation(outputDir);
@@ -215,8 +174,8 @@ export async function analyzeProject(
 
     spinner.text = 'Scanning project files...';
 
-    // Initialize scanner
-    const scanner = new FileSystemScanner();
+    // Initialize scanner and scan project
+    const scanner = createScanner();
     const scanResult = await scanner.scan({
       rootPath: resolvedPath,
       maxFiles: 1000,
@@ -240,21 +199,9 @@ export async function analyzeProject(
       );
     }
 
-    // Setup agent registry
-    spinner.start('Registering agents... \n');
-    const agentRegistry = new AgentRegistry();
-
-    // Register all available agents (order matters - foundational agents first)
-    agentRegistry.register(new ArchitectureAnalyzerAgent()); // High-level architecture first
-    agentRegistry.register(new FileStructureAgent());
-    agentRegistry.register(new DependencyAnalyzerAgent());
-    agentRegistry.register(new PatternDetectorAgent());
-    agentRegistry.register(new FlowVisualizationAgent());
-    agentRegistry.register(new SchemaGeneratorAgent());
-    agentRegistry.register(new SecurityAnalyzerAgent()); // Security analysis
-
+    // Register all agents
+    const agentRegistry = registerAgents(spinner);
     const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
-    spinner.succeed(`Registered ${availableAgents.length} agents: ${availableAgents.join(', ')}`);
 
     // Always run all agents - prompt is used to ENHANCE, not filter
     const agentsToRun = availableAgents;
@@ -276,6 +223,7 @@ export async function analyzeProject(
     // Initialize orchestrator
     spinner.start('Initializing documentation orchestrator... \n');
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
+    spinner.succeed('Orchestrator initialized successfully');
 
     // Determine depth mode configuration
     const depthMode = options.depth || 'normal';
@@ -298,7 +246,12 @@ export async function analyzeProject(
     }
 
     // Generate documentation
-    spinner.text = `Running ${agentsToRun.length} agent(s) (see progress logs below)... \n`;
+    console.log('');
+    console.log(chalk.cyan(`🤖 Running ${agentsToRun.length} agent(s)...`));
+    console.log(chalk.gray('   (Agent progress will be shown below)'));
+    console.log('');
+
+    spinner.start(`Waiting for agent execution... \n`);
 
     const generationStartTime = Date.now();
 
@@ -459,6 +412,80 @@ export async function analyzeProject(
   } catch (error) {
     spinner.fail('Analysis failed');
     console.error(chalk.red('\nError:'), error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+}
+
+async function generateC4Model(projectPath?: string, options: AnalyzeOptions = {}): Promise<void> {
+  const spinner = ora('Initializing C4 model generation...').start();
+  try {
+    // Validate and resolve project path
+    const resolvedPath = await validateProjectPath(projectPath, spinner);
+
+    // Setup output directory (default: <project>/.arch-docs-c4)
+    const outputDir = await setupOutputDirectory(resolvedPath, options.output, '.arch-docs-c4');
+
+    // Initialize scanner
+    const scanner = createScanner();
+
+    // Register all agents
+    const agentRegistry = registerAgents(spinner);
+
+    spinner.start('Initializing C4 model orchestrator...');
+    const orchestrator = new C4ModelOrchestrator(agentRegistry, scanner);
+
+    spinner.text = 'Generating C4 model...';
+    const result = await orchestrator.generateC4Model(resolvedPath, options);
+
+    spinner.succeed('C4 Model generation completed!');
+
+    // Save the generated C4 model and PlantUML files
+    if (result) {
+      spinner.start('Saving C4 model files...');
+
+      // Save JSON model
+      if (result.c4Model) {
+        await fs.writeFile(
+          path.join(outputDir, 'c4-model.json'),
+          JSON.stringify(result.c4Model, null, 2),
+        );
+      }
+
+      // Save PlantUML files
+      if (result.plantUMLModel) {
+        await fs.writeFile(
+          path.join(outputDir, 'context.puml'),
+          result.plantUMLModel.context || '',
+        );
+        await fs.writeFile(
+          path.join(outputDir, 'containers.puml'),
+          result.plantUMLModel.containers || '',
+        );
+        await fs.writeFile(
+          path.join(outputDir, 'components.puml'),
+          result.plantUMLModel.components || '',
+        );
+      }
+
+      spinner.succeed('C4 model files saved successfully!');
+    }
+
+    console.log('');
+    console.log(chalk.green.bold('✨ C4 Model Generation Complete!'));
+    console.log('');
+    console.log(chalk.cyan('Output files:'));
+    console.log(`  📄 JSON Model: ${path.join(outputDir, 'c4-model.json')}`);
+    console.log(`  📊 Context Diagram: ${path.join(outputDir, 'context.puml')}`);
+    console.log(`  📦 Containers Diagram: ${path.join(outputDir, 'containers.puml')}`);
+    console.log(`  🧩 Components Diagram: ${path.join(outputDir, 'components.puml')}`);
+    console.log('');
+    console.log(chalk.yellow('💡 Tip: Use PlantUML to render the .puml files as diagrams'));
+  } catch (error) {
+    spinner.fail('C4 Model generation failed');
+    console.error(chalk.red('\n❌ Error:'), error instanceof Error ? error.message : String(error));
+    if (options.verbose && error instanceof Error) {
+      console.error(chalk.gray(error.stack));
+    }
     process.exit(1);
   }
 }

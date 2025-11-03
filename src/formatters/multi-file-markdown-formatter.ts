@@ -78,14 +78,61 @@ export class MultiFileMarkdownFormatter {
         continue;
       }
 
+      // Collect filenames first for navigation
+      const files = customSection.files || [];
+      if (files.length > 0) {
+        for (const file of files) {
+          generatedFiles.push(path.join(options.outputDir, file.filename));
+        }
+      } else if (customSection.markdown) {
+        const fileMapping: Record<string, string> = {
+          'flow-visualization': 'flows.md',
+          'schema-generator': 'schemas.md',
+          'security-analyzer': 'security.md',
+          'file-structure': 'file-structure.md',
+          'dependency-analyzer': 'dependencies.md',
+          'pattern-detector': 'patterns.md',
+          'architecture-analyzer': 'architecture.md',
+        };
+        const filename = fileMapping[agentName] || `${agentName}.md`;
+        generatedFiles.push(path.join(options.outputDir, filename));
+      }
+    }
+
+    // Build a set of generated file names (without path) for navigation
+    const generatedFileNames = new Set(generatedFiles.map((filePath) => path.basename(filePath)));
+
+    // Now write files with proper navigation
+    const sectionsIterator2 =
+      output.customSections instanceof Map
+        ? output.customSections.entries()
+        : Object.entries(output.customSections as Record<string, any>);
+
+    for (const [agentName, section] of sectionsIterator2) {
+      const customSection = section as {
+        files?: Array<{ filename: string; content: string; title: string; category?: string }>;
+        markdown?: string;
+        metadata?: Record<string, unknown>;
+      };
+
+      // Skip if agent was skipped or has no content
+      if (customSection.metadata?.skipped === true) {
+        continue;
+      }
+
       // Use new files array if available, fallback to markdown (backwards compat)
       const files = customSection.files || [];
       if (files.length > 0) {
-        // NEW: Agent provides its own files
+        // NEW: Agent provides its own files with navigation
         for (const file of files) {
           const filePath = path.join(options.outputDir, file.filename);
-          await fs.writeFile(filePath, file.content, 'utf-8');
-          generatedFiles.push(filePath);
+          const contentWithNav = this.addNavigationToContent(
+            file.content,
+            file.filename,
+            options,
+            generatedFileNames,
+          );
+          await fs.writeFile(filePath, contentWithNav, 'utf-8');
         }
       } else if (customSection.markdown) {
         // FALLBACK: Use markdown field (deprecated pattern)
@@ -100,8 +147,13 @@ export class MultiFileMarkdownFormatter {
         };
         const filename = fileMapping[agentName] || `${agentName}.md`;
         const filePath = path.join(options.outputDir, filename);
-        await fs.writeFile(filePath, customSection.markdown, 'utf-8');
-        generatedFiles.push(filePath);
+        const contentWithNav = this.addNavigationToContent(
+          customSection.markdown,
+          filename,
+          options,
+          generatedFileNames,
+        );
+        await fs.writeFile(filePath, contentWithNav, 'utf-8');
       }
     }
 
@@ -196,11 +248,37 @@ export class MultiFileMarkdownFormatter {
 
     content += `## 📊 Quick Stats\n\n`;
     content += `- **Primary Language**: ${overview.primaryLanguage}\n`;
+
+    // Language breakdown if multiple languages
+    if (overview.languages.length > 1) {
+      content += `- **Languages Used**: ${overview.languages.join(', ')}\n`;
+    }
+
     content += `- **Total Files**: ${overview.statistics.totalFiles.toLocaleString()}\n`;
-    content += `- **Total Lines**: ${overview.statistics.totalLines.toLocaleString()}\n`;
+    content += `- **Total Lines of Code**: ${overview.statistics.totalLines.toLocaleString()}\n`;
     content += `- **Code Files**: ${overview.statistics.codeFiles.toLocaleString()}\n`;
     content += `- **Test Files**: ${overview.statistics.testFiles.toLocaleString()}\n`;
-    content += `- **Quality Score**: ${codeQuality.overallScore.toFixed(1)}/10\n\n`;
+    content += `- **Config Files**: ${overview.statistics.configFiles.toLocaleString()}\n`;
+    content += `- **Project Size**: ${this.formatFileSize(overview.statistics.totalSize)}\n`;
+
+    // Add quality score if available
+    if (codeQuality.overallScore > 0) {
+      content += `- **Quality Score**: ${codeQuality.overallScore.toFixed(1)}/10\n`;
+    }
+
+    // Add architecture style if detected
+    if (
+      architecture.style &&
+      architecture.style !== 'Unknown' &&
+      architecture.style !== 'preserved'
+    ) {
+      content += `- **Architecture**: ${architecture.style}\n`;
+    }
+
+    content += `\n`;
+
+    // Generate Key Highlights from agent data
+    content += this.generateKeyHighlights(output);
 
     content += `## 📚 Documentation Index\n\n`;
 
@@ -318,25 +396,123 @@ export class MultiFileMarkdownFormatter {
   }
 
   /**
-   * Generate navigation links
+   * Get the ordered list of documentation files
+   */
+  private getDocumentationOrder(generatedFiles: Set<string>): string[] {
+    // Define the standard order of files
+    const standardOrder = [
+      'index.md',
+      'architecture.md',
+      'file-structure.md',
+      'dependencies.md',
+      'patterns.md',
+      'code-quality.md',
+      'flows.md',
+      'schemas.md',
+      'security.md',
+      'recommendations.md',
+      'metadata.md',
+      'changelog.md',
+    ];
+
+    // Filter to only include files that were actually generated
+    return standardOrder.filter((file) => generatedFiles.has(file));
+  }
+
+  /**
+   * Generate navigation links with next/previous support
    */
   private generateNavigation(
-    _currentFile: string,
+    currentFile: string,
     options: MultiFileFormatterOptions,
-    _generatedFiles: Set<string>,
+    generatedFiles: Set<string>,
   ): string {
     if (!options.includeNavigation) {
       return '';
     }
 
-    // No hardcoded file list - navigation is contextual to current file
+    const orderedFiles = this.getDocumentationOrder(generatedFiles);
+    const currentIndex = orderedFiles.indexOf(currentFile);
+
     let nav = '\n---\n\n';
-    nav += `[← Back to Index](./index.md)\n`;
+
+    // Navigation links
+    const navLinks: string[] = [];
+
+    // Back to index (except for index.md itself)
+    if (currentFile !== 'index.md') {
+      navLinks.push(`[← Back to Index](./index.md)`);
+    }
+
+    // Previous section
+    if (currentIndex > 0) {
+      const prevFile = orderedFiles[currentIndex - 1];
+      const prevTitle = this.getFileTitle(prevFile);
+      navLinks.push(`[← Previous: ${prevTitle}](./${prevFile})`);
+    }
+
+    // Next section
+    if (currentIndex >= 0 && currentIndex < orderedFiles.length - 1) {
+      const nextFile = orderedFiles[currentIndex + 1];
+      const nextTitle = this.getFileTitle(nextFile);
+      navLinks.push(`[Next: ${nextTitle} →](./${nextFile})`);
+    }
+
+    nav += navLinks.join(' | ');
+    nav += '\n';
+
     return nav;
   }
 
   /**
-   * Generate metadata file
+   * Get human-readable title for a file
+   */
+  private getFileTitle(filename: string): string {
+    const titles: Record<string, string> = {
+      'index.md': 'Index',
+      'architecture.md': 'Architecture',
+      'file-structure.md': 'File Structure',
+      'dependencies.md': 'Dependencies',
+      'patterns.md': 'Patterns',
+      'code-quality.md': 'Code Quality',
+      'recommendations.md': 'Recommendations',
+      'flows.md': 'Flow Visualizations',
+      'schemas.md': 'Schema Documentation',
+      'security.md': 'Security Analysis',
+      'metadata.md': 'Metadata',
+      'changelog.md': 'Changelog',
+    };
+
+    return titles[filename] || filename.replace('.md', '').replace(/-/g, ' ');
+  }
+
+  /**
+   * Add navigation links to content (if not already present at the bottom)
+   */
+  private addNavigationToContent(
+    content: string,
+    currentFile: string,
+    options: MultiFileFormatterOptions,
+    generatedFiles: Set<string>,
+  ): string {
+    // Check if navigation already exists at the BOTTOM (last 500 chars)
+    // This allows "Back to Index" at the top while still adding full navigation at bottom
+    const lastChunk = content.slice(-500);
+    const hasBottomNav =
+      lastChunk.includes('[← Back to Index]') &&
+      (lastChunk.includes('[← Previous:') || lastChunk.includes('[Next:'));
+
+    if (hasBottomNav) {
+      return content;
+    }
+
+    // Add navigation at the end
+    const nav = this.generateNavigation(currentFile, options, generatedFiles);
+    return content + nav;
+  }
+
+  /**
+   * Generate metadata file with generation configuration details
    */
   private generateMetadataFile(
     output: DocumentationOutput,
@@ -346,32 +522,145 @@ export class MultiFileMarkdownFormatter {
     const nav = this.generateNavigation('metadata.md', options, generatedFiles);
     const { metadata } = output;
 
-    let content = `# Metadata\n\n`;
-    content += `## Generation Information\n\n`;
+    let content = `# Documentation Generation Metadata\n\n`;
+
+    content += `## Generator Information\n\n`;
     content += `- **Generator Version**: ${metadata.generatorVersion}\n`;
-    content += `- **Generated**: ${output.timestamp.toISOString()}\n`;
-    content += `- **Project**: ${output.projectName}\n\n`;
+    content += `- **Generation Date**: ${output.timestamp.toISOString()}\n`;
+    content += `- **Project Name**: ${output.projectName}\n`;
+    content += `- **Generation Duration**: ${(metadata.generationDuration / 1000).toFixed(2)}s\n\n`;
+
+    content += `## Configuration\n\n`;
+    const config = metadata.configuration as Record<string, unknown>;
+    if (config && Object.keys(config).length > 0) {
+      content += `| Setting | Value |\n`;
+      content += `|---------|-------|\n`;
+      for (const [key, value] of Object.entries(config)) {
+        const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        content += `| ${key} | ${displayValue} |\n`;
+      }
+      content += `\n`;
+    } else {
+      content += `Default configuration used.\n\n`;
+    }
+
+    content += `## Agents Executed\n\n`;
+    if (metadata.agentsExecuted && metadata.agentsExecuted.length > 0) {
+      content += `The following agents were executed to generate this documentation:\n\n`;
+      metadata.agentsExecuted.forEach((agentName, index) => {
+        content += `${index + 1}. **${agentName}**\n`;
+      });
+      content += `\n`;
+    }
+
+    content += `## Resource Usage\n\n`;
+    content += `- **Total Tokens Used**: ${metadata.totalTokensUsed.toLocaleString()}\n`;
+
+    // Calculate estimated cost (rough estimate based on typical pricing)
+    const estimatedCost = (metadata.totalTokensUsed / 1_000_000) * 3; // $3 per million tokens
+    content += `- **Estimated Cost**: ~$${estimatedCost.toFixed(4)}\n`;
+    content += `- **Files Analyzed**: ${output.overview.statistics.totalFiles}\n`;
+    content += `- **Total Size**: ${this.formatFileSize(output.overview.statistics.totalSize)}\n\n`;
+
+    if (metadata.warnings && metadata.warnings.length > 0) {
+      content += `## Warnings\n\n`;
+      metadata.warnings.forEach((warning) => {
+        content += `- ${warning}\n`;
+      });
+      content += `\n`;
+    }
+
+    // Agent Gap Analysis
+    if (metadata.agentGaps && metadata.agentGaps.length > 0) {
+      content += `## Agent Gap Analysis\n\n`;
+      content += `This section shows identified gaps (missing information) for each agent. These gaps represent areas where the analysis could be enhanced with more information or deeper investigation.\n\n`;
+
+      for (const gap of metadata.agentGaps) {
+        const statusEmoji = gap.clarityScore >= 90 ? '✅' : gap.clarityScore >= 80 ? '⚠️' : '🔴';
+        const statusText =
+          gap.clarityScore >= 90
+            ? 'Excellent'
+            : gap.clarityScore >= 80
+              ? 'Good'
+              : gap.clarityScore >= 70
+                ? 'Fair'
+                : 'Needs Improvement';
+
+        content += `### ${statusEmoji} ${gap.agentName}\n\n`;
+        content += `- **Status**: ${statusText} (${gap.clarityScore.toFixed(1)}% clarity)\n`;
+        content += `- **Gaps Identified**: ${gap.gapCount}\n\n`;
+
+        if (gap.missingInformation.length > 0) {
+          content += `**Missing Information**:\n\n`;
+          gap.missingInformation.forEach((info, idx) => {
+            content += `${idx + 1}. ${info}\n`;
+          });
+          content += `\n`;
+        } else if (gap.clarityScore < 100) {
+          content += `_Minor gaps exist but are non-blocking. Rerun with --depth deep for more comprehensive analysis._\n\n`;
+        }
+
+        content += `---\n\n`;
+      }
+    }
 
     content += nav;
-    if (options.includeMetadata) {
-      content += this.generateMetadataFooter(output);
-    }
 
     return content;
   }
 
   /**
-   * Generate changelog file
+   * Generate changelog file with version history
    */
   private generateChangelogFile(
     output: DocumentationOutput,
     options: MultiFileFormatterOptions,
   ): string {
-    let content = `# Changelog\n\n`;
-    content += `## ${output.timestamp.toISOString().split('T')[0]}\n\n`;
-    content += `- Documentation generated\n`;
-    content += `- Analyzed ${output.overview.statistics.totalFiles} files\n`;
-    content += `- Quality score: ${output.codeQuality.overallScore.toFixed(1)}/10\n\n`;
+    const date = output.timestamp.toISOString().split('T')[0];
+    const config = output.metadata.configuration as { mode?: string; userPrompt?: string };
+    const mode = config?.mode || 'full-generation';
+
+    let content = `# Documentation Changelog\n\n`;
+    content += `This file tracks changes and updates to the documentation over time.\n\n`;
+    content += `---\n\n`;
+
+    content += `## ${date}\n\n`;
+
+    // Determine update type
+    if (mode === 'incremental') {
+      content += `### 🔄 Incremental Update\n\n`;
+      if (config.userPrompt) {
+        content += `**Focus Area**: ${config.userPrompt}\n\n`;
+      }
+    } else if (mode === 'refinement') {
+      content += `### ✨ Refinement Update\n\n`;
+      content += `Selected sections were regenerated based on quality evaluation.\n\n`;
+    } else {
+      content += `### 📝 Initial Documentation Generation\n\n`;
+    }
+
+    content += `**Changes**:\n\n`;
+    content += `- Analyzed ${output.overview.statistics.totalFiles.toLocaleString()} files\n`;
+    content += `- Primary language: ${output.overview.primaryLanguage}\n`;
+
+    if (output.codeQuality.overallScore > 0) {
+      content += `- Quality score: ${output.codeQuality.overallScore.toFixed(1)}/10\n`;
+    }
+
+    if (output.metadata.agentsExecuted.length > 0) {
+      content += `- Agents executed: ${output.metadata.agentsExecuted.join(', ')}\n`;
+    }
+
+    content += `\n`;
+
+    content += `**Statistics**:\n\n`;
+    content += `- Total lines of code: ${output.overview.statistics.totalLines.toLocaleString()}\n`;
+    content += `- Code files: ${output.overview.statistics.codeFiles.toLocaleString()}\n`;
+    content += `- Test files: ${output.overview.statistics.testFiles.toLocaleString()}\n`;
+    content += `- Duration: ${(output.metadata.generationDuration / 1000).toFixed(2)}s\n\n`;
+
+    content += `---\n\n`;
+    content += `_For generation configuration details, see [Metadata](./metadata.md)_\n\n`;
 
     if (options.includeMetadata) {
       content += this.generateMetadataFooter(output);
@@ -469,6 +758,122 @@ export class MultiFileMarkdownFormatter {
   private generateMetadataFooter(output: DocumentationOutput): string {
     const { metadata } = output;
     return `\n---\n\n_Generated by ${metadata.generatorVersion} on ${output.timestamp.toISOString()}_\n`;
+  }
+
+  /**
+   * Format file size in human-readable format
+   */
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * Generate Key Highlights section from agent analysis
+   */
+  private generateKeyHighlights(output: DocumentationOutput): string {
+    const highlights: string[] = [];
+
+    // Architecture highlights
+    if (
+      output.architecture.style &&
+      output.architecture.style !== 'Unknown' &&
+      output.architecture.style !== 'preserved'
+    ) {
+      highlights.push(`**Architecture**: ${output.architecture.style} architecture detected`);
+    }
+
+    if (output.architecture.patterns.length > 0) {
+      const topPatterns = output.architecture.patterns.slice(0, 3).join(', ');
+      highlights.push(`**Patterns**: Uses ${topPatterns}`);
+    }
+
+    // Dependency highlights
+    if (output.dependencies.productionDeps.length > 0) {
+      highlights.push(
+        `**Dependencies**: ${output.dependencies.productionDeps.length} production dependencies`,
+      );
+    }
+
+    // Code quality highlights
+    if (output.codeQuality.overallScore > 0) {
+      const qualityRating =
+        output.codeQuality.overallScore >= 8
+          ? 'Excellent'
+          : output.codeQuality.overallScore >= 6
+            ? 'Good'
+            : output.codeQuality.overallScore >= 4
+              ? 'Fair'
+              : 'Needs Improvement';
+      highlights.push(
+        `**Code Quality**: ${qualityRating} (${output.codeQuality.overallScore.toFixed(1)}/10)`,
+      );
+    }
+
+    // Security highlights
+    if (output.dependencies.vulnerabilities.length > 0) {
+      const critical = output.dependencies.vulnerabilities.filter(
+        (v) => v.severity === 'critical',
+      ).length;
+      const high = output.dependencies.vulnerabilities.filter((v) => v.severity === 'high').length;
+      if (critical > 0 || high > 0) {
+        highlights.push(
+          `**Security**: ⚠️ ${critical} critical, ${high} high severity vulnerabilities found`,
+        );
+      }
+    }
+
+    // Test coverage
+    if (output.overview.statistics.testFiles > 0) {
+      const testRatio = (
+        (output.overview.statistics.testFiles / output.overview.statistics.codeFiles) *
+        100
+      ).toFixed(1);
+      highlights.push(
+        `**Testing**: ${output.overview.statistics.testFiles} test files (${testRatio}% ratio)`,
+      );
+    } else {
+      highlights.push(`**Testing**: ⚠️ No test files detected`);
+    }
+
+    // Complexity highlights
+    if (output.codeQuality.complexity.averageComplexity > 0) {
+      const complexityRating =
+        output.codeQuality.complexity.averageComplexity <= 5
+          ? 'Low'
+          : output.codeQuality.complexity.averageComplexity <= 10
+            ? 'Moderate'
+            : output.codeQuality.complexity.averageComplexity <= 20
+              ? 'High'
+              : 'Very High';
+      highlights.push(
+        `**Complexity**: ${complexityRating} (avg: ${output.codeQuality.complexity.averageComplexity.toFixed(1)})`,
+      );
+    }
+
+    // Tech debt
+    if (
+      output.codeQuality.metrics.technicalDebt &&
+      output.codeQuality.metrics.technicalDebt !== '0h'
+    ) {
+      highlights.push(`**Technical Debt**: ${output.codeQuality.metrics.technicalDebt}`);
+    }
+
+    // If no highlights found, return empty
+    if (highlights.length === 0) {
+      return '';
+    }
+
+    let content = `## 🎯 Key Highlights\n\n`;
+    highlights.forEach((highlight) => {
+      content += `- ${highlight}\n`;
+    });
+    content += `\n`;
+
+    return content;
   }
 
   /**

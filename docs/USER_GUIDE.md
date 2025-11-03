@@ -86,12 +86,30 @@ archdoc analyze [path] [options]
 | Flag                | Description                                                          | Default      |
 | ------------------- | -------------------------------------------------------------------- | ------------ |
 | `--output <dir>`    | Specifies the output directory for the generated files.              | `.arch-docs` |
+| `--c4`              | Generates C4 architecture model instead of standard documentation.   | `false`      |
 | `--prompt <text>`   | A natural language prompt to focus the analysis on specific aspects. |              |
 | `--depth <level>`   | The depth of the analysis. Can be `quick`, `normal`, or `deep`.      | `normal`     |
-| `--provider <name>` | The LLM provider to use (`anthropic`, `openai`, `google`).           |              |
+| `--provider <name>` | The LLM provider to use (`anthropic`, `openai`, `xai`, `google`).    |              |
 | `--model <name>`    | The specific LLM model to use.                                       |              |
 | `--no-refinement`   | Disables the iterative refinement process for a faster analysis.     |              |
 | `--verbose`         | Shows detailed progress and debugging information.                   |              |
+
+**C4 Model Generation:**
+
+When using the `--c4` flag, the generator creates a structured C4 architecture model with:
+
+- **c4-model.json**: Complete C4 model in JSON format
+- **context.puml**: PlantUML diagram showing system context (actors, external systems)
+- **containers.puml**: PlantUML diagram showing containers (deployable units)
+- **components.puml**: PlantUML diagram showing components (modules/functions)
+
+```bash
+# Generate C4 model
+archdoc analyze --c4
+
+# Generate C4 model for specific project with custom output
+archdoc analyze /path/to/project --c4 --output ./architecture-docs
+```
 
 ### `config`
 

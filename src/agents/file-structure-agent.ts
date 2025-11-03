@@ -93,7 +93,11 @@ Provide your analysis in this JSON format:
   ]
 }
 
-Focus on key insights and actionable recommendations. Be concise.`;
+Focus on key insights and actionable recommendations. Be concise.
+
+${this.getResponseLengthGuidance(_context)}
+
+CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
@@ -118,7 +122,9 @@ ${JSON.stringify(fileTypes, null, 2)}
 
 **Project Metadata**: ${JSON.stringify(context.projectMetadata, null, 2)}
 
-Please analyze this structure and provide insights about organization, patterns, and recommendations for improvement.`;
+Please analyze this structure and provide insights about organization, patterns, and recommendations for improvement.
+
+Respond with ONLY valid JSON - no markdown, no code blocks, no explanations. Start with { and end with }.`;
 
     return content;
   }
@@ -138,6 +144,31 @@ Please analyze this structure and provide insights about organization, patterns,
   protected generateSummary(data: Record<string, unknown>): string {
     const analysis = data as { summary?: string };
     return analysis.summary || 'File structure analysis completed';
+  }
+
+  protected getTargetTokenRanges(): Record<
+    'quick' | 'normal' | 'deep' | 'exhaustive',
+    { min: number; max: number }
+  > {
+    return {
+      quick: { min: 500, max: 1500 },
+      normal: { min: 1500, max: 4000 },
+      deep: { min: 4000, max: 8000 },
+      exhaustive: { min: 8000, max: 12000 },
+    };
+  }
+
+  protected getDepthSpecificGuidance(mode: 'quick' | 'normal' | 'deep' | 'exhaustive'): string {
+    const guidance = {
+      quick: '- Focus on main directories and patterns\n- Provide 3-5 recommendations',
+      normal:
+        '- Analyze organization strategy and conventions\n- Include 5-10 patterns and recommendations',
+      deep: '- Detailed analysis of all directory structures\n- Include 10-15 patterns and conventions with examples',
+      exhaustive:
+        '- Comprehensive file structure documentation\n- Document every organizational pattern and naming convention\n- Provide 15-20 detailed recommendations',
+    };
+
+    return guidance[mode];
   }
 
   // Original helper methods (unchanged)
