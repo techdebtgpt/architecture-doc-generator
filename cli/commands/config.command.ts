@@ -174,12 +174,14 @@ async function initializeConfig(): Promise<void> {
       url: 'https://console.anthropic.com/',
     },
     openai: {
-      defaultModel: 'gpt-5',
+      defaultModel: 'o1-mini',
       models: [
-        { name: 'gpt-5 (recommended) - Latest and most powerful', value: 'gpt-5' },
-        { name: 'gpt-4.1 - Previous generation flagship', value: 'gpt-4.1' },
-        { name: 'gpt-4-turbo - Fast and capable', value: 'gpt-4-turbo' },
-        { name: 'gpt-4 - Stable and reliable', value: 'gpt-4' },
+        { name: 'o1-mini (recommended) - Cost-effective reasoning', value: 'o1-mini' },
+        { name: 'o1-preview - Advanced reasoning', value: 'o1-preview' },
+        { name: 'gpt-4o - Multimodal flagship', value: 'gpt-4o' },
+        { name: 'gpt-4o-mini - Fast and cheap', value: 'gpt-4o-mini' },
+        { name: 'gpt-4-turbo - GPT-4 Turbo', value: 'gpt-4-turbo' },
+        { name: 'gpt-4 - Legacy GPT-4', value: 'gpt-4' },
       ],
       keyFormat: 'sk-...',
       url: 'https://platform.openai.com/',
@@ -321,7 +323,7 @@ async function initializeConfig(): Promise<void> {
   logger.info(`  • Tracing: ${config.tracing.enabled ? 'Enabled' : 'Disabled'}`);
   logger.info('\n💡 Tips:');
   logger.info('  • Change provider: archdoc config --set llm.provider=openai');
-  logger.info('  • Change model: archdoc config --set llm.model=gpt-5');
+  logger.info('  • Change model: archdoc config --set llm.model=o1-mini');
   logger.info('  • Update API key: archdoc config --set apiKeys.anthropic=sk-ant-...');
   logger.info('  • View settings: archdoc config --list');
   logger.info('\nNext steps:');

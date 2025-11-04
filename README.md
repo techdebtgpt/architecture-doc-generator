@@ -33,7 +33,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
 - ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
-- 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, GPT-5, Gemini 2.5, or Grok 3.
+- 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.
 - � **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
 - 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation.
 - 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection.
