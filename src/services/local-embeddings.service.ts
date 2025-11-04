@@ -1,4 +1,5 @@
 import { Embeddings, EmbeddingsParams } from '@langchain/core/embeddings';
+import { Logger } from '../utils/logger';
 
 /**
  * Simple local embeddings using TF-IDF (Term Frequency-Inverse Document Frequency)
@@ -24,6 +25,7 @@ export class LocalEmbeddings extends Embeddings {
   private vocabulary: Map<string, number> = new Map();
   private idf: Map<string, number> = new Map();
   private dimensions: number;
+  private logger = new Logger('LocalEmbeddings');
 
   constructor(params?: EmbeddingsParams & { dimensions?: number }) {
     super(params || {});
@@ -49,6 +51,11 @@ export class LocalEmbeddings extends Embeddings {
     const docFreq = new Map<string, number>();
     const totalDocs = documents.length;
 
+    if (totalDocs === 0) {
+      this.logger.warn('No documents provided to build vocabulary');
+      return;
+    }
+
     for (const doc of documents) {
       const tokens = new Set(this.tokenize(doc)); // Unique tokens per doc
       for (const token of tokens) {
@@ -69,6 +76,10 @@ export class LocalEmbeddings extends Embeddings {
     for (const [term, freq] of docFreq.entries()) {
       this.idf.set(term, Math.log(totalDocs / freq));
     }
+
+    this.logger.debug(
+      `Vocabulary built: ${this.vocabulary.size} terms from ${docFreq.size} unique tokens across ${totalDocs} documents`,
+    );
   }
 
   /**
@@ -113,6 +124,12 @@ export class LocalEmbeddings extends Embeddings {
    * Embed a single document
    */
   async embedQuery(text: string): Promise<number[]> {
+    // Ensure vocabulary is built (should be done by embedDocuments first)
+    if (this.vocabulary.size === 0) {
+      throw new Error(
+        'LocalEmbeddings: Vocabulary not built. Call embedDocuments() first to build vocabulary.',
+      );
+    }
     return this.textToVector(text);
   }
 

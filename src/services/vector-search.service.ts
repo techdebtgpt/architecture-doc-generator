@@ -243,6 +243,10 @@ export class VectorSearchService {
     // Load file contents and create documents
     const documents: Document[] = [];
     const batchSize = 50; // Process in batches to show progress
+    let loadedCount = 0;
+    let skippedCount = 0;
+
+    this.logger.info(`Loading ${filteredFiles.length} files into memory...`);
 
     for (let i = 0; i < filteredFiles.length; i += batchSize) {
       const batch = filteredFiles.slice(i, Math.min(i + batchSize, filteredFiles.length));
@@ -257,6 +261,8 @@ export class VectorSearchService {
 
           // Skip files that are too large
           if (stat.size > maxFileSize * 2) {
+            skippedCount++;
+            this.logger.debug(`Skipped (too large): ${filePath} (${stat.size} bytes)`);
             continue;
           }
 
@@ -282,28 +288,40 @@ export class VectorSearchService {
 
           // Cache the content
           this.updateCache(filePath, content);
+          loadedCount++;
         } catch (error) {
+          skippedCount++;
           this.logger.debug(`Failed to load file: ${filePath}`, {
             error: error instanceof Error ? error.message : String(error),
           });
         }
       }
 
-      // Log progress
+      // Log progress with loader bar
       const processed = Math.min(i + batchSize, filteredFiles.length);
+      const percentage = ((processed / filteredFiles.length) * 100).toFixed(1);
+      const barLength = 20;
+      const filledLength = Math.round((processed / filteredFiles.length) * barLength);
+      const bar = '█'.repeat(filledLength) + '░'.repeat(barLength - filledLength);
+
       this.logger.info(
-        `Processed ${processed}/${filteredFiles.length} files (${((processed / filteredFiles.length) * 100).toFixed(1)}%)`,
+        `📂 Loading files: [${bar}] ${percentage}% (${loadedCount} loaded, ${skippedCount} skipped)`,
       );
     }
 
     if (documents.length === 0) {
       this.logger.warn('No documents loaded - vector store will be empty');
+      this.logger.warn(`Attempted: ${filteredFiles.length}, Loaded: 0, Skipped: ${skippedCount}`);
       this.isInitialized = true;
       return;
     }
 
+    this.logger.info(
+      `✓ Loaded ${documents.length} documents (${loadedCount} files, ${skippedCount} skipped)`,
+    );
+
     // Create vector store with embeddings
-    this.logger.info(`Creating embeddings for ${documents.length} documents...`);
+    this.logger.info(`🔧 Creating embeddings for ${documents.length} documents...`);
     this.vectorStore = await MemoryVectorStore.fromDocuments(documents, this.embeddings);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
