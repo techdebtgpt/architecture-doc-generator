@@ -31,6 +31,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 - 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
 - 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
+- 🔍 **RAG Vector Search**: Semantic similarity search with FREE local embeddings or cloud providers (OpenAI, Google) - finds relevant code by meaning, not just keywords. [See docs →](docs/VECTOR_SEARCH.md)
 - ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
 - 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.

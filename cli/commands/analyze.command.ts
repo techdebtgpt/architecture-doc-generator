@@ -53,6 +53,8 @@ interface AnalyzeOptions {
   maxCost?: number; // Maximum cost in dollars before halting (default: 5.0)
   // Depth mode (simple) - conflicts with granular refinement flags
   depth?: 'quick' | 'normal' | 'deep';
+  // Search mode for file retrieval during refinement
+  searchMode?: 'vector' | 'keyword';
   // Granular refinement options (advanced) - overrides depth mode
   refinement?: boolean;
   refinementThreshold?: number;
@@ -240,9 +242,15 @@ export async function analyzeProject(
     };
     const depthConfig = depthConfigs[depthMode];
 
+    // Determine search mode (default: keyword for fast, free search)
+    const searchMode = options.searchMode || 'keyword';
+
     if (options.verbose) {
       console.log(
         `📊 Depth mode: ${depthMode} (${depthConfig.maxIterations} iterations, ${depthConfig.clarityThreshold}% clarity threshold)`,
+      );
+      console.log(
+        `🔍 Search mode: ${searchMode} (${searchMode === 'vector' ? 'semantic similarity with embeddings' : 'keyword-based matching'})`,
       );
     }
 
@@ -278,6 +286,7 @@ export async function analyzeProject(
           },
           maxQuestionsPerIteration: depthConfig.maxQuestions,
           skipSelfRefinement: depthConfig.skipSelfRefinement, // Skip refinement for quick mode
+          searchMode, // Vector (semantic) or keyword search for file retrieval
         },
         onAgentProgress: (current: number, total: number, agentName: string) => {
           const elapsed = Math.floor((Date.now() - generationStartTime) / 1000);

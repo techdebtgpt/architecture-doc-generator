@@ -100,6 +100,12 @@ export interface AgentContext {
       }>;
     };
   };
+
+  /** Shared vector store (initialized once per generation, reused across agents) */
+  vectorStore?: {
+    searchFiles: (query: string, topK?: number) => Promise<Array<{ path: string; score: number }>>;
+    cleanup: () => void;
+  };
 }
 
 /**
@@ -303,6 +309,9 @@ export interface AgentExecutionOptions {
 
   /** Skip self-refinement workflow for faster execution (quick mode) */
   skipSelfRefinement?: boolean;
+
+  /** Search mode for file retrieval: 'vector' (semantic, slower but more accurate) or 'keyword' (fast, less accurate) */
+  searchMode?: 'vector' | 'keyword';
 }
 
 /**

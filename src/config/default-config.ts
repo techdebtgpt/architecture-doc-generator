@@ -11,6 +11,8 @@ export const defaultConfig: AppConfig = {
     maxTokens: 4096,
     maxInputTokens: 100000,
     tokenBuffer: 10000,
+    embeddingsApiKey: undefined, // Optional: API key for embeddings (if not using local)
+    embeddingsProvider: 'local', // Default to FREE local embeddings (no API key needed)
   },
 
   scan: {

@@ -93,6 +93,12 @@ program
     'Analysis depth mode: quick (no refinement, fast), normal (5 iterations, 80%), deep (10 iterations, 90%)',
     'normal',
   )
+  // Search mode for file retrieval
+  .option(
+    '--search-mode <mode>',
+    'File search mode: keyword (fast, free, default) or vector (semantic similarity with embeddings via OpenAI, requires OPENAI_API_KEY)',
+    'keyword',
+  )
   .option('--c4', 'Generate C4 model instead of standard documentation', false)
   // Granular refinement options (advanced)
   .option(

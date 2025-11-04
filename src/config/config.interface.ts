@@ -10,6 +10,9 @@ export interface AppConfig {
     maxTokens: number;
     maxInputTokens: number;
     tokenBuffer: number;
+    // Embeddings API key (for vector search) - separate from main LLM provider
+    embeddingsApiKey?: string;
+    embeddingsProvider?: 'local' | 'openai' | 'google' | 'huggingface' | 'cohere' | 'voyage';
   };
 
   // Scanning Configuration
