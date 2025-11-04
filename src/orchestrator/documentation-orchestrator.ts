@@ -100,6 +100,15 @@ const DocumentationState = Annotation.Root({
     reducer: (_, update) => update,
     default: () => 0,
   }),
+
+  // Orchestrator-level token usage (for synthesis, recommendations, etc.)
+  orchestratorTokens: Annotation<{ inputTokens: number; outputTokens: number }>({
+    reducer: (current, update) => ({
+      inputTokens: current.inputTokens + update.inputTokens,
+      outputTokens: current.outputTokens + update.outputTokens,
+    }),
+    default: () => ({ inputTokens: 0, outputTokens: 0 }),
+  }),
 });
 
 /**
@@ -1025,15 +1034,32 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       (sum, r) => sum + r.executionTime,
       0,
     );
-    const totalInputTokens = Array.from(agentResults.values()).reduce(
+    const agentInputTokens = Array.from(agentResults.values()).reduce(
       (sum, r) => sum + r.tokenUsage.inputTokens,
       0,
     );
-    const totalOutputTokens = Array.from(agentResults.values()).reduce(
+    const agentOutputTokens = Array.from(agentResults.values()).reduce(
       (sum, r) => sum + r.tokenUsage.outputTokens,
       0,
     );
-    const totalCost = (totalInputTokens / 1_000_000) * 3 + (totalOutputTokens / 1_000_000) * 15;
+
+    // Include orchestrator tokens (synthesis, recommendations, etc.)
+    const totalInputTokens = agentInputTokens + state.orchestratorTokens.inputTokens;
+    const totalOutputTokens = agentOutputTokens + state.orchestratorTokens.outputTokens;
+    const totalTokens = totalInputTokens + totalOutputTokens;
+
+    // Calculate total cost using actual provider/model pricing
+    const modelConfig = this.llmService.getModelConfig(
+      this.llmService['defaultProvider'],
+      this.llmService['getDefaultModel'](this.llmService['defaultProvider']),
+    );
+    const totalCost = this.llmService['tokenManager'].calculateCost(
+      totalInputTokens,
+      totalOutputTokens,
+      modelConfig.costPerMillionInputTokens,
+      modelConfig.costPerMillionOutputTokens,
+    );
+
     const avgTokensPerAgent =
       agentResults.size > 0 ? Math.round(totalTokenUsage.totalTokens / agentResults.size) : 0;
 
@@ -1043,8 +1069,16 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     this.logger.info(`✅ Agents completed: ${agentResults.size}`);
     this.logger.info(`⏱️  Total time: ${(totalExecutionTime / 1000 / 60).toFixed(1)}m`);
     this.logger.info(
-      `💰 Total tokens: ${totalTokenUsage.totalTokens.toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`,
+      `💰 Total tokens: ${totalTokens.toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`,
     );
+    if (state.orchestratorTokens.inputTokens > 0 || state.orchestratorTokens.outputTokens > 0) {
+      this.logger.info(
+        `   ├─ Agent tokens: ${(agentInputTokens + agentOutputTokens).toLocaleString()} (${agentInputTokens.toLocaleString()} in / ${agentOutputTokens.toLocaleString()} out)`,
+      );
+      this.logger.info(
+        `   └─ Orchestrator tokens: ${(state.orchestratorTokens.inputTokens + state.orchestratorTokens.outputTokens).toLocaleString()} (${state.orchestratorTokens.inputTokens.toLocaleString()} in / ${state.orchestratorTokens.outputTokens.toLocaleString()} out)`,
+      );
+    }
     this.logger.info(`💵 Total cost: $${totalCost.toFixed(4)}`);
     this.logger.info(`📈 Avg tokens per agent: ${avgTokensPerAgent.toLocaleString()}`);
     this.logger.info('='.repeat(80));
@@ -1060,6 +1094,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       { name: 'flow-visualization', emoji: '🔄', label: 'Data Flow' },
       { name: 'schema-generator', emoji: '🗄️', label: 'Schema' },
       { name: 'security-analyzer', emoji: '🔒', label: 'Security Analysis' },
+      { name: 'kpi-analyzer', emoji: '📊', label: 'KPI Analysis' },
     ];
 
     for (const { name, emoji, label } of agentHighlights) {
@@ -1177,6 +1212,14 @@ ${allImprovements.slice(0, 30).join('\n')}
 
       const recommendationsMarkdown = response.content as string;
 
+      // Track orchestrator token usage
+      const responseUsage =
+        (response as any).usage_metadata || (response as any).response_metadata?.usage || {};
+      const orchestratorTokens = {
+        inputTokens: responseUsage.input_tokens || responseUsage.prompt_tokens || 0,
+        outputTokens: responseUsage.output_tokens || responseUsage.completion_tokens || 0,
+      };
+
       // Add to output as a custom section
       if (output?.customSections) {
         output.customSections.set('recommendations', {
@@ -1201,13 +1244,18 @@ ${allImprovements.slice(0, 30).join('\n')}
       }
 
       this.logger.info('✅ Recommendations synthesized successfully');
+
+      return {
+        ...state,
+        orchestratorTokens,
+      };
     } catch (error) {
       this.logger.warn('⚠️  Failed to synthesize recommendations', {
         error: error instanceof Error ? error.message : String(error),
       });
-    }
 
-    return state;
+      return state;
+    }
   }
 
   /**

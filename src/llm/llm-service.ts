@@ -312,7 +312,7 @@ Standalone Question:`;
       case LLMProvider.ANTHROPIC:
         return process.env.ARCHDOC_LLM_MODEL || 'claude-sonnet-4-5-20250929';
       case LLMProvider.OPENAI:
-        return process.env.ARCHDOC_LLM_MODEL || 'gpt-5';
+        return process.env.ARCHDOC_LLM_MODEL || 'o1-mini';
       case LLMProvider.GOOGLE:
         return process.env.ARCHDOC_LLM_MODEL || 'gemini-2.5-pro';
       case LLMProvider.XAI:
@@ -323,12 +323,29 @@ Standalone Question:`;
   }
 
   private extractTokenUsage(result: any, provider: LLMProvider, model?: string): TokenUsageDetails {
-    // Extract usage from response metadata
-    const usage = result.usage_metadata || result.response_metadata?.usage || {};
+    // Extract usage from response metadata - try multiple locations
+    // OpenAI: response_metadata.usage or response_metadata.token_usage
+    // Anthropic: usage_metadata
+    const usage =
+      result.usage_metadata ||
+      result.response_metadata?.usage ||
+      result.response_metadata?.token_usage ||
+      {};
 
+    // Handle both OpenAI (prompt_tokens/completion_tokens) and Anthropic (input_tokens/output_tokens) formats
     const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
     const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
     const totalTokens = usage.total_tokens || inputTokens + outputTokens;
+
+    // Log token extraction for debugging
+    if (inputTokens === 0 && outputTokens === 0) {
+      this.logger.debug('No tokens found in response metadata', {
+        hasUsageMetadata: !!result.usage_metadata,
+        hasResponseMetadata: !!result.response_metadata,
+        responseMetadataKeys: result.response_metadata ? Object.keys(result.response_metadata) : [],
+        usageKeys: usage ? Object.keys(usage) : [],
+      });
+    }
 
     const modelName = model || this.getDefaultModel(provider);
     const config = this.getModelConfig(provider, modelName);
@@ -344,7 +361,7 @@ Standalone Question:`;
       inputTokens,
       outputTokens,
       totalTokens,
-      cachedTokens: usage.cache_read_input_tokens || 0,
+      cachedTokens: usage.cache_read_input_tokens || usage.cache_creation_input_tokens || 0,
       estimatedCost,
     };
   }

@@ -360,8 +360,10 @@ export abstract class BaseAgentWorkflow {
         const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
 
         // Count tokens from LLM result
-        const inputTokens = result?.response_metadata?.usage?.input_tokens || 0;
-        const outputTokens = result?.response_metadata?.usage?.output_tokens || 0;
+        // OpenAI uses prompt_tokens/completion_tokens, Anthropic uses input_tokens/output_tokens
+        const usage = result?.response_metadata?.usage || result?.usage_metadata || {};
+        const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
+        const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
         const totalTokens = inputTokens + outputTokens;
 
         // Log token usage
@@ -370,6 +372,12 @@ export abstract class BaseAgentWorkflow {
             `Token usage: ${inputTokens} input + ${outputTokens} output = ${totalTokens} total`,
             '💰',
           );
+        } else {
+          this.logger.debug('No token usage found in response', {
+            hasResponseMetadata: !!result?.response_metadata,
+            hasUsageMetadata: !!result?.usage_metadata,
+            usageKeys: usage ? Object.keys(usage) : [],
+          });
         }
 
         // Try to parse analysis - will throw if invalid JSON
@@ -524,10 +532,17 @@ export abstract class BaseAgentWorkflow {
 
     const totalTokens = actualInputTokens + actualOutputTokens;
 
-    // Calculate cost (Anthropic Claude Sonnet 4: $3/1M input, $15/1M output)
-    const inputCost = (actualInputTokens / 1_000_000) * 3;
-    const outputCost = (actualOutputTokens / 1_000_000) * 15;
-    const totalCost = inputCost + outputCost;
+    // Calculate cost using actual provider/model pricing
+    const modelConfig = this.llmService.getModelConfig(
+      this.llmService['defaultProvider'],
+      this.llmService['getDefaultModel'](this.llmService['defaultProvider']),
+    );
+    const totalCost = this.llmService['tokenManager'].calculateCost(
+      actualInputTokens,
+      actualOutputTokens,
+      modelConfig.costPerMillionInputTokens,
+      modelConfig.costPerMillionOutputTokens,
+    );
 
     this.logger.info(
       `Tokens: ${actualInputTokens.toLocaleString()} input / ${actualOutputTokens.toLocaleString()} output = ${totalTokens.toLocaleString()} total | Cost: $${totalCost.toFixed(4)} | Remaining budget: ${(context.tokenBudget - totalTokens).toLocaleString()}`,

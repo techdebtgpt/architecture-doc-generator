@@ -25,6 +25,11 @@ if (fs.existsSync(configPath)) {
       if (config.apiKeys.google) process.env.GOOGLE_API_KEY = config.apiKeys.google;
       if (config.apiKeys.xai) process.env.XAI_API_KEY = config.apiKeys.xai;
     }
+    // Set LLM provider and model from config
+    if (config.llm) {
+      if (config.llm.provider) process.env.ARCHDOC_LLM_PROVIDER = config.llm.provider;
+      if (config.llm.model) process.env.ARCHDOC_LLM_MODEL = config.llm.model;
+    }
     if (config.tracing) {
       if (config.tracing.enabled) {
         process.env.LANGCHAIN_TRACING_V2 = 'true';

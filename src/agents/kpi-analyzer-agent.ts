@@ -121,6 +121,7 @@ Your task is to analyze the provided codebase metrics and generate a comprehensi
 - **Be honest**: Don't sugarcoat issues - be direct about problems
 - **Use emojis effectively**: Visual indicators help executive readability
 - **Prioritize impact**: Focus on metrics that matter most for project health
+- **Provide complete markdown**: Generate a full, well-formatted markdown document with all sections
 
 ## Rating Guidelines
 
@@ -138,7 +139,7 @@ Your task is to analyze the provided codebase metrics and generate a comprehensi
 - Anti-Patterns: None (0), Few (1-2), Many (3-5), Critical (6+)
 - Complexity: Low (≤5), Medium (6-10), High (11-15), Very High (>15)
 
-Provide a JSON response with calculated scores and 5-8 actionable insights.`;
+Generate a complete markdown document (NOT JSON) with the KPI dashboard. Include all sections with proper formatting, headings, tables, and bullet points.`;
   }
 
   /**
@@ -161,11 +162,18 @@ Provide a JSON response with calculated scores and 5-8 actionable insights.`;
     prompt += `- **Project Size**: ${this.formatFileSize(stats.totalSize)}\n`;
     prompt += `- **Languages**: ${stats.languages.join(', ')}\n\n`;
 
-    prompt += `\nGenerate a comprehensive KPI analysis with:\n`;
-    prompt += `1. Overall repository health score (0-100%)\n`;
-    prompt += `2. Individual ratings for: Code Organization, Architecture Quality, Code Quality, Dependency Health, Complexity\n`;
-    prompt += `3. 5-8 actionable insights with specific recommendations\n\n`;
-    prompt += `Focus on what matters most: test coverage, architectural clarity, code complexity, dependency management, and technical debt.`;
+    prompt += `### Analysis Requirements\n\n`;
+    prompt += `Generate a **complete markdown document** with the following sections:\n\n`;
+    prompt += `1. **Repository Health Score** - Overall score (0-100%) with emoji rating\n`;
+    prompt += `2. **Code Organization** - File distribution analysis, test coverage ratio\n`;
+    prompt += `3. **Architecture Quality** - Patterns, organization, design principles\n`;
+    prompt += `4. **Code Quality Metrics** - Maintainability, reliability, security\n`;
+    prompt += `5. **Dependency Health** - Package counts, vulnerabilities, risks\n`;
+    prompt += `6. **Key Insights** - 5-8 actionable recommendations with emojis\n\n`;
+    prompt += `7. **Recommendations** - Prioritized action items for improvement\n\n`;
+    prompt += `Use markdown headers (##, ###), bullet points, tables, and emojis for visual appeal.\n`;
+    prompt += `Focus on what matters most: test coverage, architectural clarity, code complexity, dependency management, and technical debt.\n\n`;
+    prompt += `Provide your response as a complete markdown document ready to save to kpi.md.`;
 
     return prompt;
   }
@@ -175,26 +183,45 @@ Provide a JSON response with calculated scores and 5-8 actionable insights.`;
    */
   protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {
     try {
-      // Try to parse as JSON
-      const jsonMatch = analysis.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      const trimmedAnalysis = analysis.trim();
+
+      // Check if we have meaningful content (at least 100 chars and some markdown structure)
+      const hasContent =
+        trimmedAnalysis.length > 100 &&
+        (trimmedAnalysis.includes('#') || trimmedAnalysis.includes('**'));
+
+      if (!hasContent) {
+        this.logger.warn('KPI analysis has insufficient content', {
+          length: trimmedAnalysis.length,
+          preview: trimmedAnalysis.substring(0, 100),
+        });
+        return {
+          healthScore: 0,
+          insights: [],
+          rawAnalysis: trimmedAnalysis,
+          hasMinimalData: true,
+        };
       }
 
-      // Fallback: Extract structured data from markdown
+      // Extract key metrics for summary
+      const healthScore = this.extractNumber(trimmedAnalysis, /health\s*score[:\s]+(\d+)/i) || 0;
+      const insights = this.extractInsights(trimmedAnalysis);
+
       return {
-        healthScore: this.extractNumber(analysis, /health\s*score[:\s]+(\d+)/i) || 0,
-        insights: this.extractInsights(analysis),
-        rawAnalysis: analysis,
+        healthScore,
+        insights,
+        rawAnalysis: trimmedAnalysis,
+        hasMinimalData: false,
       };
     } catch (error) {
-      this.logger.warn('Failed to parse KPI analysis as JSON, using raw text', {
+      this.logger.warn('Failed to parse KPI analysis', {
         error: error instanceof Error ? error.message : String(error),
       });
       return {
         healthScore: 0,
         insights: [],
-        rawAnalysis: analysis,
+        rawAnalysis: analysis.trim() || 'No analysis generated',
+        hasMinimalData: true,
       };
     }
   }
@@ -218,9 +245,22 @@ Provide a JSON response with calculated scores and 5-8 actionable insights.`;
   ): Promise<string> {
     let content = `# 📊 Repository KPI Dashboard\n\n`;
 
-    if (data.rawAnalysis) {
+    // Check if we have meaningful data
+    if (data.hasMinimalData) {
+      content += `## ⚠️ Insufficient Data\n\n`;
+      content += `Unable to generate comprehensive KPI metrics. This may occur if:\n`;
+      content += `- The project structure is minimal\n`;
+      content += `- Analysis could not extract sufficient metrics\n`;
+      content += `- LLM response was incomplete\n\n`;
+      content += `**Raw Analysis:**\n${data.rawAnalysis || 'No data available'}\n`;
+      return content;
+    }
+
+    if (data.rawAnalysis && typeof data.rawAnalysis === 'string' && data.rawAnalysis.length > 100) {
+      // If we have substantial raw analysis, use it
       content += `${data.rawAnalysis}\n\n`;
     } else {
+      // Otherwise, structure the output
       content += `## Health Score\n\n`;
       content += `**Overall Score**: ${data.healthScore || 0}%\n\n`;
 
@@ -243,7 +283,22 @@ Provide a JSON response with calculated scores and 5-8 actionable insights.`;
     data: Record<string, unknown>,
     state: typeof AgentWorkflowState.State,
   ): Promise<AgentFile[]> {
+    // Skip file generation if we have minimal/no data
+    if (data.hasMinimalData) {
+      this.logger.warn('Skipping KPI file generation due to insufficient data');
+      return [];
+    }
+
     const markdown = await this.formatMarkdown(data, state);
+
+    // Additional validation: Check if markdown has substantial content
+    // Minimum: header + at least 100 characters of meaningful content
+    if (markdown.length < 150) {
+      this.logger.warn('Skipping KPI file generation due to minimal content', {
+        contentLength: markdown.length,
+      });
+      return [];
+    }
 
     return [
       {

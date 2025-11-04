@@ -32,7 +32,9 @@
       "pattern-detector",
       "flow-visualization",
       "schema-generator",
-      "architecture-analyzer"
+      "architecture-analyzer",
+      "security-analyzer",
+      "kpi-analyzer"
     ],
     "parallel": true,
     "timeout": 300000

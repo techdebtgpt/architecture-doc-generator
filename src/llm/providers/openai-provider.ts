@@ -11,32 +11,55 @@ export class OpenAIProvider implements ILLMProvider {
   private readonly apiKey: string;
   private readonly tokenManager: TokenManager;
 
-  // Model configurations
+  // Model configurations (Updated Nov 2024 - actual OpenAI model names and pricing)
   private readonly models = {
-    'gpt-5': {
-      maxInputTokens: 256000,
-      maxOutputTokens: 8192,
-      costPerMillionInputTokens: 20.0,
+    // Reasoning models (o1 series)
+    'o1-preview': {
+      maxInputTokens: 128000,
+      maxOutputTokens: 32768,
+      costPerMillionInputTokens: 15.0,
       costPerMillionOutputTokens: 60.0,
     },
-    'gpt-4.1': {
+    'o1-mini': {
       maxInputTokens: 128000,
-      maxOutputTokens: 8192,
-      costPerMillionInputTokens: 10.0,
-      costPerMillionOutputTokens: 30.0,
+      maxOutputTokens: 65536,
+      costPerMillionInputTokens: 3.0,
+      costPerMillionOutputTokens: 12.0,
     },
+    // GPT-4o series (multimodal)
+    'gpt-4o': {
+      maxInputTokens: 128000,
+      maxOutputTokens: 16384,
+      costPerMillionInputTokens: 2.5,
+      costPerMillionOutputTokens: 10.0,
+    },
+    'gpt-4o-mini': {
+      maxInputTokens: 128000,
+      maxOutputTokens: 16384,
+      costPerMillionInputTokens: 0.15,
+      costPerMillionOutputTokens: 0.6,
+    },
+    // GPT-4 Turbo
     'gpt-4-turbo': {
       maxInputTokens: 128000,
       maxOutputTokens: 4096,
       costPerMillionInputTokens: 10.0,
       costPerMillionOutputTokens: 30.0,
     },
+    'gpt-4-turbo-preview': {
+      maxInputTokens: 128000,
+      maxOutputTokens: 4096,
+      costPerMillionInputTokens: 10.0,
+      costPerMillionOutputTokens: 30.0,
+    },
+    // Legacy GPT-4
     'gpt-4': {
       maxInputTokens: 8192,
       maxOutputTokens: 4096,
       costPerMillionInputTokens: 30.0,
       costPerMillionOutputTokens: 60.0,
     },
+    // GPT-3.5 Turbo
     'gpt-3.5-turbo': {
       maxInputTokens: 16384,
       maxOutputTokens: 4096,
@@ -60,15 +83,42 @@ export class OpenAIProvider implements ILLMProvider {
     maxTokens?: number;
     topP?: number;
   }): BaseChatModel {
-    const modelName = config.model || 'gpt-5';
+    const requestedModel = config.model || 'o1-mini';
 
-    return new ChatOpenAI({
+    // Check if model exists in our configs, warn if not
+    if (!this.models[requestedModel as keyof typeof this.models]) {
+      console.warn(
+        `⚠️  Unknown OpenAI model '${requestedModel}' - OpenAI may fallback to a different model. Available models: ${this.getAvailableModels().join(', ')}`,
+      );
+    }
+
+    const modelName = requestedModel;
+
+    // Reasoning models (o1 series) have special restrictions
+    const isReasoningModel = modelName.startsWith('o1');
+
+    const chatConfig: any = {
       openAIApiKey: this.apiKey,
       modelName,
-      temperature: config.temperature ?? 0.2,
-      maxTokens: config.maxTokens ?? 4096,
-      topP: config.topP,
-    }) as BaseChatModel;
+    };
+
+    // Reasoning models (o1 series) only support temperature=1 and don't support other sampling params
+    if (isReasoningModel) {
+      // Only set temperature to 1 (required default for reasoning models)
+      chatConfig.temperature = 1;
+      // Use max_completion_tokens for reasoning models
+      chatConfig.maxCompletionTokens = config.maxTokens ?? 4096;
+      // Don't set topP for reasoning models (not supported)
+    } else {
+      // Standard models support all parameters
+      chatConfig.temperature = config.temperature ?? 0.2;
+      chatConfig.maxTokens = config.maxTokens ?? 4096;
+      if (config.topP !== undefined) {
+        chatConfig.topP = config.topP;
+      }
+    }
+
+    return new ChatOpenAI(chatConfig) as BaseChatModel;
   }
 
   public getAvailableModels(): string[] {
@@ -84,6 +134,6 @@ export class OpenAIProvider implements ILLMProvider {
   }
 
   public async countTokens(text: string, model?: string): Promise<number> {
-    return Promise.resolve(this.tokenManager.countTokens(text, model || 'gpt-5'));
+    return Promise.resolve(this.tokenManager.countTokens(text, model || 'o1-mini'));
   }
 }
