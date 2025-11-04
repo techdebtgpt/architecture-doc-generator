@@ -11,6 +11,7 @@ import { PatternDetectorAgent } from '../../src/agents/pattern-detector-agent';
 import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agent';
 import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
+import { KPIAnalyzerAgent } from '../../src/agents/kpi-analyzer-agent';
 
 /**
  * Check if API keys are configured
@@ -98,6 +99,7 @@ export function registerAgents(spinner: Ora): AgentRegistry {
   agentRegistry.register(new FlowVisualizationAgent());
   agentRegistry.register(new SchemaGeneratorAgent());
   agentRegistry.register(new SecurityAnalyzerAgent());
+  agentRegistry.register(new KPIAnalyzerAgent()); // NEW: Repository KPI analysis with LLM
 
   const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
   spinner.succeed(`Registered ${availableAgents.length} agents: ${availableAgents.join(', ')}`);

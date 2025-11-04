@@ -4,8 +4,8 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
-[![Security Policy](https://img.shields.io/badge/Security-Policy-red.svg)](SECURITY.md)
+[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](.github/CODE_OF_CONDUCT.md)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-red.svg)](.github/SECURITY.md)
 [![Website](https://img.shields.io/badge/Website-techdebtgpt.com-blue)](https://techdebtgpt.com)
 [![GitHub stars](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator)](https://github.com/techdebtgpt/architecture-doc-generator)
 
@@ -29,14 +29,16 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 ## ✨ Features
 
-- 🤖 **7 Specialized Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, and Security.
+- 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
+- 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
+- ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
 - 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, GPT-5, Gemini 2.5, or Grok 3.
-- 📊 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, and security.
-- 📝 **Markdown Output**: Clean, version-controllable documentation.
-- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks.
+- � **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
+- 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation.
+- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection.
 - 🎨 **Customizable**: Prompt-based agent selection and configuration.
-- 📈 **LangSmith Tracing**: Full observability of AI workflows.
+- � **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
 - 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
 - ➕ **Extensible**: Add support for any language via configuration—no code changes required.
 
@@ -317,17 +319,25 @@ The tool generates a multi-file documentation structure:
 
 ```
 .arch-docs/
-├── index.md              # Table of contents
-├── metadata.md           # Generation metadata
+├── index.md              # Table of contents with smart navigation
+├── architecture.md       # High-level system design
 ├── file-structure.md     # Project organization
 ├── dependencies.md       # External & internal deps
-├── patterns.md           # Design patterns
+├── patterns.md           # Design patterns detected
+├── code-quality.md       # Quality metrics (if data exists)
 ├── flows.md              # Data & control flows
 ├── schemas.md            # Data models
-├── architecture.md       # High-level design
-├── security.md           # Security analysis
-└── recommendations.md    # Improvement suggestions
+├── security.md           # Security vulnerability analysis
+├── recommendations.md    # Improvement suggestions
+├── kpi.md                # Repository health KPI dashboard (NEW!)
+├── metadata.md           # Generation metadata + performance metrics
+└── changelog.md          # Documentation update history
 ```
+
+**What's New:**
+
+- **`kpi.md`**: LLM-generated repository health dashboard with actionable insights on code quality, testing coverage, architecture health, dependency management, and technical debt.
+- **Generation Performance Metrics**: Added to `metadata.md` showing agent confidence scores, execution times, token efficiency, and cost breakdown.
 
 ### C4 Architecture Model
 
@@ -349,17 +359,26 @@ When using `--c4`, generates structured architecture diagrams:
 
 ## 🤖 Available Agents
 
-Each agent specializes in a specific analysis task:
+Each agent specializes in a specific analysis task using LLM-powered intelligence:
 
-| Agent                     | Purpose                            | Priority |
-| ------------------------- | ---------------------------------- | -------- |
-| **File Structure**        | Project organization, entry points | HIGH     |
-| **Dependency Analyzer**   | External deps, internal imports    | HIGH     |
-| **Architecture Analyzer** | High-level design                  | HIGH     |
-| **Pattern Detector**      | Design patterns, conventions       | MEDIUM   |
-| **Flow Visualization**    | Control & data flows               | MEDIUM   |
-| **Schema Generator**      | Data models, interfaces            | MEDIUM   |
-| **Security Analyzer**     | Vulnerabilities, auth, crypto      | MEDIUM   |
+| Agent                     | Purpose                                    | Priority    | Output File         |
+| ------------------------- | ------------------------------------------ | ----------- | ------------------- |
+| **File Structure**        | Project organization, entry points         | HIGH        | `file-structure.md` |
+| **Dependency Analyzer**   | External deps, internal imports            | HIGH        | `dependencies.md`   |
+| **Architecture Analyzer** | High-level design, components              | HIGH        | `architecture.md`   |
+| **Pattern Detector**      | Design patterns, anti-patterns             | MEDIUM      | `patterns.md`       |
+| **Flow Visualization**    | Control & data flows with diagrams         | MEDIUM      | `flows.md`          |
+| **Schema Generator**      | Data models, interfaces, type definitions  | MEDIUM      | `schemas.md`        |
+| **Security Analyzer**     | Vulnerabilities, auth, secrets, crypto     | MEDIUM      | `security.md`       |
+| **KPI Analyzer** ⭐ NEW   | Repository health, executive KPI dashboard | MEDIUM-HIGH | `kpi.md`            |
+
+**KPI Analyzer Features:**
+
+- 📊 Overall repository health score (0-100%)
+- 🎯 Component scores: Code quality, testing, architecture, dependencies, complexity
+- 📈 Detailed metrics with ASCII visualizations
+- 💡 8+ actionable insights with prioritized action items
+- 🚀 Executive-friendly language with quantifiable targets
 
 ## 🏗️ Architecture Highlights
 
@@ -481,8 +500,8 @@ We welcome contributions! See the **[Contributing Guide](./docs/CONTRIBUTING.md)
 
 ### Community Guidelines
 
-- **[Code of Conduct](./CODE_OF_CONDUCT.md)** - Our pledge to foster an open and welcoming environment
-- **[Security Policy](./SECURITY.md)** - How to report security vulnerabilities responsibly
+- **[Code of Conduct](./.github/CODE_OF_CONDUCT.md)** - Our pledge to foster an open and welcoming environment
+- **[Security Policy](./.github/SECURITY.md)** - How to report security vulnerabilities responsibly
 - **[Issue Templates](./.github/ISSUE_TEMPLATE/)** - Bug reports, feature requests, and more
 - **[Pull Request Template](./.github/PULL_REQUEST_TEMPLATE.md)** - Guidelines for submitting changes
 
