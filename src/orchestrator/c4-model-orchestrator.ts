@@ -11,6 +11,13 @@ export interface OrchestratorOptions {
   maxCostDollars?: number;
   parallel?: boolean;
   userPrompt?: string;
+  /**
+   * Analysis depth level:
+   * - 'quick' (1): 1 question, 1 iteration per level (fastest, ~3 min)
+   * - 'normal' (2): 2-3 questions, 1-2 iterations per level (balanced, ~5-8 min)
+   * - 'deep' (3): 3-4 questions, 2-3 iterations per level (comprehensive, ~10-15 min)
+   */
+  depth?: 'quick' | 'normal' | 'deep' | 1 | 2 | 3;
   [key: string]: any;
 }
 
@@ -117,6 +124,39 @@ export class C4ModelOrchestrator {
     private readonly scanner: FileSystemScanner,
   ) {
     this.workflow = this.buildWorkflow();
+  }
+
+  /**
+   * Get analysis depth configuration based on depth option
+   */
+  private getDepthConfig(depth?: 'quick' | 'normal' | 'deep' | 1 | 2 | 3): {
+    questionsPerLevel: { context: number; containers: number; components: number };
+    iterations: { context: number; containers: number; components: number };
+    description: string;
+  } {
+    const normalizedDepth =
+      depth === 'quick' || depth === 1 ? 1 : depth === 'deep' || depth === 3 ? 3 : 2; // 'normal' or 2 or undefined
+
+    switch (normalizedDepth) {
+      case 1: // Quick
+        return {
+          questionsPerLevel: { context: 1, containers: 1, components: 1 },
+          iterations: { context: 1, containers: 1, components: 1 },
+          description: 'Quick analysis (1 question per level, 1 iteration)',
+        };
+      case 3: // Deep
+        return {
+          questionsPerLevel: { context: 4, containers: 4, components: 4 },
+          iterations: { context: 3, containers: 3, components: 3 },
+          description: 'Deep analysis (4 questions per level, up to 3 iterations)',
+        };
+      default: // Normal (2)
+        return {
+          questionsPerLevel: { context: 2, containers: 3, components: 3 },
+          iterations: { context: 2, containers: 2, components: 2 },
+          description: 'Normal analysis (2-3 questions per level, up to 2 iterations)',
+        };
+    }
   }
 
   /**
@@ -270,52 +310,68 @@ export class C4ModelOrchestrator {
    * Helper: Query specific agents on-demand with targeted questions
    * This allows the orchestrator to call agents multiple times with different contexts
    */
-  private async queryAgents(
+  /**
+   * Query agents with specific questions for targeted analysis
+   */
+  private async queryAgentsWithQuestions(
     state: C4State,
     agentNames: string[],
+    questions: string[],
     purpose: string,
   ): Promise<Map<string, AgentResult>> {
-    this.logger.info(`Querying agents for ${purpose}: ${agentNames.join(', ')}`);
+    this.logger.info(`Querying agents for ${purpose} with ${questions.length} questions`);
 
     const results = new Map<string, AgentResult>();
     const { scanResult, projectPath, agentResults } = state;
 
-    for (const agentName of agentNames) {
-      // Skip if already queried (unless we want to re-query)
-      if (agentResults.has(agentName)) {
-        this.logger.debug(`Using cached result for ${agentName}`);
-        results.set(agentName, agentResults.get(agentName)!);
-        continue;
+    for (const [index, question] of questions.entries()) {
+      this.logger.info(`   ❓ Q${index + 1}: ${question.substring(0, 100)}...`);
+
+      for (const agentName of agentNames) {
+        const agent = this.agentRegistry.getAgent(agentName);
+        if (!agent) {
+          this.logger.warn(`Agent ${agentName} not found, skipping`);
+          continue;
+        }
+
+        this.logger.info(`      🤖 Asking ${agentName}...`);
+
+        const context: AgentContext = {
+          executionId: `c4-${purpose}-${agentName}-q${index}-${Date.now()}`,
+          projectPath,
+          files: scanResult.files.map((f: any) => f.path),
+          fileContents: new Map(),
+          projectMetadata: {
+            c4Purpose: purpose,
+            question,
+            questionIndex: index,
+          },
+          previousResults: agentResults,
+          config: {
+            skipSelfRefinement: true, // Fast analysis for C4
+            maxIterations: 1,
+          },
+          languageHints: scanResult.languages.map((lang: any) => ({
+            language: lang.language,
+            confidence: lang.percentage / 100,
+            indicators: [lang.language],
+            coverage: lang.percentage,
+          })),
+          tokenBudget: 30000,
+          scanResult,
+          query: question, // Pass question as query for agents to focus on
+        };
+
+        const result = await agent.execute(context, {
+          skipSelfRefinement: true, // CRITICAL: Skip agent evaluation loop for speed
+        });
+
+        const resultKey = `${agentName}-q${index}`;
+        results.set(resultKey, result);
+
+        const summary = result.summary?.substring(0, 100) || 'No summary';
+        this.logger.info(`         ✅ ${summary}...`);
       }
-
-      const agent = this.agentRegistry.getAgent(agentName);
-      if (!agent) {
-        this.logger.warn(`Agent ${agentName} not found, skipping`);
-        continue;
-      }
-
-      this.logger.info(`Executing ${agentName} for ${purpose}...`);
-
-      const context: AgentContext = {
-        executionId: `c4-${purpose}-${agentName}-${Date.now()}`,
-        projectPath,
-        files: scanResult.files.map((f: any) => f.path),
-        fileContents: new Map(),
-        projectMetadata: { c4Purpose: purpose },
-        previousResults: agentResults,
-        config: {},
-        languageHints: scanResult.languages.map((lang: any) => ({
-          language: lang.language,
-          confidence: lang.percentage / 100,
-          indicators: [lang.language],
-          coverage: lang.percentage,
-        })),
-        tokenBudget: 100000,
-        scanResult,
-      };
-
-      const result = await agent.execute(context);
-      results.set(agentName, result);
     }
 
     return results;
@@ -330,33 +386,55 @@ export class C4ModelOrchestrator {
      * - Actors (users, personas, external entities that interact with the system)
      * - External Systems (databases, APIs, third-party services the system depends on)
      * - Relationships (how actors and external systems interact with the main system)
-     *
-     * Agents needed:
-     * - architecture-analyzer: Understand overall system purpose and boundaries
-     * - file-structure: Identify project structure and boundaries
      */
-    const contextAgents = await this.queryAgents(
+
+    // Get depth configuration
+    const depthConfig = this.getDepthConfig(state.options.depth);
+    this.logger.info(`📐 Analysis depth: ${depthConfig.description}`);
+
+    // Define questions based on depth
+    const allQuestions = [
+      // Question 1: Always included - System name and purpose
+      `Read package.json (if exists) for project name, description, version. Read README.md (if exists) for stated purpose. Analyze main entry point files (main.ts, index.ts, app.ts, server.ts) for initialization code. Provide the ACTUAL system name and what it does based on code, not generic assumptions.`,
+
+      // Question 2: Standard+ - User actors
+      `Examine authentication/authorization files for user roles and permissions. Analyze API route definitions for different user types. Look for user-related types/interfaces/models. Check middleware, guards, decorators for role-based access. Provide ACTUAL role names from code (e.g., "Admin", "DataScientist"), not generic "User".`,
+
+      // Question 3: Standard+ - External dependencies
+      `Scan import statements for database clients (prisma, mongoose, pg, mysql, redis). Find API client libraries (axios, fetch, SDK imports). Check config files (.env.example, config.ts) for external service URLs and API keys. Look for third-party service integrations (Stripe, SendGrid, Auth0, AWS SDK). List ALL external systems THIS codebase depends on.`,
+
+      // Question 4: Detailed only - Integration patterns
+      `Analyze HOW the system integrates with external services. Check for API wrappers, client classes, service layers. Identify authentication methods (API keys, OAuth). Look for retry logic, error handling for external calls. Document integration patterns used.`,
+    ];
+
+    const questions = allQuestions.slice(0, depthConfig.questionsPerLevel.context);
+
+    // Query agents with targeted questions
+    const contextAgents = await this.queryAgentsWithQuestions(
       state,
       ['architecture-analyzer', 'file-structure'],
+      questions,
       'C4 Context',
     );
 
     // Update state with agent results
     const updatedAgentResults = new Map(state.agentResults);
-    contextAgents.forEach((result, name) => updatedAgentResults.set(name, result));
+    contextAgents.forEach((result: AgentResult, name: string) =>
+      updatedAgentResults.set(name, result),
+    );
 
     const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
 
-    // Get FULL analysis (not truncated summaries) and actual file samples
-    const architectureResult = contextAgents.get('architecture-analyzer');
-    const structureResult = contextAgents.get('file-structure');
+    // Compile insights from all agent responses
+    const allInsights: string[] = [];
+    for (const [key, result] of contextAgents.entries()) {
+      const insight = this.extractAnalysisInsights(result.markdown || '', 3000);
+      if (insight) {
+        allInsights.push(`[${key}] ${insight}`);
+      }
+    }
 
-    // Extract actual insights from markdown content
-    const architectureAnalysis = this.extractAnalysisInsights(
-      architectureResult?.markdown || '',
-      5000,
-    );
-    const structureAnalysis = this.extractAnalysisInsights(structureResult?.markdown || '', 3000);
+    const compiledInsights = allInsights.join('\n\n---\n\n');
 
     // Get sample file contents for context
     const sampleFiles = this.getSampleFileContents(state, 10);
@@ -372,11 +450,8 @@ You are generating a C4 Model **Context Diagram (Level 1)** for a software syste
 
 **IMPORTANT**: Base your analysis on the ACTUAL codebase insights below. Do NOT invent generic examples.
 
-**Architecture Analysis:**
-${architectureAnalysis}
-
-**Project Structure:**
-${structureAnalysis}
+**Analysis from Agents (${questions.length} questions analyzed):**
+${compiledInsights.substring(0, 10000)}
 
 **Sample Files:**
 ${sampleFiles}
@@ -443,32 +518,54 @@ Return ONLY valid JSON, no markdown formatting.
      * - Containers (deployable/executable units: web app, API, database, microservice, mobile app)
      * - Technology choices for each container (Node.js, React, PostgreSQL, etc.)
      * - Relationships between containers (HTTP, gRPC, JDBC, message queue, etc.)
-     *
-     * Agents needed:
-     * - architecture-analyzer: System structure and technical choices (if not already queried)
-     * - dependency-analyzer: External dependencies and technology stack
      */
-    const containerAgents = await this.queryAgents(
+
+    // Get depth configuration
+    const depthConfig = this.getDepthConfig(state.options.depth);
+
+    // Define questions based on depth
+    const allQuestions = [
+      // Question 1: Always - Deployment units
+      `Read Dockerfile(s) - extract FROM images, EXPOSE ports, CMD/ENTRYPOINT. Read docker-compose.yml - list all services with their images/builds. Check Kubernetes manifests (k8s/, .k8s/, helm/) if present. If NO deployment files: analyze package.json scripts, README for deployment info. List ACTUAL deployment units.`,
+
+      // Question 2: Standard+ - Tech stack
+      `Read package.json dependencies - identify frameworks (NestJS, Express, React, Next.js, Angular). Analyze imports in main files - detect ORMs (Prisma, TypeORM), libraries. Check requirements.txt, Gemfile, pom.xml for non-JS projects. List runtime (Node.js version from .nvmrc, Dockerfile) and ALL key technologies used.`,
+
+      // Question 3: Standard+ - Infrastructure
+      `Find Prisma schema, TypeORM entities, Sequelize models for database. Detect Redis clients, connection configs for caching. Find BullMQ, RabbitMQ, Kafka imports for message queues. Look for S3 clients, file upload configs for storage. List ALL infrastructure components THIS system uses.`,
+
+      // Question 4: Detailed only - Communication patterns
+      `Analyze @Controller decorators, Express routes for HTTP/REST APIs. Find .proto files, gRPC client/server code. Detect Socket.IO, WS library for WebSocket. Check message queue publishers/subscribers. Extract actual port numbers, API paths, protocol details from code.`,
+    ];
+
+    const questions = allQuestions.slice(0, depthConfig.questionsPerLevel.containers);
+
+    // Query agents with targeted questions
+    const containerAgents = await this.queryAgentsWithQuestions(
       state,
       ['architecture-analyzer', 'dependency-analyzer'],
+      questions,
       'C4 Containers',
     );
 
     // Update state with agent results
     const updatedAgentResults = new Map(state.agentResults);
-    containerAgents.forEach((result, name) => updatedAgentResults.set(name, result));
+    containerAgents.forEach((result: AgentResult, name: string) =>
+      updatedAgentResults.set(name, result),
+    );
 
     const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
 
-    // Get FULL analysis (not truncated summaries)
-    const architectureResult = containerAgents.get('architecture-analyzer');
-    const dependencyResult = containerAgents.get('dependency-analyzer');
+    // Compile insights from all agent responses
+    const allInsights: string[] = [];
+    for (const [key, result] of containerAgents.entries()) {
+      const insight = this.extractAnalysisInsights(result.markdown || '', 3000);
+      if (insight) {
+        allInsights.push(`[${key}] ${insight}`);
+      }
+    }
 
-    const architectureAnalysis = this.extractAnalysisInsights(
-      architectureResult?.markdown || '',
-      5000,
-    );
-    const dependencyAnalysis = this.extractAnalysisInsights(dependencyResult?.markdown || '', 4000);
+    const compiledInsights = allInsights.join('\n\n---\n\n');
 
     // Get sample files for technology stack identification
     const sampleFiles = this.getSampleFileContents(state, 8);
@@ -501,11 +598,8 @@ Also define relationships between containers (HTTP REST, gRPC, JDBC, message que
 **C4 Context (from Level 1):**
 ${c4Context ? JSON.stringify(c4Context, null, 2).substring(0, 1000) : 'Not available'}
 
-**Architecture Analysis:**
-${architectureAnalysis}
-
-**Dependency & Technology Stack:**
-${dependencyAnalysis}
+**Analysis from Agents (${questions.length} questions analyzed):**
+${compiledInsights.substring(0, 10000)}
 
 **Sample Files:**
 ${sampleFiles}
@@ -562,9 +656,32 @@ ${sampleFiles}
      * - architecture-analyzer: Component structure (if not already queried)
      * - pattern-detector: Design patterns and module organization
      */
-    const componentAgents = await this.queryAgents(
+
+    // Get depth configuration for targeted questions
+    const depthConfig = this.getDepthConfig(state.options.depth);
+
+    // Define questions based on depth (1-4 questions)
+    const allQuestions = [
+      // Question 1: Always included - Basic component structure
+      `List top-level modules/folders (e.g., src/services/, src/controllers/, src/models/). Identify REAL class names from files. Look for main entry point (index.ts, main.ts) for exports. Check package.json "main"/"exports" fields. Provide ACTUAL module/class/service names, NOT generic placeholders.`,
+
+      // Question 2: Standard+ - Design patterns
+      `Detect design patterns with SPECIFIC examples: Find Factory classes (*Factory.ts), Strategy interfaces (*Strategy.ts), Observer/EventEmitter patterns. Identify service layer (business logic), controller layer (HTTP/API), repository layer (data access). List actual pattern implementations found.`,
+
+      // Question 3: Standard+ - Dependencies
+      `Analyze import statements between components. Check internal imports (e.g., "import { X } from './services'"). Map component dependencies. Identify shared utilities, helpers. Document which components depend on which. Extract actual method signatures and interfaces.`,
+
+      // Question 4: Detailed only - Responsibilities
+      `Read component implementations to determine responsibilities. Analyze class/function comments, JSDoc. Check test files (*spec.ts, *test.ts) for component behavior. Document what each component ACTUALLY does based on its implementation, not assumptions.`,
+    ];
+
+    const questions = allQuestions.slice(0, depthConfig.questionsPerLevel.components);
+
+    // Query agents with targeted questions
+    const componentAgents = await this.queryAgentsWithQuestions(
       state,
       ['architecture-analyzer', 'pattern-detector'],
+      questions,
       'C4 Components',
     );
 
@@ -574,15 +691,16 @@ ${sampleFiles}
 
     const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
 
-    // Get FULL analysis (not truncated summaries)
-    const architectureResult = componentAgents.get('architecture-analyzer');
-    const patternResult = componentAgents.get('pattern-detector');
+    // Compile insights from all agent responses across questions
+    const allInsights: string[] = [];
+    for (const [key, result] of componentAgents.entries()) {
+      const insight = this.extractAnalysisInsights(result.markdown || '', 3000);
+      if (insight) {
+        allInsights.push(`[${key}] ${insight}`);
+      }
+    }
 
-    const architectureAnalysis = this.extractAnalysisInsights(
-      architectureResult?.markdown || '',
-      5000,
-    );
-    const patternAnalysis = this.extractAnalysisInsights(patternResult?.markdown || '', 4000);
+    const compiledInsights = allInsights.join('\n\n---\n\n');
 
     // Get sample files to identify actual components
     const sampleFiles = this.getSampleFileContents(state, 15);
@@ -600,11 +718,8 @@ You are generating a C4 Model **Components Diagram (Level 3)** for a software sy
 - Design patterns in code (Factory, Strategy, Observer, etc.)
 - File/folder organization (src/services/, src/controllers/, src/models/)
 
-**Architecture Analysis:**
-${architectureAnalysis}
-
-**Design Patterns & Modules:**
-${patternAnalysis}
+**Analysis from Agents (${questions.length} questions analyzed):**
+${compiledInsights.substring(0, 10000)}
 
 **Sample Files (Component Structure):**
 ${sampleFiles}
