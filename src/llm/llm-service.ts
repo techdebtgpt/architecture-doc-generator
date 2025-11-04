@@ -88,9 +88,12 @@ export class LLMService {
     }
 
     try {
+      // If no model specified, use the default for this provider
+      const modelToUse = options.model || this.getDefaultModel(provider);
+
       const model = llmProvider.getChatModel(
         {
-          model: options.model,
+          model: modelToUse,
           temperature: options.temperature,
           maxTokens: options.maxTokens,
           topP: options.topP,
@@ -312,7 +315,7 @@ Standalone Question:`;
       case LLMProvider.ANTHROPIC:
         return process.env.ARCHDOC_LLM_MODEL || 'claude-sonnet-4-5-20250929';
       case LLMProvider.OPENAI:
-        return process.env.ARCHDOC_LLM_MODEL || 'o1-mini';
+        return process.env.ARCHDOC_LLM_MODEL || 'gpt-4o-mini';
       case LLMProvider.GOOGLE:
         return process.env.ARCHDOC_LLM_MODEL || 'gemini-2.5-pro';
       case LLMProvider.XAI:

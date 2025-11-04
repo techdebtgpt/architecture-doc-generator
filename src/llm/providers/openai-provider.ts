@@ -83,7 +83,7 @@ export class OpenAIProvider implements ILLMProvider {
     maxTokens?: number;
     topP?: number;
   }): BaseChatModel {
-    const requestedModel = config.model || 'o1-mini';
+    const requestedModel = config.model || 'gpt-4o-mini';
 
     // Check if model exists in our configs, warn if not
     if (!this.models[requestedModel as keyof typeof this.models]) {
@@ -98,8 +98,8 @@ export class OpenAIProvider implements ILLMProvider {
     const isReasoningModel = modelName.startsWith('o1');
 
     const chatConfig: any = {
-      openAIApiKey: this.apiKey,
-      modelName,
+      apiKey: this.apiKey,
+      model: modelName,
     };
 
     // Reasoning models (o1 series) only support temperature=1 and don't support other sampling params

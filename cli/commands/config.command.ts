@@ -174,14 +174,14 @@ async function initializeConfig(): Promise<void> {
       url: 'https://console.anthropic.com/',
     },
     openai: {
-      defaultModel: 'o1-mini',
+      defaultModel: 'gpt-4o-mini',
       models: [
-        { name: 'o1-mini (recommended) - Cost-effective reasoning', value: 'o1-mini' },
-        { name: 'o1-preview - Advanced reasoning', value: 'o1-preview' },
+        { name: 'gpt-4o-mini (recommended) - Fast and cheap', value: 'gpt-4o-mini' },
         { name: 'gpt-4o - Multimodal flagship', value: 'gpt-4o' },
-        { name: 'gpt-4o-mini - Fast and cheap', value: 'gpt-4o-mini' },
         { name: 'gpt-4-turbo - GPT-4 Turbo', value: 'gpt-4-turbo' },
         { name: 'gpt-4 - Legacy GPT-4', value: 'gpt-4' },
+        { name: 'o1-mini - Reasoning (Tier 5 required)', value: 'o1-mini' },
+        { name: 'o1-preview - Advanced reasoning (Tier 5 required)', value: 'o1-preview' },
       ],
       keyFormat: 'sk-...',
       url: 'https://platform.openai.com/',

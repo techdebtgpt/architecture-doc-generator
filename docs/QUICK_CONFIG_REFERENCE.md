@@ -104,6 +104,6 @@ Choose the LLM provider that best fits your needs.
 | Provider      | Recommended Model            | Best For                                   |
 | ------------- | ---------------------------- | ------------------------------------------ |
 | **Anthropic** | `claude-sonnet-4-5-20250929` | Deep code analysis and reasoning.          |
-| **OpenAI**    | `o1-mini`                    | Cost-effective reasoning model.            |
+| **OpenAI**    | `gpt-4o-mini`                | Fast and affordable model.                 |
 | **Google**    | `gemini-2.5-pro`             | Strong reasoning and large context window. |
 | **xAI**       | `grok-3-beta`                | Real-time insights and unique perspective. |
