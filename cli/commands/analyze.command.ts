@@ -1,4 +1,4 @@
-import * as path from 'path';
+﻿import * as path from 'path';
 import * as fs from 'fs/promises';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -6,6 +6,7 @@ import { DocumentationOrchestrator } from '../../src/orchestrator/documentation-
 import { C4ModelOrchestrator } from '../../src/orchestrator/c4-model-orchestrator';
 import { MultiFileMarkdownFormatter } from '../../src/formatters/multi-file-markdown-formatter';
 import { MarkdownFormatter } from '../../src/formatters/markdown-formatter';
+import { C4ModelFormatter } from '../../src/formatters/c4-model-formatter';
 import {
   checkConfiguration,
   validateProjectPath,
@@ -434,52 +435,39 @@ async function generateC4Model(projectPath?: string, options: AnalyzeOptions = {
     spinner.start('Initializing C4 model orchestrator...');
     const orchestrator = new C4ModelOrchestrator(agentRegistry, scanner);
 
-    spinner.text = 'Generating C4 model...';
+    spinner.text = 'Generating C4 model...\n';
     const result = await orchestrator.generateC4Model(resolvedPath, options);
 
     spinner.succeed('C4 Model generation completed!');
 
-    // Save the generated C4 model and PlantUML files
-    if (result) {
-      spinner.start('Saving C4 model files...');
+    // Format and save output using C4ModelFormatter
+    spinner.start('Generating documentation files...');
+    const formatter = new C4ModelFormatter();
+    await formatter.format(result, { outputDir });
 
-      // Save JSON model
-      if (result.c4Model) {
-        await fs.writeFile(
-          path.join(outputDir, 'c4-model.json'),
-          JSON.stringify(result.c4Model, null, 2),
-        );
-      }
-
-      // Save PlantUML files
-      if (result.plantUMLModel) {
-        await fs.writeFile(
-          path.join(outputDir, 'context.puml'),
-          result.plantUMLModel.context || '',
-        );
-        await fs.writeFile(
-          path.join(outputDir, 'containers.puml'),
-          result.plantUMLModel.containers || '',
-        );
-        await fs.writeFile(
-          path.join(outputDir, 'components.puml'),
-          result.plantUMLModel.components || '',
-        );
-      }
-
-      spinner.succeed('C4 model files saved successfully!');
-    }
+    const fileCount = (await fs.readdir(outputDir)).length;
+    spinner.succeed(`Generated ${fileCount} documentation files`);
 
     console.log('');
     console.log(chalk.green.bold('✨ C4 Model Generation Complete!'));
     console.log('');
-    console.log(chalk.cyan('Output files:'));
-    console.log(`  📄 JSON Model: ${path.join(outputDir, 'c4-model.json')}`);
-    console.log(`  📊 Context Diagram: ${path.join(outputDir, 'context.puml')}`);
-    console.log(`  📦 Containers Diagram: ${path.join(outputDir, 'containers.puml')}`);
-    console.log(`  🧩 Components Diagram: ${path.join(outputDir, 'components.puml')}`);
+    console.log(chalk.cyan('Summary:'));
+    console.log(`  Project: ${path.basename(resolvedPath)}`);
+    console.log(`  Files analyzed: ${result.metadata.totalFiles}`);
+    console.log(`  Agents executed: ${result.metadata.agentsExecuted.length}`);
+    console.log(`  Generation time: ${(result.metadata.generationDuration / 1000).toFixed(1)}s`);
+    console.log(`  Output: ${path.join(outputDir, 'index.md')}`);
     console.log('');
-    console.log(chalk.yellow('💡 Tip: Use PlantUML to render the .puml files as diagrams'));
+    console.log(chalk.yellow('📖 Documentation files:'));
+    console.log(`  📋 Index: ${path.join(outputDir, 'index.md')}`);
+    console.log(`  📊 Context Diagram: ${path.join(outputDir, 'c4-context.md')}`);
+    console.log(`  📦 Containers Diagram: ${path.join(outputDir, 'c4-containers.md')}`);
+    console.log(`  🧩 Components Diagram: ${path.join(outputDir, 'c4-components.md')}`);
+    console.log(`  💡 Recommendations: ${path.join(outputDir, 'recommendations.md')}`);
+    console.log('');
+    console.log(
+      chalk.yellow('💡 Tip: View index.md to start exploring your C4 architecture model'),
+    );
   } catch (error) {
     spinner.fail('C4 Model generation failed');
     console.error(chalk.red('\n❌ Error:'), error instanceof Error ? error.message : String(error));
