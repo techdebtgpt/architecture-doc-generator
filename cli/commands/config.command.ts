@@ -33,7 +33,7 @@ const DEFAULT_CONFIG = {
     embeddingsProvider: 'local', // Default to FREE local embeddings
   },
   scan: {
-    maxFiles: 1000,
+    maxFiles: 10000,
     maxFileSize: 1048576,
     respectGitignore: true,
     excludePatterns: [

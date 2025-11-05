@@ -151,6 +151,8 @@ export interface OrchestratorOptions {
   agentOptions?: AgentExecutionOptions;
   onAgentProgress?: (current: number, total: number, agentName: string) => void;
   runName?: string; // Custom run name for LangSmith tracing (supports {timestamp}, {agent}, {project})
+  retrievalStrategy?: 'vector' | 'graph' | 'hybrid' | 'smart'; // File retrieval strategy for hybrid search
+  embeddingsProvider?: 'local' | 'openai' | 'google'; // Embeddings provider for vector search (default: local)
   languageConfig?: {
     custom?: Record<
       string,
@@ -277,8 +279,12 @@ export class DocumentationOrchestrator {
 
     // Validate embeddings API key if vector search mode is enabled
     if (options.agentOptions?.searchMode === 'vector') {
-      // Determine embeddings provider from environment variable (default: local - FREE!)
-      const embeddingsProvider = (process.env.EMBEDDINGS_PROVIDER || 'local').toLowerCase();
+      // Determine embeddings provider from options (default: local - FREE!)
+      const embeddingsProvider = (
+        options.embeddingsProvider ||
+        process.env.EMBEDDINGS_PROVIDER ||
+        'local'
+      ).toLowerCase();
 
       // Check for provider-specific API keys
       const hasOpenAIKey =
@@ -328,14 +334,12 @@ export class DocumentationOrchestrator {
       | undefined;
 
     if (options.agentOptions?.searchMode === 'vector') {
-      // Determine embeddings provider from environment (default: local - FREE!)
-      const embeddingsProvider = (process.env.EMBEDDINGS_PROVIDER || 'local').toLowerCase() as
-        | 'local'
-        | 'openai'
-        | 'google'
-        | 'cohere'
-        | 'voyage'
-        | 'huggingface';
+      // Determine embeddings provider from options (default: local - FREE!)
+      const embeddingsProvider = (
+        options.embeddingsProvider ||
+        process.env.EMBEDDINGS_PROVIDER ||
+        'local'
+      ).toLowerCase() as 'local' | 'openai' | 'google' | 'cohere' | 'voyage' | 'huggingface';
 
       this.logger.info(
         `🔍 Initializing shared vector store with ${embeddingsProvider} embeddings...`,

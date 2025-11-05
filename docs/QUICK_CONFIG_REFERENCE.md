@@ -43,11 +43,21 @@ The `.archdoc.config.json` file is the central place for all your settings. Here
     "provider": "anthropic",
     "model": "claude-sonnet-4-5-20250929",
     "temperature": 0.2,
-    "maxTokens": 4096
+    "maxTokens": 4096,
+    "embeddingsProvider": "local"
   },
   "scan": {
-    "maxFiles": 1000,
+    "maxFiles": 10000,
     "excludePatterns": ["**/node_modules/**", "**/dist/**"]
+  },
+  "retrieval": {
+    "strategy": "hybrid",
+    "vectorWeight": 0.6,
+    "graphWeight": 0.4,
+    "includeRelatedFiles": true,
+    "maxDepth": 2,
+    "similarityThreshold": 0.3,
+    "topK": 10
   },
   "output": {
     "directory": ".arch-docs",

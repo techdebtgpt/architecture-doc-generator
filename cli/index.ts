@@ -96,8 +96,12 @@ program
   // Search mode for file retrieval
   .option(
     '--search-mode <mode>',
-    'File search mode: keyword (fast, free, default) or vector (semantic similarity with embeddings via OpenAI, requires OPENAI_API_KEY)',
-    'keyword',
+    'File search mode: vector (semantic similarity) or keyword (traditional matching). Default from config or vector.',
+  )
+  // Retrieval strategy for hybrid search
+  .option(
+    '--retrieval-strategy <strategy>',
+    'Retrieval strategy: vector (semantic only), graph (structural only), hybrid (both), smart (auto-detect). Default from config or hybrid.',
   )
   .option('--c4', 'Generate C4 model instead of standard documentation', false)
   // Granular refinement options (advanced)

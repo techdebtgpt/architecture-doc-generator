@@ -42,7 +42,7 @@ For project-specific settings, create a `.archdoc.config.json` file in your proj
     "maxTokens": 4096
   },
   "scan": {
-    "maxFiles": 1000,
+    "maxFiles": 10000,
     "excludePatterns": ["**/node_modules/**", "**/dist/**"]
   },
   "output": {

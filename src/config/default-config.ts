@@ -11,8 +11,6 @@ export const defaultConfig: AppConfig = {
     maxTokens: 4096,
     maxInputTokens: 100000,
     tokenBuffer: 10000,
-    embeddingsApiKey: undefined, // Optional: API key for embeddings (if not using local)
-    embeddingsProvider: 'local', // Default to FREE local embeddings (no API key needed)
   },
 
   scan: {
@@ -72,6 +70,18 @@ export const defaultConfig: AppConfig = {
     parallel: true,
     timeout: 300000, // 5 minutes
     retries: 3,
+  },
+
+  searchMode: {
+    mode: 'vector', // Default: semantic search (can be 'keyword' for faster, simpler matching)
+    embeddingsProvider: 'local', // Default to FREE local TF-IDF embeddings (no API key needed)
+    strategy: 'hybrid', // Default: combine semantic + structural
+    vectorWeight: 0.6, // 60% semantic similarity
+    graphWeight: 0.4, // 40% structural relationships
+    includeRelatedFiles: true, // Include imports/dependencies
+    maxDepth: 2, // Traverse graph up to 2 hops
+    similarityThreshold: 0.3, // Minimum 30% similarity for vector results
+    topK: 10, // Return top 10 results per query
   },
 
   logging: {

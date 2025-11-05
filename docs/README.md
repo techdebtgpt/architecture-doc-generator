@@ -7,9 +7,13 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 - [**User Guide**](./USER_GUIDE.md): Detailed instructions on how to use the CLI, including all commands, options, and configuration.
 - [**Configuration Guide**](./CONFIGURATION_GUIDE.md): A complete reference for all configuration options available in `.archdoc.config.json` and environment variables.
 - [**Quick Config Reference**](./QUICK_CONFIG_REFERENCE.md): A cheat sheet for quick access to the most common configuration settings.
+- [**Search Strategy Benchmark**](./SEARCH_STRATEGY_BENCHMARK.md): Real-world performance comparison of all search strategies (vector, hybrid, graph, smart, keyword) with recommendations.
+- [**Vector Search Guide**](./VECTOR_SEARCH.md): Comprehensive guide to RAG-based vector search, embeddings, and retrieval strategies.
 - [**API Reference**](./API.md): Documentation for the programmatic API, allowing you to integrate ArchDoc Generator into your own applications.
 - [**Architecture**](./ARCHITECTURE.md): An in-depth look at the technical design, patterns, and agent-based system of the generator.
+- [**Agent Workflow**](./AGENT_WORKFLOW.md): Learn how agents use self-refinement workflows to iteratively improve analysis quality.
 - [**Integration Guide**](./INTEGRATION_GUIDE.md): Instructions for integrating the ArchDoc Generator into CI/CD pipelines and other workflows.
+- [**Custom Languages**](./CUSTOM_LANGUAGES.md): Add support for any programming language via configuration (no code changes needed).
 - [**Contributing Guide**](./CONTRIBUTING.md): Guidelines for developers who want to contribute to the project, including setup, coding standards, and pull request processes.
 - [**CI/CD**](./CI_CD.md): Information on the continuous integration and deployment setup for this project.
 

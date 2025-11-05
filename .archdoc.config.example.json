@@ -11,7 +11,7 @@
     "maxTokens": 4096
   },
   "scan": {
-    "maxFiles": 1000,
+    "maxFiles": 10000,
     "maxFileSize": 1048576,
     "respectGitignore": true,
     "excludePatterns": [
@@ -38,6 +38,17 @@
     ],
     "parallel": true,
     "timeout": 300000
+  },
+  "searchMode": {
+    "mode": "vector",
+    "embeddingsProvider": "local",
+    "strategy": "hybrid",
+    "vectorWeight": 0.6,
+    "graphWeight": 0.4,
+    "includeRelatedFiles": true,
+    "maxDepth": 2,
+    "similarityThreshold": 0.3,
+    "topK": 10
   },
   "refinement": {
     "enabled": true,

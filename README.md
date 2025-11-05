@@ -17,6 +17,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 - [Features](#-features)
 - [Quick Start](#-quick-start)
+- [Search Strategy Performance](#-search-strategy-performance)
 - [CLI Usage](#-cli-usage)
 - [Programmatic Usage](#-programmatic-usage)
 - [Configuration](#-configuration)
@@ -24,6 +25,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - [Available Agents](#-available-agents)
 - [Architecture Highlights](#️-architecture-highlights)
 - [Supported Languages](#-supported-languages)
+- [Common Questions](#-common-questions)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -31,7 +33,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 - 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
 - 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
-- 🔍 **RAG Vector Search**: Semantic similarity search with FREE local embeddings or cloud providers (OpenAI, Google) - finds relevant code by meaning, not just keywords. [See docs →](docs/VECTOR_SEARCH.md)
+- 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
 - ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
 - 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.
@@ -57,6 +59,30 @@ yarn global add @techdebtgpt/archdoc-generator
 # Using pnpm
 pnpm add -g @techdebtgpt/archdoc-generator
 ```
+
+## 📊 Search Strategy Performance
+
+We benchmarked all search strategies on a real-world 6K+ file NestJS project. **Hybrid strategy (semantic + structural)** is recommended for production use.
+
+**Quick Comparison**:
+
+| Strategy        | Speed   | Cost     | Best For                        |
+| --------------- | ------- | -------- | ------------------------------- |
+| **Hybrid** ⭐   | 417s    | $0.40    | **Production** (recommended)    |
+| **Vector-only** | 389s ⚡ | $0.39 💰 | Fast iteration                  |
+| **Smart**       | 394s    | $0.39    | Auto-adaptive, efficient        |
+| **Graph**       | 446s    | $0.40    | Deep architecture analysis      |
+| **Keyword**     | 405s    | $0.40    | No embeddings (not recommended) |
+
+**📖 Full Benchmark**: See **[Search Strategy Benchmark](./docs/SEARCH_STRATEGY_BENCHMARK.md)** for:
+
+- Detailed performance metrics
+- Content quality comparison
+- Configuration examples
+- Cost projections by project size
+- Use case recommendations
+
+---
 
 ### Interactive Setup (Recommended)
 
@@ -173,6 +199,68 @@ archdoc export .arch-docs --format confluence --output ./confluence.md
 # Export with custom template
 archdoc export .arch-docs --format html --template ./my-template.html --output ./custom-docs.html
 ```
+
+#### Vector Search & Hybrid Retrieval
+
+```bash
+# Vector search with local embeddings (FREE, default)
+archdoc analyze --search-mode vector
+
+# Keyword search (faster, simpler)
+archdoc analyze --search-mode keyword
+
+# Hybrid retrieval (semantic + structural)
+archdoc analyze --search-mode vector --retrieval-strategy hybrid
+
+# Configure in .archdoc.config.json for persistence:
+{
+  "searchMode": {
+    "mode": "vector",
+    "embeddingsProvider": "local",
+    "strategy": "hybrid",
+    "vectorWeight": 0.6,
+    "graphWeight": 0.4
+  }
+}
+
+# See docs/VECTOR_SEARCH.md for complete documentation
+```
+
+#### What Files Are Excluded?
+
+Both **File Scanner** and **Vector Search** automatically exclude common build/dependency folders (language-agnostic):
+
+**Default Exclusions** (applies to all languages):
+
+- **Dependencies**: `node_modules/`, `vendor/`, `target/`, `packages/`, `bower_components/`
+- **Build outputs**: `dist/`, `build/`, `out/`, `bin/`, `obj/`, `target/`
+- **Test files**: `.test.`, `.spec.`, `__tests__/`, `test_`, `*_test.*`
+- **Version control**: `.git/`, `.svn/`, `.hg/`
+- **Generated code**: Coverage reports, logs, OS files (`.DS_Store`, `Thumbs.db`)
+
+**Gitignore Support**:
+
+- Automatically honors `.gitignore` patterns (default: `respectGitignore: true`)
+- Works with all languages (not just JavaScript/Node.js)
+
+**Customize Exclusions** in `.archdoc.config.json`:
+
+```json
+{
+  "scan": {
+    "excludePatterns": [
+      "**/node_modules/**", // JavaScript/TypeScript
+      "**/vendor/**", // PHP, Go
+      "**/target/**", // Java, Rust
+      "**/venv/**", // Python virtual env
+      "**/my-custom-folder/**" // Your own exclusions
+    ],
+    "respectGitignore": true // Honor .gitignore (default: true)
+  }
+}
+```
+
+**Example**: On a 6,187-file NestJS project, vector search processes ~889 source files (14%) - focusing on actual code, not dependencies.
 
 #### Advanced Usage
 
@@ -362,16 +450,41 @@ When using `--c4`, generates structured architecture diagrams:
 
 Each agent specializes in a specific analysis task using LLM-powered intelligence:
 
-| Agent                     | Purpose                                    | Priority    | Output File         |
-| ------------------------- | ------------------------------------------ | ----------- | ------------------- |
-| **File Structure**        | Project organization, entry points         | HIGH        | `file-structure.md` |
-| **Dependency Analyzer**   | External deps, internal imports            | HIGH        | `dependencies.md`   |
-| **Architecture Analyzer** | High-level design, components              | HIGH        | `architecture.md`   |
-| **Pattern Detector**      | Design patterns, anti-patterns             | MEDIUM      | `patterns.md`       |
-| **Flow Visualization**    | Control & data flows with diagrams         | MEDIUM      | `flows.md`          |
-| **Schema Generator**      | Data models, interfaces, type definitions  | MEDIUM      | `schemas.md`        |
-| **Security Analyzer**     | Vulnerabilities, auth, secrets, crypto     | MEDIUM      | `security.md`       |
-| **KPI Analyzer** ⭐ NEW   | Repository health, executive KPI dashboard | MEDIUM-HIGH | `kpi.md`            |
+| Agent                     | Purpose                                    | Priority    | Output File         | Notes                           |
+| ------------------------- | ------------------------------------------ | ----------- | ------------------- | ------------------------------- |
+| **File Structure**        | Project organization, entry points         | HIGH        | `file-structure.md` | Always runs                     |
+| **Dependency Analyzer**   | External deps, internal imports            | HIGH        | `dependencies.md`   | Always runs                     |
+| **Architecture Analyzer** | High-level design, components              | HIGH        | `architecture.md`   | Always runs                     |
+| **Pattern Detector**      | Design patterns, anti-patterns             | MEDIUM      | `patterns.md`       | Always runs                     |
+| **Flow Visualization**    | Control & data flows with diagrams         | MEDIUM      | `flows.md`          | Always runs                     |
+| **Schema Generator**      | Data models, interfaces, type definitions  | MEDIUM      | `schemas.md`        | **Only if schemas detected** ⚠️ |
+| **Security Analyzer**     | Vulnerabilities, auth, secrets, crypto     | MEDIUM      | `security.md`       | Always runs                     |
+| **KPI Analyzer** ⭐ NEW   | Repository health, executive KPI dashboard | MEDIUM-HIGH | `kpi.md`            | Always runs                     |
+
+**⚠️ Schema Generator Smart Behavior:**
+
+The Schema Generator agent is **intelligent** - it only generates output when it detects actual schema files:
+
+**Detects:**
+
+- ✅ **Database**: Prisma schemas (`.prisma`), TypeORM entities (`@Entity`), Sequelize models
+- ✅ **API**: DTOs (`.dto.ts`), OpenAPI/Swagger definitions
+- ✅ **GraphQL**: Type definitions (`.graphql`, `.gql`)
+- ✅ **Types**: TypeScript interfaces, type definitions (focused schema files only)
+
+**Behavior:**
+
+- If **NO schemas found**: Generates `schemas.md` with "No schema definitions found" message
+- If **schemas found**: Generates comprehensive documentation with Mermaid ER/class diagrams
+- Uses `__FORCE_STOP__` to avoid unnecessary LLM calls when no schemas exist
+
+**Why "No schemas"?**
+
+- Project may use embedded types in service/controller files (not dedicated schema files)
+- Database-less projects (e.g., static site generators, CLI tools)
+- API-only projects using inline interfaces
+
+This is **not a failure** - it's smart detection saving you tokens and cost! 💰
 
 **KPI Analyzer Features:**
 
@@ -514,7 +627,94 @@ We welcome contributions! See the **[Contributing Guide](./docs/CONTRIBUTING.md)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
 - **🐛 Issues**: [Report Issues](https://github.com/techdebtgpt/architecture-doc-generator/issues)
 
-## �📄 License
+## ❓ Common Questions
+
+### Q: Why does Schema Generator say "No schema definitions found"?
+
+**A:** This is **not a failure** - it's smart detection! The Schema Generator only generates output when it detects dedicated schema files:
+
+**What it detects**:
+
+- ✅ **Prisma**: `schema.prisma`, `*.prisma`
+- ✅ **TypeORM**: `@Entity()`, `*.entity.ts`
+- ✅ **DTOs**: `*.dto.ts`, API schemas
+- ✅ **GraphQL**: `*.graphql`, `*.gql`
+- ✅ **OpenAPI**: `swagger.json`, `openapi.yaml`
+
+**Common causes of "No schemas"**:
+
+1. **Analyzing subdirectory only** - Schema files in `prisma/` won't be found if you run on `src/` only
+   - ❌ `archdoc analyze ./src` (misses `./prisma/schema.prisma`)
+   - ✅ `archdoc analyze .` (includes all directories)
+
+2. **Embedded types** - Types in service/controller files (not dedicated schema files)
+3. **Database-less projects** - Static sites, CLI tools, frontend-only apps
+4. **Inline interfaces** - TypeScript interfaces mixed with business logic
+
+**Solution**: Run analysis from project root, not subdirectories.
+
+### Q: What files are excluded from vector search?
+
+**A:** Vector search automatically excludes:
+
+- **Dependencies**: `node_modules/`, `vendor/`, `target/`
+- **Build outputs**: `dist/`, `build/`, `out/`, `bin/`, `obj/`
+- **Test files**: `.test.`, `.spec.`, `__tests__/`, `test_`
+- **Git**: `.git/` (and respects `.gitignore` by default)
+
+From 6,187 total files, only ~889 source files (14%) are indexed for optimal performance.
+
+### Q: Which search strategy should I use?
+
+**A:** For **production**, use **Hybrid** (default):
+
+- Combines semantic similarity (60%) + dependency graph (40%)
+- Best balance of quality and performance
+- Only 7% slower than vector-only, but 28% better architectural insights
+
+For **fast iteration**, use **Vector-only** or **Smart**.
+
+### Q: How much does it cost?
+
+**A:** Using local embeddings (FREE) with Claude Haiku:
+
+- Small project (1K files): ~$0.10-0.20
+- Medium project (5K files): ~$0.35-0.45
+- Large project (10K+ files): ~$0.60-0.80
+
+**Tip:** Use `--depth quick` to reduce cost by ~30%.
+
+### Q: Can I use it on private/closed-source code?
+
+**A:** Yes! Your code is only sent to the LLM provider (Anthropic/OpenAI/Google) and is **not** stored or shared. Use local embeddings (`embeddingsProvider: "local"`) for completely offline semantic search.
+
+### Q: How do I add support for my custom language?
+
+**A:** No code changes needed! Add to `.archdoc.config.json`:
+
+```json
+{
+  "languages": {
+    "custom": {
+      "myLanguage": {
+        "displayName": "My Language",
+        "filePatterns": {
+          "extensions": [".mylang"]
+        },
+        "importPatterns": {
+          "myImport": "^import\\s+([^;]+);"
+        }
+      }
+    }
+  }
+}
+```
+
+See [Custom Language Guide](./docs/CUSTOM_LANGUAGES.md) for details.
+
+---
+
+## 📄 License
 
 Apache License 2.0 - see the [LICENSE](./LICENSE) file for details.
 
