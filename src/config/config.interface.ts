@@ -52,6 +52,29 @@ export interface AppConfig {
     retries: number;
   };
 
+  // Search Mode Configuration (for file retrieval during agent analysis)
+  searchMode?: {
+    // Mode: 'vector' (semantic), 'keyword' (traditional text matching)
+    mode?: 'vector' | 'keyword';
+    // Embeddings provider for vector search (only used when mode='vector')
+    embeddingsProvider?: 'local' | 'openai' | 'google';
+    // Retrieval strategy: 'vector' (semantic), 'graph' (structural), 'hybrid' (both), 'smart' (auto)
+    // Only applies when mode='vector'
+    strategy?: 'vector' | 'graph' | 'hybrid' | 'smart';
+    // Weight for vector similarity (0-1, only used in hybrid strategy)
+    vectorWeight?: number;
+    // Weight for graph relationships (0-1, only used in hybrid strategy)
+    graphWeight?: number;
+    // Include related files (imports, dependencies) in results
+    includeRelatedFiles?: boolean;
+    // Maximum graph traversal depth for related files
+    maxDepth?: number;
+    // Minimum similarity threshold for vector results (0-1)
+    similarityThreshold?: number;
+    // Top K results to return per query
+    topK?: number;
+  };
+
   // Logging Configuration
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';

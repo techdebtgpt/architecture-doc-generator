@@ -23,15 +23,17 @@ const DEFAULT_CONFIG = {
     openai: '',
     google: '',
     xai: '',
+    embeddings: '', // Separate API key for vector search embeddings (if not using local)
   },
   llm: {
     provider: 'anthropic',
     model: 'claude-sonnet-4-5-20250929',
     temperature: 0.2,
     maxTokens: 4096,
+    embeddingsProvider: 'local', // Default to FREE local embeddings
   },
   scan: {
-    maxFiles: 1000,
+    maxFiles: 10000,
     maxFileSize: 1048576,
     respectGitignore: true,
     excludePatterns: [
@@ -250,6 +252,105 @@ async function initializeConfig(): Promise<void> {
   config.llm.model = selectedModel;
 
   logger.info(`\n✅ Configured to use: ${provider} (${selectedModel})`);
+
+  // Vector search setup (optional - for embeddings)
+  logger.info('\n\n🔍 Vector Search Configuration (OPTIONAL)\n');
+  logger.info('Vector search uses embeddings for semantic file matching.');
+  logger.info("It's more accurate but slower than keyword search, and requires an API key.\n");
+
+  const { enableVectorSearch } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'enableVectorSearch',
+      message: 'Enable vector search with embeddings?',
+      default: false,
+    },
+  ]);
+
+  if (enableVectorSearch) {
+    const { embeddingsProvider } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'embeddingsProvider',
+        message: 'Choose embeddings provider:',
+        choices: [
+          {
+            name: 'Local (FREE, recommended) - TF-IDF embeddings, no API key, works offline',
+            value: 'local',
+          },
+          {
+            name: 'OpenAI - text-embedding-3-small, $0.02/1M tokens, best accuracy',
+            value: 'openai',
+          },
+          {
+            name: 'Google Vertex AI - text-embedding-004, affordable and efficient',
+            value: 'google',
+          },
+          {
+            name: 'Cohere - Coming soon (requires @langchain/cohere package)',
+            value: 'cohere',
+          },
+          {
+            name: 'Voyage AI - Coming soon (requires @langchain/community package)',
+            value: 'voyage',
+          },
+          {
+            name: 'HuggingFace - Coming soon (requires @langchain/community package)',
+            value: 'huggingface',
+          },
+        ],
+        default: 'local',
+      },
+    ]);
+
+    // Only prompt for API key if not using local/free embeddings
+    if (embeddingsProvider !== 'local' && embeddingsProvider !== 'huggingface') {
+      const providerUrls: Record<string, string> = {
+        openai: 'https://platform.openai.com/',
+        google: 'https://cloud.google.com/vertex-ai',
+        cohere: 'https://dashboard.cohere.com/',
+        voyage: 'https://www.voyageai.com/',
+      };
+
+      logger.info(`\nGet your embeddings API key at: ${providerUrls[embeddingsProvider]}`);
+
+      const { embeddingsApiKey } = await inquirer.prompt([
+        {
+          type: 'password',
+          name: 'embeddingsApiKey',
+          message: `Enter ${embeddingsProvider} embeddings API key:`,
+          validate: (input: string) => {
+            if (!input || input.trim().length === 0) {
+              return 'Embeddings API key is required for vector search';
+            }
+            return true;
+          },
+          mask: '*',
+        },
+      ]);
+
+      config.apiKeys.embeddings = embeddingsApiKey.trim();
+    } else {
+      logger.info(`\n✅ Using ${embeddingsProvider} embeddings - no API key required`);
+    }
+
+    config.llm.embeddingsProvider = embeddingsProvider;
+    logger.info(`✅ Vector search enabled with ${embeddingsProvider} embeddings`);
+
+    // Warn about unsupported providers
+    if (['cohere', 'voyage', 'huggingface'].includes(embeddingsProvider)) {
+      logger.warn(`\n⚠️  ${embeddingsProvider} embeddings support is not yet fully implemented.`);
+      logger.warn('   OpenAI and Google providers are currently supported.');
+      logger.warn('   You can still use vector search by setting EMBEDDINGS_PROVIDER=openai');
+    }
+
+    logger.info('\n   Use --search-mode vector when running archdoc analyze');
+    logger.info(`   Set EMBEDDINGS_PROVIDER=${embeddingsProvider} to use this provider`);
+  } else {
+    logger.info(
+      '   Skipped - you can enable it later with: archdoc config --set llm.embeddingsProvider=openai',
+    );
+  }
 
   // LangSmith tracing setup (optional)
   const { enableTracing } = await inquirer.prompt([

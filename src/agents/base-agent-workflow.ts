@@ -3,8 +3,8 @@ import { MemorySaver } from '@langchain/langgraph';
 import type { AgentContext, AgentResult, AgentFile } from '../types/agent.types';
 import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
+import { PerformanceTracker } from '../utils/performance-tracker';
 import { Retry } from '../utils/retry';
-import { FileSearchService } from './file-search-service';
 
 /**
  * Agent internal state for self-refinement workflow
@@ -181,6 +181,10 @@ export abstract class BaseAgentWorkflow {
     context: AgentContext,
     options?: import('../types/agent.types').AgentExecutionOptions,
   ): Promise<AgentResult> {
+    // Start performance tracking
+    const perfTracker = new PerformanceTracker();
+    perfTracker.start();
+
     // Configuration optimized for gap-filling workflow
     // Max iterations can be overridden via context config
     const maxIterations = (context.config?.maxIterations as number) || 5;
@@ -201,11 +205,30 @@ export abstract class BaseAgentWorkflow {
       '⚙️',
     );
 
-    return this.executeWorkflow(
-      context,
-      config,
-      options?.runnableConfig as Record<string, unknown> | undefined,
-    );
+    try {
+      const result = await this.executeWorkflow(
+        context,
+        config,
+        options?.runnableConfig as Record<string, unknown> | undefined,
+      );
+
+      // Log performance metrics
+      const perfMetrics = perfTracker.end();
+      this.logger.info(
+        `Agent execution complete | ${PerformanceTracker.formatMetrics(perfMetrics)}`,
+        '📊',
+      );
+
+      return result;
+    } catch (error) {
+      // Log performance even on error
+      const perfMetrics = perfTracker.end();
+      this.logger.info(
+        `Agent execution failed | ${PerformanceTracker.formatMetrics(perfMetrics)}`,
+        '📊',
+      );
+      throw error;
+    }
   }
 
   /**
@@ -471,9 +494,12 @@ export abstract class BaseAgentWorkflow {
     const maxQuestionsPerIteration = config.configurable?.maxQuestionsPerIteration || 3;
     const isQuickMode = maxQuestionsPerIteration <= 2;
 
+    // Allow agents to override maxTokens (e.g., schema-generator needs different limits)
+    const maxTokens = this.getMaxOutputTokens(isQuickMode, context);
+
     const modelOptions = {
       temperature: 0.3,
-      maxTokens: isQuickMode ? 8000 : 16000,
+      maxTokens,
     };
 
     // Calculate input token count
@@ -988,7 +1014,7 @@ Example good questions:
 
   /**
    * Retrieve relevant files based on generated questions
-   * Uses keyword-based search to find files without embeddings (memory-efficient)
+   * Supports both vector-based (semantic) and keyword-based search
    */
   private async retrieveFilesNode(state: typeof AgentWorkflowState.State) {
     const { selfQuestions, context, iteration } = state;
@@ -1001,37 +1027,22 @@ Example good questions:
       };
     }
 
+    // Get search mode from context config (default to 'keyword' for fast, free search)
+    const searchMode = (context.config?.searchMode as 'vector' | 'keyword') || 'keyword';
+
     this.logger.info(
-      `Iteration ${iteration}: Searching files for ${selfQuestions.length} question(s)...`,
+      `Iteration ${iteration}: Searching files for ${selfQuestions.length} question(s) using ${searchMode} search...`,
       '📂',
     );
 
-    const fileSearch = new FileSearchService(context.projectPath, context.dependencyGraph);
-    const allRetrievedFiles: Array<{ path: string; content: string }> = [];
+    let allRetrievedFiles: Array<{ path: string; content: string }> = [];
 
-    // Search files for each question
-    for (const question of selfQuestions) {
-      const scoredFiles = fileSearch.searchFiles(question, context.files, {
-        topK: 3, // Get top 3 files per question
-        maxFileSize: 50000, // 50KB limit per file
-      });
-
-      if (scoredFiles.length > 0) {
-        this.logger.debug(
-          `Question: "${question.substring(0, 60)}..." -> Found ${scoredFiles.length} file(s)`,
-          {
-            topFile: scoredFiles[0].path,
-            score: scoredFiles[0].score,
-          },
-        );
-
-        // Retrieve file contents
-        const fileContents = await fileSearch.retrieveFiles(scoredFiles, {
-          maxFileSize: 50000,
-        });
-
-        allRetrievedFiles.push(...fileContents.map((f) => ({ path: f.path, content: f.content })));
-      }
+    if (searchMode === 'vector') {
+      // Vector-based semantic search (more accurate, slower)
+      allRetrievedFiles = await this.vectorSearchFiles(selfQuestions, context, iteration);
+    } else {
+      // Keyword-based search (faster, less accurate)
+      allRetrievedFiles = await this.keywordSearchFiles(selfQuestions, context, iteration);
     }
 
     // Deduplicate files by path
@@ -1059,6 +1070,101 @@ Example good questions:
       ...state,
       retrievedFiles: uniqueFiles,
     };
+  }
+
+  /**
+   * Search files using vector-based semantic similarity
+   */
+  private async vectorSearchFiles(
+    questions: string[],
+    context: AgentContext,
+    _iteration: number,
+  ): Promise<Array<{ path: string; content: string }>> {
+    // Use shared vector store from context (initialized once by orchestrator)
+    if (!context.vectorStore) {
+      this.logger.warn('Vector store not available in context - falling back to keyword search');
+      return await this.keywordSearchFiles(questions, context, _iteration);
+    }
+
+    const allRetrievedFiles: Array<{ path: string; content: string }> = [];
+
+    // Search files for each question using semantic similarity
+    for (const question of questions) {
+      try {
+        const searchResults = await context.vectorStore.searchFiles(question, 3); // Top 3 per question
+
+        if (searchResults.length > 0) {
+          this.logger.debug(
+            `Question: "${question.substring(0, 60)}..." -> Found ${searchResults.length} file(s)`,
+            {
+              topFile: searchResults[0].path,
+              relevance: searchResults[0].score.toFixed(3),
+            },
+          );
+
+          // Load file contents from disk
+          const fs = await import('fs/promises');
+          for (const result of searchResults) {
+            try {
+              const content = await fs.readFile(result.path, 'utf-8');
+              allRetrievedFiles.push({ path: result.path, content });
+            } catch (readError) {
+              this.logger.debug(`Failed to read file: ${result.path}`, {
+                error: readError instanceof Error ? readError.message : String(readError),
+              });
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to search for question: ${question.substring(0, 60)}...`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    // No cleanup needed - vector store is shared and managed by orchestrator
+
+    return allRetrievedFiles;
+  }
+
+  /**
+   * Search files using keyword-based matching (fallback for speed)
+   */
+  private async keywordSearchFiles(
+    questions: string[],
+    context: AgentContext,
+    _iteration: number,
+  ): Promise<Array<{ path: string; content: string }>> {
+    const { FileSearchService } = await import('../services/file-search.service');
+    const fileSearch = new FileSearchService(context.projectPath, context.dependencyGraph);
+    const allRetrievedFiles: Array<{ path: string; content: string }> = [];
+
+    // Search files for each question using keywords
+    for (const question of questions) {
+      const scoredFiles = fileSearch.searchFiles(question, context.files, {
+        topK: 3, // Get top 3 files per question
+        maxFileSize: 50000, // 50KB limit per file
+      });
+
+      if (scoredFiles.length > 0) {
+        this.logger.debug(
+          `Question: "${question.substring(0, 60)}..." -> Found ${scoredFiles.length} file(s)`,
+          {
+            topFile: scoredFiles[0].path,
+            score: scoredFiles[0].score,
+          },
+        );
+
+        // Retrieve file contents
+        const fileContents = await fileSearch.retrieveFiles(scoredFiles, {
+          maxFileSize: 50000,
+        });
+
+        allRetrievedFiles.push(...fileContents.map((f) => ({ path: f.path, content: f.content })));
+      }
+    }
+
+    return allRetrievedFiles;
   }
 
   /**
@@ -1603,6 +1709,19 @@ ${this.getDepthSpecificGuidance(mode)}`;
     };
 
     return guidance[mode];
+  }
+
+  /**
+   * Get maximum output tokens for LLM calls
+   * Override this in subclasses if agent needs different limits
+   * Default implementation returns: Quick mode = 8000, Normal/Deep = 16000
+   *
+   * @param isQuickMode - Whether running in quick mode
+   * @param _context - Agent execution context
+   * @returns Maximum number of output tokens
+   */
+  protected getMaxOutputTokens(isQuickMode: boolean, _context: AgentContext): number {
+    return isQuickMode ? 8000 : 16000; // Default limits
   }
 
   // Abstract methods that subclasses must implement

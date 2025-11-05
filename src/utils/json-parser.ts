@@ -28,14 +28,14 @@ export class LLMJsonParser {
       // Strategy 1: Extract from ```json code blocks
       const jsonCodeBlock = this.extractFromCodeBlock(result, 'json');
       if (jsonCodeBlock) {
-        return JSON.parse(jsonCodeBlock) as T;
+        return this.parseWithCleanup<T>(jsonCodeBlock, 4);
       }
 
       // Strategy 2: Extract from any code block (without language identifier)
       const genericCodeBlock = this.extractFromGenericCodeBlock(result);
       if (genericCodeBlock) {
         try {
-          return JSON.parse(genericCodeBlock) as T;
+          return this.parseWithCleanup<T>(genericCodeBlock, 4);
         } catch {
           // Not valid JSON, continue
         }
@@ -44,13 +44,25 @@ export class LLMJsonParser {
       // Strategy 3: Find JSON object anywhere in text
       const jsonObject = this.extractJsonObject(result);
       if (jsonObject) {
-        return JSON.parse(jsonObject) as T;
+        return this.parseWithCleanup<T>(jsonObject, 4);
       }
 
       // Strategy 4: Parse entire response as JSON
-      return JSON.parse(result) as T;
+      return this.parseWithCleanup<T>(result, 4);
     } catch (error) {
-      if (logErrors) {
+      // Check if response is truncated (missing closing backticks or braces)
+      const isTruncated = this.detectTruncation(result);
+
+      if (isTruncated && logErrors) {
+        this.logger.warn(
+          `${contextName}: Response appears truncated (missing closing markers). Increase maxTokens or reduce input size.`,
+          {
+            error: error instanceof Error ? error.message : String(error),
+            preview: result.substring(0, 200),
+            endPreview: result.substring(Math.max(0, result.length - 100)),
+          },
+        );
+      } else if (logErrors) {
         this.logger.warn(`${contextName}: Failed to parse JSON from LLM response`, {
           error: error instanceof Error ? error.message : String(error),
           preview: result.substring(0, 200),
@@ -68,12 +80,84 @@ export class LLMJsonParser {
   }
 
   /**
+   * Detect if LLM response appears to be truncated
+   */
+  private static detectTruncation(text: string): boolean {
+    // Check for incomplete code blocks
+    const hasOpeningBackticks = text.includes('```');
+    const backtickCount = (text.match(/```/g) || []).length;
+
+    // Odd number of backticks = unclosed block
+    if (hasOpeningBackticks && backtickCount % 2 !== 0) {
+      return true;
+    }
+
+    // Check for unbalanced braces
+    const openBraces = (text.match(/{/g) || []).length;
+    const closeBraces = (text.match(/}/g) || []).length;
+
+    if (openBraces > closeBraces + 2) {
+      // Allow some tolerance for nested objects
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Parse JSON with progressive cleanup strategies
+   * Handles common LLM formatting issues like trailing commas, comments, etc.
+   */
+  private static parseWithCleanup<T>(jsonStr: string, maxRetries: number): T {
+    let currentAttempt = jsonStr;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return JSON.parse(currentAttempt) as T;
+      } catch (error) {
+        if (i === maxRetries - 1) {
+          throw error; // Last attempt failed
+        }
+
+        // Progressive cleanup strategies
+        switch (i) {
+          case 0:
+            // Remove trailing commas before } or ]
+            currentAttempt = currentAttempt.replace(/,(\s*[}\]])/g, '$1');
+            break;
+          case 1:
+            // Remove single-line comments
+            currentAttempt = currentAttempt.replace(/\/\/.*$/gm, '');
+            break;
+          case 2:
+            // Remove multi-line comments
+            currentAttempt = currentAttempt.replace(/\/\*[\s\S]*?\*\//g, '');
+            break;
+        }
+      }
+    }
+
+    // Should never reach here, but TypeScript needs it
+    throw new Error('JSON parsing failed after all cleanup attempts');
+  }
+
+  /**
    * Extract content from code block with specific language identifier
-   * Example: ```json { ... } ```
+   * Example: ```json { ... } ``` or ````json { ... } ````
+   * Also handles edge cases like: ` ```json`, `\n```json`, etc.
    */
   private static extractFromCodeBlock(text: string, language: string): string | null {
-    const regex = new RegExp(`\`\`\`${language}\\s*([\\s\\S]*?)\\s*\`\`\``, 'i');
-    const match = text.match(regex);
+    // Strategy 1: Most flexible - match any whitespace between markers
+    // Matches: ```json\n{...}\n```, ```json{...}```, ``` json {` ...} ``` etc.
+    let regex = new RegExp(`\`\`\`\\s*${language}\\s*([\\s\\S]*?)\\s*\`\`\``, 'i');
+    let match = text.match(regex);
+
+    // Strategy 2: Quadruple backticks (sometimes LLMs use this)
+    if (!match) {
+      regex = new RegExp(`\`\`\`\`\\s*${language}\\s*([\\s\\S]*?)\\s*\`\`\`\``, 'i');
+      match = text.match(regex);
+    }
+
     if (!match) return null;
 
     const content = match[1].trim();

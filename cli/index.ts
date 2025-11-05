@@ -25,6 +25,11 @@ if (fs.existsSync(configPath)) {
       if (config.apiKeys.google) process.env.GOOGLE_API_KEY = config.apiKeys.google;
       if (config.apiKeys.xai) process.env.XAI_API_KEY = config.apiKeys.xai;
     }
+    // Set embeddings keys (separate from LLM API keys)
+    if (config.embeddings) {
+      if (config.embeddings.openai) process.env.OPENAI_EMBEDDINGS_KEY = config.embeddings.openai;
+      if (config.embeddings.google) process.env.GOOGLE_EMBEDDINGS_KEY = config.embeddings.google;
+    }
     // Set LLM provider and model from config
     if (config.llm) {
       if (config.llm.provider) process.env.ARCHDOC_LLM_PROVIDER = config.llm.provider;
@@ -58,6 +63,7 @@ import { Command } from 'commander';
 import { analyzeProject } from './commands/analyze.command';
 import { registerConfigCommand } from './commands/config.command';
 import { exportDocumentation } from './commands/export.command';
+import { registerHelpCommand } from './commands/help.command';
 
 // Read version from package.json
 const packageJson = JSON.parse(
@@ -93,6 +99,16 @@ program
     'Analysis depth mode: quick (no refinement, fast), normal (5 iterations, 80%), deep (10 iterations, 90%)',
     'normal',
   )
+  // Search mode for file retrieval
+  .option(
+    '--search-mode <mode>',
+    'File search mode: vector (semantic similarity) or keyword (traditional matching). Default from config or vector.',
+  )
+  // Retrieval strategy for hybrid search
+  .option(
+    '--retrieval-strategy <strategy>',
+    'Retrieval strategy: vector (semantic only), graph (structural only), hybrid (both), smart (auto-detect). Default from config or hybrid.',
+  )
   .option('--c4', 'Generate C4 model instead of standard documentation', false)
   // Granular refinement options (advanced)
   .option(
@@ -126,6 +142,9 @@ program
 
 // Config command
 registerConfigCommand(program);
+
+// Help command
+registerHelpCommand(program);
 
 // Parse CLI arguments
 program.parse();

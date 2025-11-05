@@ -53,6 +53,10 @@ interface AnalyzeOptions {
   maxCost?: number; // Maximum cost in dollars before halting (default: 5.0)
   // Depth mode (simple) - conflicts with granular refinement flags
   depth?: 'quick' | 'normal' | 'deep';
+  // Search mode for file retrieval during refinement
+  searchMode?: 'vector' | 'keyword';
+  // Retrieval strategy: 'vector' (semantic), 'graph' (structural), 'hybrid' (both), 'smart' (auto)
+  retrievalStrategy?: 'vector' | 'graph' | 'hybrid' | 'smart';
   // Granular refinement options (advanced) - overrides depth mode
   refinement?: boolean;
   refinementThreshold?: number;
@@ -179,7 +183,7 @@ export async function analyzeProject(
     const scanner = createScanner();
     const scanResult = await scanner.scan({
       rootPath: resolvedPath,
-      maxFiles: 1000,
+      maxFiles: 10000,
       maxFileSize: 1048576, // 1MB
       respectGitignore: true,
       includeHidden: false,
@@ -226,6 +230,29 @@ export async function analyzeProject(
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
     spinner.succeed('Orchestrator initialized successfully');
 
+    // Load config file if exists
+    let userConfig: any = {};
+    try {
+      const configPath = path.join(process.cwd(), '.archdoc.config.json');
+      const configContent = await fs.readFile(configPath, 'utf-8');
+      userConfig = JSON.parse(configContent);
+
+      if (options.verbose) {
+        console.log(chalk.gray(`\n📄 Config loaded from: ${configPath}`));
+        console.log(chalk.gray(`   searchMode: ${JSON.stringify(userConfig.searchMode)}`));
+      }
+    } catch (_error) {
+      // Config file doesn't exist or invalid - use defaults
+      if (options.verbose) {
+        console.log(
+          chalk.gray(
+            `\n📄 No config file found at: ${path.join(process.cwd(), '.archdoc.config.json')}`,
+          ),
+        );
+        console.log(chalk.gray('   Using defaults'));
+      }
+    }
+
     // Determine depth mode configuration
     const depthMode = options.depth || 'normal';
     const depthConfigs = {
@@ -240,9 +267,70 @@ export async function analyzeProject(
     };
     const depthConfig = depthConfigs[depthMode];
 
+    // Determine search mode: CLI flag > config file > default (vector)
+    const configSearchMode = userConfig.searchMode?.mode;
+    const searchMode = options.searchMode || configSearchMode || 'vector';
+
     if (options.verbose) {
+      console.log(chalk.gray(`   options.searchMode: ${options.searchMode}`));
+      console.log(chalk.gray(`   configSearchMode: ${configSearchMode}`));
+      console.log(chalk.gray(`   final searchMode: ${searchMode}`));
+    }
+
+    // Determine retrieval strategy (only relevant when searchMode='vector')
+    // Priority: CLI flag > config file > default (hybrid)
+    // If keyword mode, retrieval strategy is ignored (no vector store available)
+    const configRetrievalStrategy = userConfig.searchMode?.strategy;
+    const retrievalStrategy =
+      searchMode === 'vector'
+        ? options.retrievalStrategy || configRetrievalStrategy || 'hybrid'
+        : undefined;
+
+    // Determine embeddings provider (only relevant when searchMode='vector')
+    // Priority: config file > env var > default (local)
+    const embeddingsProvider =
+      searchMode === 'vector'
+        ? (userConfig.searchMode?.embeddingsProvider as
+            | 'local'
+            | 'openai'
+            | 'google'
+            | undefined) || 'local'
+        : undefined;
+
+    // Always show retrieval configuration (not just in verbose mode)
+    console.log('');
+    console.log(chalk.blue('🔧 Retrieval Configuration:'));
+    console.log(
+      chalk.blue(
+        `   Search mode: ${searchMode} (${searchMode === 'vector' ? 'semantic similarity with embeddings' : 'keyword-based matching'})`,
+      ),
+    );
+    if (embeddingsProvider) {
+      console.log(chalk.blue(`   Embeddings: ${embeddingsProvider.toUpperCase()} provider`));
+    }
+
+    if (retrievalStrategy) {
       console.log(
-        `📊 Depth mode: ${depthMode} (${depthConfig.maxIterations} iterations, ${depthConfig.clarityThreshold}% clarity threshold)`,
+        chalk.blue(
+          `   Strategy: ${retrievalStrategy} (${
+            retrievalStrategy === 'vector'
+              ? 'semantic only'
+              : retrievalStrategy === 'graph'
+                ? 'dependency graph only'
+                : retrievalStrategy === 'hybrid'
+                  ? 'semantic + structural (60/40)'
+                  : 'auto-detect best'
+          })`,
+        ),
+      );
+    }
+
+    if (options.verbose) {
+      console.log('');
+      console.log(
+        chalk.gray(
+          `📊 Depth: ${depthMode} (${depthConfig.maxIterations} iterations, ${depthConfig.clarityThreshold}% clarity threshold)`,
+        ),
       );
     }
 
@@ -252,9 +340,12 @@ export async function analyzeProject(
     console.log(chalk.gray('   (Agent progress will be shown below)'));
     console.log('');
 
-    spinner.start(`Waiting for agent execution... \n`);
+    // Stop spinner during agent execution to avoid log spam
+    spinner.stop();
 
     const generationStartTime = Date.now();
+    let lastProgressUpdate = 0;
+    const progressThrottleMs = 2000; // Update progress at most every 2 seconds
 
     let documentation;
     try {
@@ -278,13 +369,26 @@ export async function analyzeProject(
           },
           maxQuestionsPerIteration: depthConfig.maxQuestions,
           skipSelfRefinement: depthConfig.skipSelfRefinement, // Skip refinement for quick mode
+          searchMode, // Vector (semantic) or keyword search for file retrieval
         },
+        retrievalStrategy, // Retrieval strategy for hybrid search (vector + graph)
+        embeddingsProvider, // Embeddings provider for vector search (local, openai, google)
         onAgentProgress: (current: number, total: number, agentName: string) => {
-          const elapsed = Math.floor((Date.now() - generationStartTime) / 1000);
+          const now = Date.now();
+          // Throttle progress updates to every 2 seconds to avoid log spam
+          if (now - lastProgressUpdate < progressThrottleMs) {
+            return;
+          }
+          lastProgressUpdate = now;
+
+          const elapsed = Math.floor((now - generationStartTime) / 1000);
           const minutes = Math.floor(elapsed / 60);
           const seconds = elapsed % 60;
           const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-          spinner.text = `Running agent ${current}/${total}: ${agentName} [${timeStr}] (see progress logs below)... \n`;
+          // Use \r to overwrite the same line
+          process.stdout.write(
+            `\r${chalk.cyan(`⏳ Running agent ${current}/${total}: ${agentName} [${timeStr}]`)}${' '.repeat(20)} \n`,
+          );
         },
       });
     } catch (error) {
@@ -300,7 +404,9 @@ export async function analyzeProject(
       throw error;
     }
 
-    spinner.succeed('Documentation generation completed!');
+    // Clear the progress line and print completion message
+    process.stdout.write('\n');
+    console.log(chalk.green('✅ Documentation generation completed!'));
 
     // Format and save output
     let outputLocation: string;

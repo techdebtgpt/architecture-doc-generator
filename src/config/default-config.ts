@@ -72,6 +72,18 @@ export const defaultConfig: AppConfig = {
     retries: 3,
   },
 
+  searchMode: {
+    mode: 'vector', // Default: semantic search (can be 'keyword' for faster, simpler matching)
+    embeddingsProvider: 'local', // Default to FREE local TF-IDF embeddings (no API key needed)
+    strategy: 'hybrid', // Default: combine semantic + structural
+    vectorWeight: 0.6, // 60% semantic similarity
+    graphWeight: 0.4, // 40% structural relationships
+    includeRelatedFiles: true, // Include imports/dependencies
+    maxDepth: 2, // Traverse graph up to 2 hops
+    similarityThreshold: 0.3, // Minimum 30% similarity for vector results
+    topK: 10, // Return top 10 results per query
+  },
+
   logging: {
     level: 'info',
     file: '.archdoc.log',

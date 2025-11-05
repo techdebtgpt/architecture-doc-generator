@@ -1,12 +1,67 @@
 import { Agent } from './agent.interface';
 import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
 import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
+import { z } from 'zod';
+import { LLMJsonParser } from '../utils/json-parser';
+
+/**
+ * Zod schema for structured KPI output
+ * Ensures consistent, deterministic metrics across runs
+ */
+const KPIOutputSchema = z.object({
+  healthScore: z.object({
+    overall: z.number().min(0).max(100),
+    codeQuality: z.number().min(0).max(10),
+    testing: z.number().min(0).max(10),
+    architecture: z.number().min(0).max(10),
+    dependencies: z.number().min(0).max(10),
+    complexity: z.number().min(0).max(10),
+    rating: z.enum(['excellent', 'good', 'fair', 'poor']),
+  }),
+  codeOrganization: z.object({
+    totalFiles: z.number(),
+    codeFiles: z.number(),
+    testFiles: z.number(),
+    configFiles: z.number(),
+    testCoverageRatio: z.number(),
+    sizeCategory: z.enum(['small', 'medium', 'large', 'very-large']),
+  }),
+  insights: z.array(
+    z.object({
+      category: z.enum([
+        'size',
+        'testing',
+        'patterns',
+        'complexity',
+        'dependencies',
+        'architecture',
+        'security',
+        'documentation',
+      ]),
+      severity: z.enum(['critical', 'high', 'medium', 'low', 'info']),
+      title: z.string(),
+      description: z.string(),
+      recommendation: z.string(),
+    }),
+  ),
+  recommendations: z.array(
+    z.object({
+      priority: z.enum(['p1', 'p2', 'p3', 'p4']),
+      title: z.string(),
+      description: z.string(),
+      effort: z.string(),
+      impact: z.enum(['critical', 'high', 'medium', 'low']),
+    }),
+  ),
+});
+
+type KPIOutput = z.infer<typeof KPIOutputSchema>;
 
 /**
  * KPI Analyzer Agent
  *
  * Analyzes repository health metrics and generates actionable KPI insights using LLM.
- * Provides executive-level overview of code quality, architecture, testing, and technical debt.
+ * Uses structured output (Zod schema) for deterministic, consistent results.
  */
 export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
   /**
@@ -68,159 +123,194 @@ export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
   }
 
   /**
-   * Build system prompt
+   * Override max tokens for deterministic output
+   */
+  protected override getMaxOutputTokens(_isQuickMode: boolean, _context: AgentContext): number {
+    return 3000; // Fixed size for structured output
+  }
+
+  /**
+   * Build system prompt for structured JSON output
    */
   protected async buildSystemPrompt(_context: AgentContext): Promise<string> {
     return `You are an expert software engineering consultant specializing in repository health analysis and KPI reporting.
 
-Your task is to analyze the provided codebase metrics and generate a comprehensive, executive-level KPI dashboard that provides actionable insights about repository health.
+Your task is to analyze the provided codebase metrics and generate a **structured JSON object** with repository health scores and actionable insights.
 
-## Analysis Focus
+## Output Schema
 
-1. **Repository Health Score** (0-100%):
-   - Calculate overall health based on: code quality (30%), testing (20%), architecture (20%), dependencies (15%), complexity (15%)
-   - Provide clear rating with emoji: 🌟 Excellent (≥80%), ✅ Good (≥60%), ⚠️ Fair (≥40%), ❌ Poor (<40%)
+You MUST return valid JSON matching this exact structure:
 
-2. **Code Organization**:
-   - Analyze file distribution (code vs test vs config)
-   - Evaluate test coverage ratio (test files / code files)
-   - Assess project size and average file complexity
-   - Rate language diversity
+\`\`\`json
+{
+  "healthScore": {
+    "overall": <0-100>,
+    "codeQuality": <0-10>,
+    "testing": <0-10>,
+    "architecture": <0-10>,
+    "dependencies": <0-10>,
+    "complexity": <0-10>,
+    "rating": "excellent" | "good" | "fair" | "poor"
+  },
+  "codeOrganization": {
+    "totalFiles": <number>,
+    "codeFiles": <number>,
+    "testFiles": <number>,
+    "configFiles": <number>,
+    "testCoverageRatio": <number>,
+    "sizeCategory": "small" | "medium" | "large" | "very-large"
+  },
+  "insights": [
+    {
+      "category": "size" | "testing" | "patterns" | "complexity" | "dependencies" | "architecture" | "security" | "documentation",
+      "severity": "critical" | "high" | "medium" | "low" | "info",
+      "title": "Short title (3-5 words)",
+      "description": "What is the issue",
+      "recommendation": "What to do about it"
+    }
+  ],
+  "recommendations": [
+    {
+      "priority": "p1" | "p2" | "p3" | "p4",
+      "title": "Action item title",
+      "description": "Detailed description",
+      "effort": "Time estimate (e.g., '4-8 hours', '1-2 sprints')",
+      "impact": "critical" | "high" | "medium" | "low"
+    }
+  ]
+}
+\`\`\`
 
-3. **Architecture Quality**:
-   - Evaluate architectural clarity and pattern usage
-   - Assess component organization
-   - Identify design pattern strengths
-   - Highlight anti-pattern risks
+## Scoring Guidelines
 
-4. **Code Quality Metrics**:
-   - Maintainability, reliability, security scores
-   - Test coverage percentage
-   - Code smells and technical debt assessment
-   - Complexity analysis
+**Overall Health** (0-100):
+- Code Quality (30%): codeQuality * 3
+- Testing (20%): testing * 2
+- Architecture (20%): architecture * 2
+- Dependencies (15%): dependencies * 1.5
+- Complexity (15%): complexity * 1.5
 
-5. **Dependency Health**:
-   - Total dependency count and distribution
-   - Outdated packages risk
-   - Vulnerability assessment
-   - Dependency bloat analysis
+**Component Scores** (0-10 each):
+- **Code Quality**: Maintainability + reliability + security indicators
+- **Testing**: Test-to-code ratio (0.2 = 10, 0.1 = 5, 0.05 = 3, 0 = 0)
+- **Architecture**: Pattern usage + organization clarity
+- **Dependencies**: Total count (0-50 = 10, 51-100 = 7, 101-200 = 5, 200+ = 3)
+- **Complexity**: Average complexity (≤5 = 10, 6-10 = 7, 11-15 = 4, 15+ = 2)
 
-6. **Key Insights** (Most Important):
-   - Generate 5-8 bullet points with actionable insights
-   - Each insight should have emoji + bold title + explanation
-   - Focus on: size appropriateness, test coverage quality, pattern usage, architectural clarity, complexity management, dependency health
-   - Examples:
-     * "📏 **Large codebase** - Consider modularization strategies for better maintainability"
-     * "⚠️ **Low test coverage** - Current ratio suggests quality risks; aim for 1 test per 5 code files"
-     * "🌟 **Strong pattern usage** - Consistent architectural patterns indicate mature codebase"
+**Rating** (based on overall score):
+- excellent: ≥80
+- good: 60-79
+- fair: 40-59
+- poor: <40
 
-## Output Requirements
+**Size Category**:
+- small: <1,000 files
+- medium: 1,000-3,000 files
+- large: 3,001-10,000 files
+- very-large: >10,000 files
 
-- **Be specific and quantitative**: Always include numbers and percentages
-- **Be actionable**: Every insight should suggest what to do
-- **Be honest**: Don't sugarcoat issues - be direct about problems
-- **Use emojis effectively**: Visual indicators help executive readability
-- **Prioritize impact**: Focus on metrics that matter most for project health
-- **Provide complete markdown**: Generate a full, well-formatted markdown document with all sections
+**Insight Categories** (generate 5-8 insights):
+1. **Size**: Project scale appropriateness
+2. **Testing**: Test coverage quality and ratio
+3. **Patterns**: Design pattern usage
+4. **Complexity**: Code complexity management
+5. **Dependencies**: Dependency health and bloat
+6. **Architecture**: Architectural clarity
+7. **Security**: Security posture
+8. **Documentation**: Documentation coverage
 
-## Rating Guidelines
+## Critical Rules
 
-**Health Score Components**:
-- Code Quality (0-10): Maintainability, reliability, security
-- Test Coverage: Ratio of test files to code files (aim for 20%+)
-- Architecture: Clear style + component organization
-- Dependencies: Count (<50 good, <100 ok, >100 concerning) + vulnerabilities
-- Complexity: Average complexity (≤5 good, ≤10 ok, >10 high)
+1. **Return ONLY valid JSON** - no markdown, no explanations, no code blocks
+2. **Use precise numbers** - calculate scores based on provided metrics
+3. **Be consistent** - same input should give same output
+4. **Be actionable** - every insight must have a clear recommendation
+5. **Prioritize** - order insights by severity (critical → high → medium → low → info)
 
-**Insight Categories**:
-- Size: Small (<1K lines), Medium (<10K), Large (<50K), Very Large (≥50K)
-- Test Ratio: None (0%), Low (<20%), Medium (20-80%), High (>80%)
-- Patterns: Poor (0-2), Good (3-5), Excellent (6+)
-- Anti-Patterns: None (0), Few (1-2), Many (3-5), Critical (6+)
-- Complexity: Low (≤5), Medium (6-10), High (11-15), Very High (>15)
-
-Generate a complete markdown document (NOT JSON) with the KPI dashboard. Include all sections with proper formatting, headings, tables, and bullet points.`;
+Generate the JSON object now.`;
   }
 
   /**
-   * Build human prompt with project context
+   * Build human prompt with project metrics
    */
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
-    let prompt = `Analyze the following repository and generate a comprehensive KPI dashboard:\n\n`;
-
-    // Project overview
-    prompt += `## Project: ${context.projectPath}\n\n`;
-
-    // File statistics
     const stats = this.calculateFileStatistics(context);
-    prompt += `### File Statistics\n\n`;
-    prompt += `- **Total Files**: ${stats.totalFiles}\n`;
-    prompt += `- **Code Files**: ${stats.codeFiles}\n`;
-    prompt += `- **Test Files**: ${stats.testFiles}\n`;
-    prompt += `- **Config Files**: ${stats.configFiles}\n`;
-    prompt += `- **Total Lines**: ${stats.totalLines.toLocaleString()}\n`;
-    prompt += `- **Project Size**: ${this.formatFileSize(stats.totalSize)}\n`;
-    prompt += `- **Languages**: ${stats.languages.join(', ')}\n\n`;
 
-    prompt += `### Analysis Requirements\n\n`;
-    prompt += `Generate a **complete markdown document** with the following sections:\n\n`;
-    prompt += `1. **Repository Health Score** - Overall score (0-100%) with emoji rating\n`;
-    prompt += `2. **Code Organization** - File distribution analysis, test coverage ratio\n`;
-    prompt += `3. **Architecture Quality** - Patterns, organization, design principles\n`;
-    prompt += `4. **Code Quality Metrics** - Maintainability, reliability, security\n`;
-    prompt += `5. **Dependency Health** - Package counts, vulnerabilities, risks\n`;
-    prompt += `6. **Key Insights** - 5-8 actionable recommendations with emojis\n\n`;
-    prompt += `7. **Recommendations** - Prioritized action items for improvement\n\n`;
-    prompt += `Use markdown headers (##, ###), bullet points, tables, and emojis for visual appeal.\n`;
-    prompt += `Focus on what matters most: test coverage, architectural clarity, code complexity, dependency management, and technical debt.\n\n`;
-    prompt += `Provide your response as a complete markdown document ready to save to kpi.md.`;
+    return `Analyze this repository and return JSON with health scores and insights:
 
-    return prompt;
+## Repository Metrics
+
+Project: ${context.projectPath}
+Total Files: ${stats.totalFiles}
+Code Files: ${stats.codeFiles}
+Test Files: ${stats.testFiles}
+Config Files: ${stats.configFiles}
+Languages: ${stats.languages.join(', ')}
+Test-to-Code Ratio: ${(stats.testFiles / Math.max(stats.codeFiles, 1)).toFixed(2)}
+
+## Instructions
+
+Calculate health scores based on the metrics above and return a JSON object matching the schema provided in the system prompt.
+
+Focus on:
+1. Realistic test coverage assessment (test-to-code ratio)
+2. Project size category (total files)
+3. Language diversity impact
+4. Actionable insights with clear recommendations
+
+Return ONLY the JSON object - no markdown, no explanations.`;
   }
 
   /**
-   * Parse LLM analysis output
+   * Parse LLM analysis output using Zod schema
    */
   protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {
     try {
-      const trimmedAnalysis = analysis.trim();
-
-      // Check if we have meaningful content (at least 100 chars and some markdown structure)
-      const hasContent =
-        trimmedAnalysis.length > 100 &&
-        (trimmedAnalysis.includes('#') || trimmedAnalysis.includes('**'));
-
-      if (!hasContent) {
-        this.logger.warn('KPI analysis has insufficient content', {
-          length: trimmedAnalysis.length,
-          preview: trimmedAnalysis.substring(0, 100),
-        });
-        return {
-          healthScore: 0,
-          insights: [],
-          rawAnalysis: trimmedAnalysis,
-          hasMinimalData: true,
-        };
-      }
-
-      // Extract key metrics for summary
-      const healthScore = this.extractNumber(trimmedAnalysis, /health\s*score[:\s]+(\d+)/i) || 0;
-      const insights = this.extractInsights(trimmedAnalysis);
-
-      return {
-        healthScore,
-        insights,
-        rawAnalysis: trimmedAnalysis,
-        hasMinimalData: false,
-      };
-    } catch (error) {
-      this.logger.warn('Failed to parse KPI analysis', {
-        error: error instanceof Error ? error.message : String(error),
+      // Parse JSON from LLM response
+      const parsed = LLMJsonParser.parse<KPIOutput>(analysis, {
+        contextName: 'kpi-analyzer',
+        logErrors: true,
       });
+
+      // Validate with Zod schema
+      const validated = KPIOutputSchema.parse(parsed);
+
+      return validated as Record<string, unknown>;
+    } catch (error) {
+      this.logger.warn('Failed to parse KPI analysis, using fallback', {
+        error: error instanceof Error ? error.message : String(error),
+        preview: analysis.substring(0, 200),
+      });
+
+      // Fallback to minimal valid structure
       return {
-        healthScore: 0,
-        insights: [],
-        rawAnalysis: analysis.trim() || 'No analysis generated',
+        healthScore: {
+          overall: 0,
+          codeQuality: 0,
+          testing: 0,
+          architecture: 0,
+          dependencies: 0,
+          complexity: 0,
+          rating: 'poor',
+        },
+        codeOrganization: {
+          totalFiles: 0,
+          codeFiles: 0,
+          testFiles: 0,
+          configFiles: 0,
+          testCoverageRatio: 0,
+          sizeCategory: 'small',
+        },
+        insights: [
+          {
+            category: 'architecture',
+            severity: 'critical',
+            title: 'Analysis Failed',
+            description: 'KPI analysis could not be completed due to parsing errors',
+            recommendation: 'Re-run analysis with verbose logging to diagnose the issue',
+          },
+        ],
+        recommendations: [],
         hasMinimalData: true,
       };
     }
@@ -230,50 +320,173 @@ Generate a complete markdown document (NOT JSON) with the KPI dashboard. Include
    * Generate summary from parsed data
    */
   protected generateSummary(data: Record<string, unknown>): string {
-    const healthScore = (data.healthScore as number) || 0;
-    const insightCount = ((data.insights as string[]) || []).length;
+    const healthScore = data.healthScore as KPIOutput['healthScore'];
+    const insights = data.insights as KPIOutput['insights'];
 
-    return `Repository health score: ${healthScore}%. Generated ${insightCount} actionable insights for improvement.`;
+    if (!healthScore || !insights) {
+      return 'KPI analysis incomplete';
+    }
+
+    const rating = this.getRatingEmoji(healthScore.rating);
+    return `Repository health: ${healthScore.overall}% (${rating} ${healthScore.rating}). ${insights.length} insights generated.`;
   }
 
   /**
-   * Format markdown output (backwards compatibility)
+   * Get emoji for rating
+   */
+  private getRatingEmoji(rating: string): string {
+    const emojiMap: Record<string, string> = {
+      excellent: '🌟',
+      good: '✅',
+      fair: '⚠️',
+      poor: '❌',
+    };
+    return emojiMap[rating] || '❓';
+  }
+
+  /**
+   * Format markdown output from structured data
    */
   protected async formatMarkdown(
     data: Record<string, unknown>,
     _state: typeof AgentWorkflowState.State,
   ): Promise<string> {
-    let content = `# 📊 Repository KPI Dashboard\n\n`;
-
-    // Check if we have meaningful data
+    // Check for minimal data fallback
     if (data.hasMinimalData) {
-      content += `## ⚠️ Insufficient Data\n\n`;
-      content += `Unable to generate comprehensive KPI metrics. This may occur if:\n`;
-      content += `- The project structure is minimal\n`;
-      content += `- Analysis could not extract sufficient metrics\n`;
-      content += `- LLM response was incomplete\n\n`;
-      content += `**Raw Analysis:**\n${data.rawAnalysis || 'No data available'}\n`;
-      return content;
+      return this.formatMinimalMarkdown();
     }
 
-    if (data.rawAnalysis && typeof data.rawAnalysis === 'string' && data.rawAnalysis.length > 100) {
-      // If we have substantial raw analysis, use it
-      content += `${data.rawAnalysis}\n\n`;
-    } else {
-      // Otherwise, structure the output
-      content += `## Health Score\n\n`;
-      content += `**Overall Score**: ${data.healthScore || 0}%\n\n`;
+    const healthScore = data.healthScore as KPIOutput['healthScore'];
+    const codeOrg = data.codeOrganization as KPIOutput['codeOrganization'];
+    const insights = data.insights as KPIOutput['insights'];
+    const recommendations = data.recommendations as KPIOutput['recommendations'];
 
-      if (data.insights && Array.isArray(data.insights) && data.insights.length > 0) {
-        content += `## Key Insights\n\n`;
-        (data.insights as string[]).forEach((insight) => {
-          content += `- ${insight}\n`;
-        });
-        content += `\n`;
-      }
+    if (!healthScore || !codeOrg || !insights) {
+      return this.formatMinimalMarkdown();
     }
+
+    const rating = this.getRatingEmoji(healthScore.rating);
+
+    let content = `# 📊 Repository KPI Dashboard\n\n`;
+    content += `## 🎯 Overall Health Score\n\n`;
+    content += `**${healthScore.overall}/100** ${rating} ${healthScore.rating.toUpperCase()}\n\n`;
+
+    content += `| Component | Score | Weight |\n`;
+    content += `|-----------|-------|--------|\n`;
+    content += `| Code Quality | ${healthScore.codeQuality}/10 | 30% |\n`;
+    content += `| Testing | ${healthScore.testing}/10 | 20% |\n`;
+    content += `| Architecture | ${healthScore.architecture}/10 | 20% |\n`;
+    content += `| Dependencies | ${healthScore.dependencies}/10 | 15% |\n`;
+    content += `| Complexity | ${healthScore.complexity}/10 | 15% |\n\n`;
+
+    content += `## 📁 Code Organization\n\n`;
+    content += `- **Total Files**: ${codeOrg.totalFiles.toLocaleString()}\n`;
+    content += `- **Code Files**: ${codeOrg.codeFiles.toLocaleString()}\n`;
+    content += `- **Test Files**: ${codeOrg.testFiles.toLocaleString()}\n`;
+    content += `- **Config Files**: ${codeOrg.configFiles.toLocaleString()}\n`;
+    content += `- **Test Coverage Ratio**: ${codeOrg.testCoverageRatio.toFixed(2)}:1\n`;
+    content += `- **Size Category**: ${codeOrg.sizeCategory}\n\n`;
+
+    content += `## 💡 Key Insights\n\n`;
+    const sortedInsights = [...insights].sort((a, b) => {
+      const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+      return severityOrder[a.severity] - severityOrder[b.severity];
+    });
+
+    sortedInsights.forEach((insight) => {
+      const severityEmoji = this.getSeverityEmoji(insight.severity);
+      content += `### ${severityEmoji} ${insight.title}\n\n`;
+      content += `**Category**: ${insight.category} | **Severity**: ${insight.severity}\n\n`;
+      content += `${insight.description}\n\n`;
+      content += `**Recommendation**: ${insight.recommendation}\n\n`;
+    });
+
+    if (recommendations && recommendations.length > 0) {
+      content += `## 📋 Recommendations\n\n`;
+
+      const grouped = this.groupRecommendationsByPriority(recommendations);
+
+      (['p1', 'p2', 'p3', 'p4'] as const).forEach((priority) => {
+        const items = grouped[priority];
+        if (items.length > 0) {
+          content += `### Priority ${priority.toUpperCase()}\n\n`;
+          items.forEach((rec) => {
+            const impactEmoji = this.getImpactEmoji(rec.impact);
+            content += `#### ${impactEmoji} ${rec.title}\n\n`;
+            content += `${rec.description}\n\n`;
+            content += `- **Effort**: ${rec.effort}\n`;
+            content += `- **Impact**: ${rec.impact}\n\n`;
+          });
+        }
+      });
+    }
+
+    content += `---\n\n`;
+    content += `*Generated by KPI Analyzer v${this.getMetadata().version}*\n`;
 
     return content;
+  }
+
+  /**
+   * Format minimal markdown for failed analysis
+   */
+  private formatMinimalMarkdown(): string {
+    return `# 📊 Repository KPI Dashboard
+
+## ⚠️ Analysis Incomplete
+
+Unable to generate comprehensive KPI metrics. This may indicate:
+- Parsing errors in the analysis pipeline
+- Insufficient project data
+- LLM response formatting issues
+
+Please re-run the analysis or check logs for details.
+
+---
+
+*Generated by KPI Analyzer v${this.getMetadata().version}*
+`;
+  }
+
+  /**
+   * Get emoji for severity level
+   */
+  private getSeverityEmoji(severity: string): string {
+    const emojiMap: Record<string, string> = {
+      critical: '🔴',
+      high: '🟠',
+      medium: '🟡',
+      low: '🟢',
+      info: 'ℹ️',
+    };
+    return emojiMap[severity] || '❓';
+  }
+
+  /**
+   * Get emoji for impact level
+   */
+  private getImpactEmoji(impact: string): string {
+    const emojiMap: Record<string, string> = {
+      critical: '🔴',
+      high: '🟠',
+      medium: '🟡',
+      low: '🟢',
+    };
+    return emojiMap[impact] || '❓';
+  }
+
+  /**
+   * Group recommendations by priority
+   */
+  private groupRecommendationsByPriority(
+    recommendations: KPIOutput['recommendations'],
+  ): Record<'p1' | 'p2' | 'p3' | 'p4', KPIOutput['recommendations']> {
+    return {
+      p1: recommendations.filter((r) => r.priority === 'p1'),
+      p2: recommendations.filter((r) => r.priority === 'p2'),
+      p3: recommendations.filter((r) => r.priority === 'p3'),
+      p4: recommendations.filter((r) => r.priority === 'p4'),
+    };
   }
 
   /**
@@ -363,40 +576,5 @@ Generate a complete markdown document (NOT JSON) with the KPI dashboard. Include
       totalSize: 0, // Would need file stats
       languages: Array.from(languageSet).slice(0, 5), // Top 5 languages
     };
-  }
-
-  /**
-   * Helper: Extract number from text
-   */
-  private extractNumber(text: string, pattern: RegExp): number | null {
-    const match = text.match(pattern);
-    return match ? parseInt(match[1], 10) : null;
-  }
-
-  /**
-   * Helper: Extract insights from markdown
-   */
-  private extractInsights(text: string): string[] {
-    const insights: string[] = [];
-    const lines = text.split('\n');
-
-    for (const line of lines) {
-      if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
-        insights.push(line.trim().substring(2));
-      }
-    }
-
-    return insights;
-  }
-
-  /**
-   * Helper: Format file size
-   */
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   }
 }
