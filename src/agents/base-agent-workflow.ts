@@ -494,9 +494,8 @@ export abstract class BaseAgentWorkflow {
     const maxQuestionsPerIteration = config.configurable?.maxQuestionsPerIteration || 3;
     const isQuickMode = maxQuestionsPerIteration <= 2;
 
-    // Allow agents to override maxTokens (e.g., schema-generator needs more)
-    const defaultMaxTokens = isQuickMode ? 8000 : 16000;
-    const maxTokens = this.getMaxOutputTokens?.(isQuickMode, context) ?? defaultMaxTokens;
+    // Allow agents to override maxTokens (e.g., schema-generator needs different limits)
+    const maxTokens = this.getMaxOutputTokens(isQuickMode, context);
 
     const modelOptions = {
       temperature: 0.3,
@@ -1714,13 +1713,16 @@ ${this.getDepthSpecificGuidance(mode)}`;
 
   /**
    * Get maximum output tokens for LLM calls
-   * Override this in subclasses if agent needs more output tokens (e.g., schema-generator)
+   * Override this in subclasses if agent needs different limits
+   * Default implementation returns: Quick mode = 8000, Normal/Deep = 16000
    *
    * @param isQuickMode - Whether running in quick mode
-   * @param context - Agent execution context
+   * @param _context - Agent execution context
    * @returns Maximum number of output tokens
    */
-  protected getMaxOutputTokens?(isQuickMode: boolean, context: AgentContext): number | undefined;
+  protected getMaxOutputTokens(isQuickMode: boolean, _context: AgentContext): number {
+    return isQuickMode ? 8000 : 16000; // Default limits
+  }
 
   // Abstract methods that subclasses must implement
   protected abstract getAgentName(): string;

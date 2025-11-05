@@ -63,6 +63,7 @@ import { Command } from 'commander';
 import { analyzeProject } from './commands/analyze.command';
 import { registerConfigCommand } from './commands/config.command';
 import { exportDocumentation } from './commands/export.command';
+import { registerHelpCommand } from './commands/help.command';
 
 // Read version from package.json
 const packageJson = JSON.parse(
@@ -141,6 +142,9 @@ program
 
 // Config command
 registerConfigCommand(program);
+
+// Help command
+registerHelpCommand(program);
 
 // Parse CLI arguments
 program.parse();

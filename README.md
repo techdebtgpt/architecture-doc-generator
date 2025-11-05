@@ -113,11 +113,14 @@ This will:
 
 | Command                 | Description                          | Example                                   |
 | ----------------------- | ------------------------------------ | ----------------------------------------- |
+| `archdoc help`          | Show comprehensive help              | `archdoc help`                            |
 | `archdoc analyze`       | Generate comprehensive documentation | `archdoc analyze /path/to/project`        |
 | `archdoc analyze --c4`  | Generate C4 architecture model       | `archdoc analyze --c4`                    |
 | `archdoc config --init` | Interactive configuration setup      | `archdoc config --init`                   |
 | `archdoc config --list` | Show current configuration           | `archdoc config --list`                   |
 | `archdoc export`        | Export docs to different formats     | `archdoc export .arch-docs --format html` |
+
+> 💡 **Tip**: Run `archdoc help` for a comprehensive guide with examples, configuration options, and common workflows.
 
 #### Documentation Generation
 
