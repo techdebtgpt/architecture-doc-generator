@@ -242,7 +242,7 @@ Examples:
 Return ONLY a JSON array of 5-10 lowercase keywords/patterns specific to this project:
 ["keyword1", "keyword2", ...]`;
 
-      const response = await model.invoke(prompt);
+      const response = await model.invoke(prompt, { runName: 'security-pattern-discovery' });
       const content = typeof response.content === 'string' ? response.content : '';
 
       // Parse JSON array from response

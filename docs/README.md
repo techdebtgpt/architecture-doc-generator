@@ -4,11 +4,19 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 
 ## 📚 Table of Contents
 
+### 📖 Getting Started
+
 - [**User Guide**](./USER_GUIDE.md): Detailed instructions on how to use the CLI, including all commands, options, and configuration.
 - [**Configuration Guide**](./CONFIGURATION_GUIDE.md): A complete reference for all configuration options available in `.archdoc.config.json` and environment variables.
 - [**Quick Config Reference**](./QUICK_CONFIG_REFERENCE.md): A cheat sheet for quick access to the most common configuration settings.
-- [**Search Strategy Benchmark**](./SEARCH_STRATEGY_BENCHMARK.md): Real-world performance comparison of all search strategies (vector, hybrid, graph, smart, keyword) with recommendations.
-- [**Vector Search Guide**](./VECTOR_SEARCH.md): Comprehensive guide to RAG-based vector search, embeddings, and retrieval strategies.
+
+### 🔍 Vector Search & Performance
+
+- [**Vector Search Guide**](./VECTOR_SEARCH.md): ⭐ Complete guide to vector search with integrated recommendations. Covers RAG-based search, embeddings providers (local/OpenAI), retrieval strategies (Graph/Hybrid/Vector/Smart), and when to use each.
+- [**🏆 Search Strategy Benchmark**](./SEARCH_STRATEGY_BENCHMARK.md): Comprehensive real-world benchmark of 6 configurations on tech-debt-api showing **Graph + Local as winner** (84.8%, 6.1min, $0.0841). Includes detailed per-agent analysis and why OpenAI underperformed.
+
+### 🔧 Integration & Development
+
 - [**API Reference**](./API.md): Documentation for the programmatic API, allowing you to integrate ArchDoc Generator into your own applications.
 - [**Architecture**](./ARCHITECTURE.md): An in-depth look at the technical design, patterns, and agent-based system of the generator.
 - [**Agent Workflow**](./AGENT_WORKFLOW.md): Learn how agents use self-refinement workflows to iteratively improve analysis quality.

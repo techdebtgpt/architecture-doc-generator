@@ -60,27 +60,35 @@ yarn global add @techdebtgpt/archdoc-generator
 pnpm add -g @techdebtgpt/archdoc-generator
 ```
 
-## 📊 Search Strategy Performance
+## 📊 Vector Search & Embeddings Performance
 
-We benchmarked all search strategies on a real-world 6K+ file NestJS project. **Hybrid strategy (semantic + structural)** is recommended for production use.
+We benchmarked **6 configurations** (including OpenAI embeddings) on a real-world 6,187-file NestJS project. **Graph + Local embeddings is the clear winner!**
 
 **Quick Comparison**:
 
-| Strategy        | Speed   | Cost     | Best For                        |
-| --------------- | ------- | -------- | ------------------------------- |
-| **Hybrid** ⭐   | 417s    | $0.40    | **Production** (recommended)    |
-| **Vector-only** | 389s ⚡ | $0.39 💰 | Fast iteration                  |
-| **Smart**       | 394s    | $0.39    | Auto-adaptive, efficient        |
-| **Graph**       | 446s    | $0.40    | Deep architecture analysis      |
-| **Keyword**     | 405s    | $0.40    | No embeddings (not recommended) |
+| Configuration        | Speed           | Cost         | Accuracy     | Winner?    |
+| -------------------- | --------------- | ------------ | ------------ | ---------- |
+| **Graph + Local** ⭐ | **6.1 min** ⚡  | **$0.08** 💰 | **84.8%** 🎯 | **YES** ✅ |
+| Hybrid + Local       | 6.4 min         | $0.09        | 84.3%        | Good       |
+| Smart + Local        | 6.3 min         | $0.08        | 84.6%        | Good       |
+| Keyword-only         | 7.3 min         | $0.09        | 84.6%        | Fallback   |
+| **OpenAI** ❌        | **11.7 min** ⚠️ | **$0.29** ⚠️ | **82.9%** ⚠️ | **NO**     |
 
-**📖 Full Benchmark**: See **[Search Strategy Benchmark](./docs/SEARCH_STRATEGY_BENCHMARK.md)** for:
+**Key Findings:**
 
-- Detailed performance metrics
-- Content quality comparison
-- Configuration examples
-- Cost projections by project size
-- Use case recommendations
+- ✅ Graph + Local: **Fastest, cheapest, most accurate** (best overall)
+- ❌ OpenAI: **92% slower, 3.4x more expensive, 1.9% less accurate** (NOT recommended)
+- 🆓 Local embeddings (free) outperform OpenAI embeddings (paid) for code analysis
+
+**📖 Complete Analysis**: See **[Search Strategy Benchmark](./docs/SEARCH_STRATEGY_BENCHMARK.md)** for:
+
+- Per-agent clarity scores (8 agents × 6 configurations)
+- Why Graph + Local won (structural > semantic for code)
+- Why OpenAI underperformed (8192 token limit, context loss, batching overhead)
+- Configuration examples for all use cases
+- Memory usage and technical deep-dive
+
+Also see: [Vector Search Guide](./docs/VECTOR_SEARCH.md) - Complete guide to vector search with integrated recommendations
 
 ---
 

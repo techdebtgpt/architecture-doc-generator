@@ -803,7 +803,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
    * orchestrator just executes them sequentially
    */
   private buildWorkflow() {
-    const graph = new StateGraph(DocumentationState);
+    const graph = new StateGraph(DocumentationState, {});
 
     // Define nodes
     graph.addNode('executeAgent', this.executeAgentNode.bind(this));
@@ -827,7 +827,9 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     // End after synthesis
     graph.addEdge('synthesizeRecommendations' as '__start__', END);
 
-    return graph.compile({ checkpointer: this.checkpointer });
+    return graph.compile({ checkpointer: this.checkpointer }).withConfig({
+      runName: `DocumentationOrchestrator-${Date.now()}`,
+    });
   }
 
   /**

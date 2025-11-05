@@ -1,593 +1,1167 @@
-# Vector Search for Architecture Documentation
+# Vector Search for Architecture Documentation# Vector Search for Architecture Documentation
 
-> **Complete guide to semantic similarity search with RAG (Retrieval-Augmented Generation) in architecture-doc-generator**
+> **AI-powered semantic search with RAG (Retrieval-Augmented Generation) for finding relevant code files**> **Complete guide to semantic similarity search with RAG (Retrieval-Augmented Generation) in architecture-doc-generator**
 
-## Table of Contents
+## Table of Contents## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Overview](#overview)
-3. [How It Works](#how-it-works)
-4. [Embeddings Providers](#embeddings-providers)
-5. [Configuration](#configuration)
-6. [Performance & Cost](#performance--cost)
-7. [Usage Examples](#usage-examples)
-8. [Advanced Features](#advanced-features)
-9. [Comparison: Vector vs Keyword](#comparison-vector-vs-keyword)
+1. [Quick Start](#quick-start)1. [Quick Start](#quick-start)
+
+2. [Overview](#overview)2. [Overview](#overview)
+
+3. [Configuration](#configuration)3. [How It Works](#how-it-works)
+
+4. [Performance Benchmark](#performance-benchmark)4. [Embeddings Providers](#embeddings-providers)
+
+5. [Embeddings Providers](#embeddings-providers)5. [Configuration](#configuration)
+
+6. [Retrieval Strategies](#retrieval-strategies)6. [Performance & Cost](#performance--cost)
+
+7. [How It Works](#how-it-works)7. [Usage Examples](#usage-examples)
+
+8. [Best Practices](#best-practices)8. [Advanced Features](#advanced-features)
+
+9. [Troubleshooting](#troubleshooting)9. [Comparison: Vector vs Keyword](#comparison-vector-vs-keyword)
+
 10. [Troubleshooting](#troubleshooting)
-11. [Best Practices](#best-practices)
+
+---11. [Best Practices](#best-practices)
+
 12. [Technical Deep Dive](#technical-deep-dive)
-13. [Future Enhancements](#future-enhancements)
 
----
+## Quick Start13. [Future Enhancements](#future-enhancements)
 
-## Quick Start
+### TL;DR---
 
-### TL;DR
+**Use Graph + Local embeddings** - Fastest (6.1min), most accurate (84.8%), free, offline.## Quick Start
 
-The architecture-doc-generator supports **semantic similarity search** using RAG with embeddings. This finds relevant code files by **meaning**, not just keywords.
+````bash### TL;DR
 
-### Installation
+# Recommended configuration
 
-```bash
-npm install -g @techdebtgpt/archdoc-generator
-```
+archdoc analyze ./my-project --search-mode vector --retrieval-strategy graphThe architecture-doc-generator supports **semantic similarity search** using RAG with embeddings. This finds relevant code files by **meaning**, not just keywords.
 
-### Basic Usage
 
-```bash
-# Default: Free local embeddings (no API key required)
-# If .archdoc.config.json exists with retrieval.strategy set, uses that automatically
-archdoc analyze ./my-project
 
-# Configure via config file (.archdoc.config.json):
+# Or via config file**🏆 RECOMMENDED: Use Graph + Local** - Best accuracy (84.8%), fastest (6.1min), free ($0.00), offline. [See benchmark results](./BENCHMARK_RESULTS.md).
+
 {
-  "searchMode": {
-    "mode": "vector",           // "vector" or "keyword"
-    "embeddingsProvider": "local",  // "local", "openai", or "google"
-    "strategy": "hybrid"        // "vector", "graph", "hybrid", or "smart"
-  }
+
+  "searchMode": {### Installation
+
+    "mode": "vector",
+
+    "embeddingsProvider": "local",```bash
+
+    "strategy": "graph"npm install -g @techdebtgpt/archdoc-generator
+
+  }```
+
 }
 
-# Or use CLI flags:
+```### Basic Usage
+
+
+
+### When to Use Each Configuration```bash
+
+# RECOMMENDED: Graph strategy with local embeddings (best overall)
+
+| Configuration | Speed | Cost | Accuracy | Best For |archdoc analyze ./my-project --search-mode vector --retrieval-strategy graph
+
+|--------------|-------|------|----------|----------|
+
+| **Graph + Local** ⭐ | **6.1 min** | **FREE** | **84.8%** | **Production** (RECOMMENDED) |# Default: Uses config from .archdoc.config.json if exists
+
+| Hybrid + Local | 6.4 min | FREE | 84.3% | Balanced semantic+structural |archdoc analyze ./my-project
+
+| Smart + Local | 6.3 min | FREE | 84.6% | Auto-adaptive, varied codebases |
+
+| Keyword-only | 7.3 min | FREE | 84.6% | CI/CD, no embeddings |# Configure via config file (.archdoc.config.json):
+
+| ~~OpenAI~~ ❌ | 11.7 min | $0.29 | 82.9% | **NOT RECOMMENDED** |{
+
+  "searchMode": {
+
+> **📊 See [Search Strategy Benchmark](./SEARCH_STRATEGY_BENCHMARK.md) for complete analysis**    "mode": "vector",               // "vector" or "keyword"
+
+    "embeddingsProvider": "local",  // "local" (recommended), "openai", or "google"
+
+---    "strategy": "graph"             // "graph" (best!), "hybrid", "vector", or "smart"
+
+  }
+
+## Overview}
+
+
+
+### What is Vector Search?# Hybrid strategy (semantic 60% + structural 40%)
+
 archdoc analyze ./my-project --search-mode vector --retrieval-strategy hybrid
 
-# Or environment variables (fallback):
-EMBEDDINGS_PROVIDER=openai OPENAI_API_KEY=sk-... archdoc analyze ./my-project
+Vector search uses **embeddings** (numerical representations of text) to find semantically similar code files. Instead of exact keyword matching, it understands **meaning** and **context**.
 
-# Keyword search (fastest, no embeddings)
-archdoc analyze ./my-project --search-mode keyword
-```
+# Keyword search (no embeddings, good for CI/CD)
 
-### When to Use Each Mode
+**Example:**archdoc analyze ./my-project --search-mode keyword
 
-| Mode                | Best For                                    | Speed   | Accuracy         | Cost              |
-| ------------------- | ------------------------------------------- | ------- | ---------------- | ----------------- |
-| **Local (default)** | Getting started, privacy-sensitive, offline | Fast    | Good (70-80%)    | FREE ✅           |
-| **OpenAI**          | Production docs, highest accuracy           | Medium  | Excellent (95%+) | ~$0.01/10K files  |
-| **Google**          | Production docs, cost-effective             | Medium  | Excellent (90%+) | ~$0.005/10K files |
-| **Keyword**         | CI/CD, simple projects                      | Fastest | Basic (60-75%)   | FREE ✅           |
+````
 
----
+Query: "error handling patterns"# NOT RECOMMENDED: OpenAI embeddings (slower, more expensive, lower accuracy)
 
-## Overview
+# See BENCHMARK_RESULTS.md for why OpenAI underperformed
 
-### Features
+Vector Search finds:EMBEDDINGS_PROVIDER=openai OPENAI_API_KEY=sk-... archdoc analyze ./my-project
 
-#### **Semantic Similarity Search**
+✅ error-handler.ts (no exact match, but semantically related)```
 
-- Converts code files into vector representations (embeddings)
+✅ exception-middleware.ts (understands "error" ≈ "exception")
+
+✅ retry-logic.ts (understands error handling includes retries)### When to Use Each Mode
+
+Keyword Search finds:> **⭐ NEW: Comprehensive benchmark results show Graph + Local is the winner!** See [BENCHMARK_RESULTS.md](./BENCHMARK_RESULTS.md) for complete analysis.
+
+✅ error-handler.ts (contains "error")
+
+❌ exception-middleware.ts (no "error" keyword)| Mode | Best For | Speed | Accuracy (Real-World) | Cost |
+
+❌ retry-logic.ts (no "error" keyword)| ------------------- | ------------------------------------------- | ------- | --------------------- | ----------------- |
+
+````| **Graph + Local** ⭐ | **PRODUCTION** (best overall)             | **Fastest** (6.1min) | **Excellent (84.8%)** | **FREE** ✅       |
+
+| **Hybrid + Local**  | Balanced semantic+structural                | Fast (6.4min)    | Very Good (84.3%)     | FREE ✅           |
+
+### Key Features| **Smart + Local**   | Auto-adaptive, varied codebases             | Fast (6.3min)    | Very Good (84.6%)     | FREE ✅           |
+
+| **Keyword**         | CI/CD, simple projects, no embeddings       | Fast (7.3min)    | Good (84.6%)          | FREE ✅           |
+
+- **🆓 Free by default** - Local TF-IDF embeddings (no API key required)| **OpenAI** ❌       | **NOT RECOMMENDED** (slow, expensive, worse)| Slow (11.7min)   | Below Average (82.9%) | **3.4x MORE** ($0.29) |
+
+- **🎯 Semantic understanding** - Finds code by meaning, not just keywords| **Google**          | Alternative to OpenAI (untested)            | Medium  | Unknown (est. 90%+)   | ~$0.005/10K files |
+
+- **🔗 Structural awareness** - Follows imports and dependencies
+
+- **⚡ Fast** - 6-7 minutes for 6K+ file projects---
+
+- **🔒 Privacy-preserving** - Code never leaves your machine (with local embeddings)
+
+- **🎨 Flexible** - Multiple strategies (graph, hybrid, vector, smart)## Overview
+
+
+
+---### Features
+
+
+
+## Configuration#### **Semantic Similarity Search**
+
+
+
+### Basic Configuration- Converts code files into vector representations (embeddings)
+
 - Finds files based on **semantic meaning** rather than exact keyword matches
-- Handles synonyms, related concepts, and contextual relevance automatically
 
-#### **Multiple Embeddings Providers**
+**Via CLI:**- Handles synonyms, related concepts, and contextual relevance automatically
+
+```bash
+
+# Graph strategy (recommended)#### **Multiple Embeddings Providers**
+
+archdoc analyze ./project --search-mode vector --retrieval-strategy graph
 
 Supports multiple embedding providers with easy switching:
 
-| Provider    | Model                  | Dimensions | Cost             | Best For          |
+# Hybrid strategy (semantic + structural)
+
+archdoc analyze ./project --search-mode vector --retrieval-strategy hybrid| Provider    | Model                  | Dimensions | Cost             | Best For          |
+
 | ----------- | ---------------------- | ---------- | ---------------- | ----------------- |
-| **Local**   | TF-IDF                 | 128        | FREE             | Default, no setup |
-| **OpenAI**  | text-embedding-3-small | 1536       | ~$0.02/1M tokens | Highest accuracy  |
-| **Google**  | text-embedding-004     | 768        | ~$0.01/1M tokens | Cost-effective    |
+
+# Keyword mode (no embeddings)| **Local**   | TF-IDF                 | 128        | FREE             | Default, no setup |
+
+archdoc analyze ./project --search-mode keyword| **OpenAI**  | text-embedding-3-small | 1536       | ~$0.02/1M tokens | Highest accuracy  |
+
+```| **Google**  | text-embedding-004     | 768        | ~$0.01/1M tokens | Cost-effective    |
+
 | HuggingFace | all-MiniLM-L6-v2       | 384        | FREE (with key)  | Open source       |
-| Cohere      | embed-english-v3.0     | 1024       | ~$0.10/1M tokens | Enterprise        |
-| Voyage      | voyage-2               | 1024       | ~$0.12/1M tokens | Specialized       |
 
-#### **In-Memory Vector Store**
+**Via Config File (.archdoc.config.json):**| Cohere      | embed-english-v3.0     | 1024       | ~$0.10/1M tokens | Enterprise        |
 
-- Uses LangChain's `MemoryVectorStore` for fast, memory-efficient storage
-- No external database or persistent storage required
-- Automatically initialized and cleaned up per agent execution
+```json| Voyage      | voyage-2               | 1024       | ~$0.12/1M tokens | Specialized       |
 
-#### **Dual Search Modes**
+{
 
-Supports both search strategies with configurable option:
+  "searchMode": {#### **In-Memory Vector Store**
 
-| Mode                   | Description                          | Speed  | Accuracy | Best For                    |
-| ---------------------- | ------------------------------------ | ------ | -------- | --------------------------- |
-| **`vector`** (default) | Semantic similarity using embeddings | Slower | Higher   | Complex queries, production |
-| **`keyword`**          | Traditional keyword matching         | Faster | Lower    | Simple queries, CI/CD       |
+    "mode": "vector",
 
----
+    "embeddingsProvider": "local",- Uses LangChain's `MemoryVectorStore` for fast, memory-efficient storage
 
-## How It Works
+    "strategy": "graph"- No external database or persistent storage required
 
-### Complete Process Flow
+  }- Automatically initialized and cleaned up per agent execution
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. INITIALIZATION PHASE (Once Per Agent)                    │
-└─────────────────────────────────────────────────────────────┘
+}
+
+```#### **Dual Search Modes**
+
+
+
+### Advanced ConfigurationSupports both search strategies with configurable option:
+
+
+
+```json| Mode                   | Description                          | Speed  | Accuracy | Best For                    |
+
+{| ---------------------- | ------------------------------------ | ------ | -------- | --------------------------- |
+
+  "searchMode": {| **`vector`** (default) | Semantic similarity using embeddings | Slower | Higher   | Complex queries, production |
+
+    "mode": "vector",| **`keyword`**          | Traditional keyword matching         | Faster | Lower    | Simple queries, CI/CD       |
+
+    "embeddingsProvider": "local",
+
+    "strategy": "hybrid",---
+
+    "vectorWeight": 0.6,
+
+    "graphWeight": 0.4,## How It Works
+
+    "similarityThreshold": 0.3,
+
+    "topK": 10,### Complete Process Flow
+
+    "includeRelatedFiles": true,
+
+    "maxDepth": 2```
+
+  }┌─────────────────────────────────────────────────────────────┐
+
+}│ 1. INITIALIZATION PHASE (Once Per Agent)                    │
+
+```└─────────────────────────────────────────────────────────────┘
+
    │
-   ├─► Step 1: Filter Files
-   │   ├─ Input: All project files (e.g., 500 files)
-   │   ├─ Exclude: node_modules, dist, .git, test files
-   │   ├─ Size limit: Skip files > 100KB
-   │   └─ Output: ~150 filtered files
-   │
-   ├─► Step 2: Load File Contents (Batched)
-   │   ├─ Read files in batches of 50
-   │   ├─ Truncate content to maxFileSize (50KB default)
-   │   ├─ Cache content in memory (LRU cache)
+
+**Options:**   ├─► Step 1: Filter Files
+
+- `mode`: `"vector"` or `"keyword"`   │   ├─ Input: All project files (e.g., 500 files)
+
+- `embeddingsProvider`: `"local"` (recommended), `"openai"`, `"google"`   │   ├─ Exclude: node_modules, dist, .git, test files
+
+- `strategy`: `"graph"` (best!), `"hybrid"`, `"vector"`, `"smart"`   │   ├─ Size limit: Skip files > 100KB
+
+- `vectorWeight`: Semantic similarity weight (0-1, default: 0.6)   │   └─ Output: ~150 filtered files
+
+- `graphWeight`: Structural relationship weight (0-1, default: 0.4)   │
+
+- `similarityThreshold`: Minimum score to include file (0-1, default: 0.3)   ├─► Step 2: Load File Contents (Batched)
+
+- `topK`: Max files per query (default: 10)   │   ├─ Read files in batches of 50
+
+- `includeRelatedFiles`: Include imported/importer files (default: true)   │   ├─ Truncate content to maxFileSize (50KB default)
+
+- `maxDepth`: Dependency traversal depth (default: 2)   │   ├─ Cache content in memory (LRU cache)
+
    │   └─ Create LangChain Document objects
-   │
-   ├─► Step 3: Generate Embeddings
-   │   ├─ LOCAL: Calculate TF-IDF vectors (instant)
-   │   ├─ CLOUD: Send to API (OpenAI/Google/etc.)
-   │   ├─ Model converts text → vector array
-   │   └─ Returns: Vector array [0.123, -0.456, ...]
-   │
-   └─► Step 4: Build In-Memory Vector Store
-       ├─ Store vectors in MemoryVectorStore (RAM)
-       ├─ Index: ~10MB per 1000 files
-       ├─ Supports fast similarity search
-       └─ Ready for queries
 
-┌─────────────────────────────────────────────────────────────┐
-│ 2. SEARCH PHASE (Multiple Times Per Agent)                  │
-└─────────────────────────────────────────────────────────────┘
+---   │
+
+   ├─► Step 3: Generate Embeddings
+
+## Performance Benchmark   │   ├─ LOCAL: Calculate TF-IDF vectors (instant)
+
+   │   ├─ CLOUD: Send to API (OpenAI/Google/etc.)
+
+### Test Environment   │   ├─ Model converts text → vector array
+
+   │   └─ Returns: Vector array [0.123, -0.456, ...]
+
+- **Project**: tech-debt-api (Production NestJS)   │
+
+- **Files**: 6,187 total, 888 analyzed   └─► Step 4: Build In-Memory Vector Store
+
+- **LLM**: Claude Haiku 4.5       ├─ Store vectors in MemoryVectorStore (RAM)
+
+- **Agents**: 8 specialized agents       ├─ Index: ~10MB per 1000 files
+
+       ├─ Supports fast similarity search
+
+### Complete Results       └─ Ready for queries
+
+
+
+| Configuration | Time | Init | Tokens | Cost | Clarity | KPI Score | Winner? |┌─────────────────────────────────────────────────────────────┐
+
+|--------------|------|------|--------|------|---------|-----------|---------|│ 2. SEARCH PHASE (Multiple Times Per Agent)                  │
+
+| **Graph + Local** ⭐ | **6.1 min** | 0.2s | 175,965 | **$0.08** | **84.8%** | **87.5%** | ✅ **YES** |└─────────────────────────────────────────────────────────────┘
+
+| Hybrid + Local | 6.4 min | 0.2s | 178,545 | $0.09 | 84.3% | 87.5% | Good |   │
+
+| Smart + Local | 6.3 min | 0.2s | 174,687 | $0.08 | 84.6% | 84.5% | Good |   ├─► Step 1: Question Embedding
+
+| Vector + Local | 6.2 min | 0.2s | 173,252 | $0.08 | 83.1% | 85.5% | Baseline |   │   ├─ Question: "What error handling patterns?"
+
+| Keyword-only | 7.3 min | 0s | 183,289 | $0.09 | 84.6% | 85.8% | Fallback |   │   ├─ Convert question to vector
+
+| **OpenAI** ❌ | **11.7 min** | **90s** | 494,682 | **$0.29** | **82.9%** | **79.3%** | ❌ **NO** |   │   └─ Returns: Query vector [0.234, -0.567, ...]
+
    │
-   ├─► Step 1: Question Embedding
-   │   ├─ Question: "What error handling patterns?"
-   │   ├─ Convert question to vector
-   │   └─ Returns: Query vector [0.234, -0.567, ...]
-   │
-   ├─► Step 2: Similarity Search (In-Memory)
+
+### Key Findings   ├─► Step 2: Similarity Search (In-Memory)
+
    │   ├─ Compare query vector with all file vectors
-   │   ├─ Algorithm: Cosine similarity
-   │   ├─ Speed: ~100ms for 1000 files
-   │   └─ Returns: Top K files with scores
-   │
-   ├─► Step 3: Filter by Threshold
-   │   ├─ Keep only scores >= 0.5
+
+✅ **Graph + Local Wins**   │   ├─ Algorithm: Cosine similarity
+
+- Fastest execution (6.1 min)   │   ├─ Speed: ~100ms for 1000 files
+
+- Highest accuracy (84.8%)   │   └─ Returns: Top K files with scores
+
+- Best KPI analysis (87.5% in 1 iteration)   │
+
+- Most cost-effective ($0.08)   ├─► Step 3: Filter by Threshold
+
+- Free & offline   │   ├─ Keep only scores >= 0.5
+
    │   ├─ Sort: Highest similarity first
-   │   └─ Output: Top 3 most relevant files
-   │
-   └─► Step 4: Enhancement with Dependency Graph
-       ├─ Add imported files (+0.4 relevance)
-       ├─ Add importer files (+0.3 relevance)
-       ├─ Add same-module files (+0.2 relevance)
+
+❌ **OpenAI Fails**   │   └─ Output: Top 3 most relevant files
+
+- 92% slower (11.7 min vs 6.1 min)   │
+
+- 3.4x more expensive ($0.29 vs $0.08)   └─► Step 4: Enhancement with Dependency Graph
+
+- 1.9% lower accuracy (82.9% vs 84.8%)       ├─ Add imported files (+0.4 relevance)
+
+- KPI analysis unstable (3 iterations, still lowest: 79.3%)       ├─ Add importer files (+0.3 relevance)
+
+- Context loss (8192 token limit → 1500 token/doc truncation)       ├─ Add same-module files (+0.2 relevance)
+
        └─ Return FileContent[] with scores
 
+### Why Graph + Local Won
+
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. CLEANUP PHASE (After Agent Completes)                    │
-└─────────────────────────────────────────────────────────────┘
-   │
-   └─► Clear Memory
+
+**1. Code is Structural, Not Semantic**│ 3. CLEANUP PHASE (After Agent Completes)                    │
+
+- Architecture defined by imports, dependencies, modules└─────────────────────────────────────────────────────────────┘
+
+- Graph traversal captures these directly   │
+
+- Semantic similarity misses structural patterns   └─► Clear Memory
+
        ├─ Delete vector store (~10MB freed)
-       ├─ Clear file content cache
-       └─ Reset initialization flag
-```
+
+**2. Local Embeddings Sufficient**       ├─ Clear file content cache
+
+- TF-IDF captures keyword overlap (highly relevant for code)       └─ Reset initialization flag
+
+- Combined with graph enhancement (imports, dependents)```
+
+- No context loss from truncation
 
 ### Similarity Scoring
 
-Cosine similarity scores range from 0 to 1:
+**3. OpenAI Limitations**
 
-- **1.0** = Perfect match (exact semantic similarity)
-- **0.8-0.99** = Highly relevant
+- 8192 token total limit requires batching (178 batches, 90s overhead)Cosine similarity scores range from 0 to 1:
+
+- Each doc truncated to 1500 tokens (lost critical context)
+
+- Semantic embeddings optimized for prose, not code structure- **1.0** = Perfect match (exact semantic similarity)
+
+- Higher cost for worse results- **0.8-0.99** = Highly relevant
+
 - **0.6-0.79** = Moderately relevant
-- **0.5-0.59** = Somewhat relevant
+
+> **📊 See [Search Strategy Benchmark](./SEARCH_STRATEGY_BENCHMARK.md) for detailed per-agent scores and technical deep-dive**- **0.5-0.59** = Somewhat relevant
+
 - **< 0.5** = Filtered out (below threshold)
+
+---
 
 **How cosine similarity works:**
 
-```
-Vector A (query): [0.5, 0.3, 0.8]
-Vector B (file):  [0.6, 0.4, 0.7]
-
-Cosine Similarity = (A · B) / (||A|| × ||B||)
-                  = (0.5×0.6 + 0.3×0.4 + 0.8×0.7) / (√0.98 × √1.01)
-                  = 0.98 (highly similar!)
-```
-
----
-
 ## Embeddings Providers
 
-### Local Embeddings (Default, FREE)
+````
+
+### Local (TF-IDF) - Recommended ⭐Vector A (query): [0.5, 0.3, 0.8]
+
+Vector B (file): [0.6, 0.4, 0.7]
+
+**What it is:** Free keyword-based embeddings using term frequency-inverse document frequency.
+
+Cosine Similarity = (A · B) / (||A|| × ||B||)
+
+**Pros:** = (0.5×0.6 + 0.3×0.4 + 0.8×0.7) / (√0.98 × √1.01)
+
+- ✅ 100% FREE = 0.98 (highly similar!)
+
+- ✅ Works offline```
+
+- ✅ Privacy-preserving (code never leaves machine)
+
+- ✅ Fast init (0.2s vs 90s for OpenAI)---
+
+- ✅ No truncation/context loss
+
+- ✅ Proven best for code (84.8% accuracy)## Embeddings Providers
+
+**Cons:**### Local Embeddings (Default, FREE)
+
+- ⚠️ No deep semantic understanding (but not needed for code!)
 
 **Advantages:**
 
-- ✅ **100% FREE** - No API key required
-- ✅ **Works offline** - No network calls
-- ✅ **Privacy-preserving** - Your code never leaves your machine
-- ✅ **Fast initialization** - No API latency
-- ✅ **No rate limits** - Process unlimited files
+**Configuration:**
 
-**Limitations:**
+````json- ✅ **100% FREE** - No API key required
 
-- ⚠️ Lower accuracy (70-80% vs 95% for OpenAI)
+{- ✅ **Works offline** - No network calls
+
+  "searchMode": {- ✅ **Privacy-preserving** - Your code never leaves your machine
+
+    "embeddingsProvider": "local"- ✅ **Fast initialization** - No API latency
+
+  }- ✅ **No rate limits** - Process unlimited files
+
+}
+
+```**Limitations:**
+
+
+
+**When to use:** Always! Unless you have a specific reason not to.- ⚠️ Lower accuracy (70-80% vs 95% for OpenAI)
+
 - ⚠️ No semantic understanding (keyword-based TF-IDF)
-- ⚠️ Smaller vector dimensions (128 vs 1536)
 
-**When to use:**
+### OpenAI - NOT Recommended ❌- ⚠️ Smaller vector dimensions (128 vs 1536)
 
-- Getting started with vector search
-- Privacy-sensitive codebases
+
+
+**What it is:** Cloud-based neural embeddings (text-embedding-3-small, 1536 dimensions).**When to use:**
+
+
+
+**Pros:**- Getting started with vector search
+
+- ✅ Deep semantic understanding (for natural language)- Privacy-sensitive codebases
+
 - Offline/air-gapped environments
-- Cost-conscious projects
-- CI/CD pipelines (fast + free)
 
-**Technical details:**
+**Cons:**- Cost-conscious projects
 
-- Algorithm: TF-IDF (Term Frequency-Inverse Document Frequency)
-- Dimensions: 128
-- Implementation: Custom `LocalEmbeddings` class
+- ❌ 3.4x more expensive ($0.29 vs $0.08)- CI/CD pipelines (fast + free)
+
+- ❌ 92% slower (11.7 min vs 6.1 min)
+
+- ❌ 1.9% lower accuracy (82.9% vs 84.8%)**Technical details:**
+
+- ❌ 8192 token limit (requires batching + truncation)
+
+- ❌ Context loss (1500 tokens/doc max)- Algorithm: TF-IDF (Term Frequency-Inverse Document Frequency)
+
+- ❌ Network dependency- Dimensions: 128
+
+- ❌ Privacy concerns- Implementation: Custom `LocalEmbeddings` class
+
 - Dependencies: None (built-in)
 
-### OpenAI Embeddings
-
-**Advantages:**
-
-- ✅ Highest accuracy (95%+ relevance)
-- ✅ True semantic understanding
-- ✅ Handles synonyms, context, relationships
-- ✅ Large vector space (1536 dimensions)
-
-**Requirements:**
-
-- OpenAI API key (`OPENAI_API_KEY`)
-
 **Configuration:**
 
-```bash
-# Environment variable (fallback)
-export OPENAI_API_KEY=sk-...
-export EMBEDDINGS_PROVIDER=openai
+```json### OpenAI Embeddings
 
-# Recommended: .archdoc.config.json
 {
-  "apiKeys": {
-    "anthropic": "sk-ant-...",
+
+  "embeddings": {**Advantages:**
+
     "openai": "sk-..."
-  },
-  "searchMode": {
-    "mode": "vector",
-    "embeddingsProvider": "openai",
-    "strategy": "hybrid"
-  }
+
+  },- ✅ Highest accuracy (95%+ relevance)
+
+  "searchMode": {- ✅ True semantic understanding
+
+    "embeddingsProvider": "openai"- ✅ Handles synonyms, context, relationships
+
+  }- ✅ Large vector space (1536 dimensions)
+
 }
-```
 
-**Cost:** ~$0.02 per 1M tokens (~$0.006 per 150 files)
+```**Requirements:**
 
-### Google Embeddings
 
-**Advantages:**
 
-- ✅ High accuracy (90%+)
+**When to use:** Don't. Our testing proved it underperforms for code analysis.- OpenAI API key (`OPENAI_API_KEY`)
+
+
+
+### Google (Untested)**Configuration:**
+
+
+
+**What it is:** Google text-embedding-004 (768 dimensions).```bash
+
+# Environment variable (fallback)
+
+**Expected:**export OPENAI_API_KEY=sk-...
+
+- 50% cheaper than OpenAIexport EMBEDDINGS_PROVIDER=openai
+
+- Similar performance issues (semantic > structural)
+
+- Untested on our benchmark# Recommended: .archdoc.config.json
+
+{
+
+**Configuration:**  "apiKeys": {
+
+```json    "anthropic": "sk-ant-...",
+
+{    "openai": "sk-..."
+
+  "embeddings": {  },
+
+    "google": "..."  "searchMode": {
+
+  },    "mode": "vector",
+
+  "searchMode": {    "embeddingsProvider": "openai",
+
+    "embeddingsProvider": "google"    "strategy": "hybrid"
+
+  }  }
+
+}}
+
+````
+
+---**Cost:** ~$0.02 per 1M tokens (~$0.006 per 150 files)
+
+## Retrieval Strategies### Google Embeddings
+
+### Graph - Best Overall ⭐**Advantages:**
+
+**What it does:** Pure dependency graph traversal (ignores semantic similarity).- ✅ High accuracy (90%+)
+
 - ✅ Cost-effective (~50% cheaper than OpenAI)
-- ✅ Good semantic understanding
-- ✅ Efficient vector space (768 dimensions)
 
-**Requirements:**
+**How it works:**- ✅ Good semantic understanding
 
-- Google API key (`GOOGLE_API_KEY`)
+1. Start with files matching query keywords- ✅ Efficient vector space (768 dimensions)
 
-**Configuration:**
+2. Follow import chains (A imports B)
 
-```bash
-export GOOGLE_API_KEY=...
-export EMBEDDINGS_PROVIDER=google
-```
+3. Follow dependent chains (C imports A)**Requirements:**
 
-**Cost:** ~$0.01 per 1M tokens (~$0.003 per 150 files)
+4. Include same-module files
 
-### Other Providers
+5. Score by structural proximity- Google API key (`GOOGLE_API_KEY`)
 
-**HuggingFace** (Open Source):
+**Pros:\*\***Configuration:\*\*
 
-- Free with API key
-- Model: `all-MiniLM-L6-v2`
-- Good for experimentation
+- ✅ Highest accuracy (84.8%)
+
+- ✅ Fastest execution (6.1 min)```bash
+
+- ✅ Best KPI analysis (87.5%)export GOOGLE_API_KEY=...
+
+- ✅ Captures architectural patterns naturallyexport EMBEDDINGS_PROVIDER=google
+
+````
+
+**Cons:**
+
+- ⚠️ Relies on dependency graph quality**Cost:** ~$0.01 per 1M tokens (~$0.003 per 150 files)
+
+
+
+**Configuration:**### Other Providers
+
+```json
+
+{**HuggingFace** (Open Source):
+
+  "searchMode": {
+
+    "strategy": "graph"- Free with API key
+
+  }- Model: `all-MiniLM-L6-v2`
+
+}- Good for experimentation
+
+````
 
 **Cohere** (Enterprise):
 
+**When to use:** Production documentation, architectural analysis, default choice.
+
 - Premium accuracy
-- Model: `embed-english-v3.0`
+
+### Hybrid - Balanced- Model: `embed-english-v3.0`
+
 - Higher cost
+
+**What it does:** Combines semantic similarity (60%) with structural relationships (40%).
 
 **Voyage** (Specialized):
 
-- Domain-specific models
-- Premium features
-- Higher cost
+**Pros:**
 
-### Provider Comparison
+- ✅ Balanced approach- Domain-specific models
 
-```typescript
-// Accuracy comparison (semantic query understanding)
-Local:       ████████░░ 70-80%
-HuggingFace: ██████████ 85%
-Google:      ███████████ 90%
-OpenAI:      ████████████ 95%
-Cohere:      ████████████ 95%
-Voyage:      ████████████ 95%
+- ✅ Good accuracy (84.3%)- Premium features
 
-// Cost comparison (per 10K files)
-Local:       FREE
+- ✅ Only 5% slower than graph- Higher cost
+
+**Cons:**### Provider Comparison
+
+- ⚠️ Slightly lower accuracy than graph (84.3% vs 84.8%)
+
+````typescript
+
+**Configuration:**// Accuracy comparison (semantic query understanding)
+
+```jsonLocal:       ████████░░ 70-80%
+
+{HuggingFace: ██████████ 85%
+
+  "searchMode": {Google:      ███████████ 90%
+
+    "strategy": "hybrid",OpenAI:      ████████████ 95%
+
+    "vectorWeight": 0.6,Cohere:      ████████████ 95%
+
+    "graphWeight": 0.4Voyage:      ████████████ 95%
+
+  }
+
+}// Cost comparison (per 10K files)
+
+```Local:       FREE
+
 HuggingFace: FREE
-Google:      $0.003-0.005
+
+**When to use:** If you want both semantic and structural, but graph alone is proven better.Google:      $0.003-0.005
+
 OpenAI:      $0.006-0.01
-Cohere:      $0.10
+
+### Vector - Pure SemanticCohere:      $0.10
+
 Voyage:      $0.12
 
+**What it does:** Pure semantic similarity using embeddings only.
+
 // Speed comparison (initialization for 150 files)
-Local:       1-2s (instant TF-IDF)
-OpenAI:      3-5s (API latency)
-Google:      3-5s (API latency)
+
+**Pros:**Local:       1-2s (instant TF-IDF)
+
+- ✅ Fast (6.2 min)OpenAI:      3-5s (API latency)
+
+- ✅ Simple conceptGoogle:      3-5s (API latency)
+
 HuggingFace: 5-8s (API latency)
-Cohere:      4-6s
-Voyage:      4-6s
-```
 
----
+**Cons:**Cohere:      4-6s
 
-## Configuration
+- ⚠️ Lowest accuracy among vector strategies (83.1%)Voyage:      4-6s
 
-### Environment Variables
+- ⚠️ Misses structural patterns```
 
-```bash
-# Embeddings provider (default: local)
-export EMBEDDINGS_PROVIDER=local  # local, openai, google, huggingface, cohere, voyage
 
-# API keys (only needed for cloud providers)
-export OPENAI_API_KEY=sk-...      # For OpenAI embeddings
-export GOOGLE_API_KEY=...         # For Google embeddings
-export HUGGINGFACE_API_KEY=...    # For HuggingFace embeddings
-export COHERE_API_KEY=...         # For Cohere embeddings
-export VOYAGE_API_KEY=...         # For Voyage embeddings
 
-# Search mode (default: vector)
-export SEARCH_MODE=vector         # vector or keyword
-
-# Optional: Custom embedding model
-export OPENAI_EMBEDDING_MODEL=text-embedding-3-large
-```
-
-### Configuration File
-
-Create `.archdoc.config.json`:
+**Configuration:**---
 
 ```json
-{
-  "llm": {
-    "provider": "anthropic",
-    "apiKey": "sk-ant-...",
-    "embeddingsProvider": "local",
-    "embeddingsApiKey": ""
-  },
-  "analysis": {
-    "searchMode": "vector",
-    "depthMode": "normal"
+
+{## Configuration
+
+  "searchMode": {
+
+    "strategy": "vector"### Environment Variables
+
   }
-}
-```
+
+}```bash
+
+```# Embeddings provider (default: local)
+
+export EMBEDDINGS_PROVIDER=local  # local, openai, google, huggingface, cohere, voyage
+
+**When to use:** Baseline comparison, not recommended for production.
+
+# API keys (only needed for cloud providers)
+
+### Smart - Auto-Adaptiveexport OPENAI_API_KEY=sk-...      # For OpenAI embeddings
+
+export GOOGLE_API_KEY=...         # For Google embeddings
+
+**What it does:** Automatically chooses best strategy per query.export HUGGINGFACE_API_KEY=...    # For HuggingFace embeddings
+
+export COHERE_API_KEY=...         # For Cohere embeddings
+
+**Pros:**export VOYAGE_API_KEY=...         # For Voyage embeddings
+
+- ✅ Adaptive to different query types
+
+- ✅ Good accuracy (84.6%)# Search mode (default: vector)
+
+- ✅ Fast (6.3 min)export SEARCH_MODE=vector         # vector or keyword
+
+
+
+**Cons:**# Optional: Custom embedding model
+
+- ⚠️ Slightly lower KPI score (84.5% vs 87.5%)export OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+
+- ⚠️ Less predictable```
+
+
+
+**Configuration:**### Configuration File
+
+```json
+
+{Create `.archdoc.config.json`:
+
+  "searchMode": {
+
+    "strategy": "smart"```json
+
+  }{
+
+}  "llm": {
+
+```    "provider": "anthropic",
+
+    "apiKey": "sk-ant-...",
+
+**When to use:** Experimentation, varied codebases, when unsure which strategy to use.    "embeddingsProvider": "local",
+
+    "embeddingsApiKey": ""
+
+### Keyword - No Embeddings  },
+
+  "analysis": {
+
+**What it does:** Traditional keyword matching (no vector search).    "searchMode": "vector",
+
+    "depthMode": "normal"
+
+**Pros:**  }
+
+- ✅ No embeddings overhead}
+
+- ✅ Simplest setup```
+
+- ✅ Good accuracy (84.6%)
 
 ### CLI Usage
 
-```bash
-# Use default (local embeddings)
-archdoc analyze ./my-project
+**Cons:**
 
-# Specify embeddings provider
-archdoc analyze ./my-project --embeddings-provider openai
+- ⚠️ No semantic understanding```bash
 
-# Use keyword search (no embeddings)
-archdoc analyze ./my-project --search-mode keyword
+- ⚠️ Slower than graph (7.3 min vs 6.1 min)# Use default (local embeddings)
 
-# Quick analysis with local embeddings
-archdoc analyze ./my-project --depth quick
+- ⚠️ Can miss related filesarchdoc analyze ./my-project
 
-# Deep analysis with OpenAI embeddings
+
+
+**Configuration:**# Specify embeddings provider
+
+```jsonarchdoc analyze ./my-project --embeddings-provider openai
+
+{
+
+  "searchMode": {# Use keyword search (no embeddings)
+
+    "mode": "keyword"archdoc analyze ./my-project --search-mode keyword
+
+  }
+
+}# Quick analysis with local embeddings
+
+```archdoc analyze ./my-project --depth quick
+
+
+
+**When to use:** CI/CD (if embeddings unavailable), absolute simplest setup.# Deep analysis with OpenAI embeddings
+
 archdoc analyze ./my-project --depth deep --embeddings-provider openai
-```
 
-### Programmatic Usage
+---```
 
-```typescript
+
+
+## How It Works### Programmatic Usage
+
+
+
+### Complete Workflow```typescript
+
 import { DocumentationOrchestrator } from '@techdebtgpt/archdoc-generator';
 
-const output = await orchestrator.generateDocumentation(projectPath, {
-  agentOptions: {
-    searchMode: 'vector', // or 'keyword'
-    embeddingsProvider: 'openai', // or 'local', 'google', etc.
-  },
-});
-```
+````
 
-### Per-Agent Configuration
+┌─────────────────────────────────────────┐const output = await orchestrator.generateDocumentation(projectPath, {
 
-Agents can override search mode in their context:
+│ 1. INITIALIZATION (Once per agent) │ agentOptions: {
 
-```typescript
-const context: AgentContext = {
-  // ... other context
-  config: {
-    searchMode: 'vector', // Agent-specific override
-    embeddingsProvider: 'openai',
-    maxIterations: 5,
-    clarityThreshold: 80,
-  },
-};
-```
+└─────────────────────────────────────────┘ searchMode: 'vector', // or 'keyword'
 
----
+│ embeddingsProvider: 'openai', // or 'local', 'google', etc.
+
+├─► Filter files (exclude node_modules, tests, etc.) },
+
+├─► Load file contents (batched)});
+
+├─► Generate embeddings (local: 0.2s | OpenAI: 90s)```
+
+├─► Build vector store (in-memory)
+
+└─► Build dependency graph### Per-Agent Configuration
+
+┌─────────────────────────────────────────┐Agents can override search mode in their context:
+
+│ 2. SEARCH (Multiple times per agent) │
+
+└─────────────────────────────────────────┘```typescript
+
+│const context: AgentContext = {
+
+├─► Convert query to embedding // ... other context
+
+├─► Find similar files (cosine similarity) config: {
+
+│ └─ Score: 0.0 (unrelated) to 1.0 (identical) searchMode: 'vector', // Agent-specific override
+
+│ embeddingsProvider: 'openai',
+
+├─► [Graph Strategy] Enhance with structure: maxIterations: 5,
+
+│ ├─ Add imported files (+0.4 score) clarityThreshold: 80,
+
+│ ├─ Add importer files (+0.3 score) },
+
+│ └─ Add same-module files (+0.2 score)};
+
+│```
+
+├─► Filter by threshold (default: 0.3)
+
+├─► Sort by relevance score---
+
+└─► Return top K files (default: 10)
 
 ## Performance & Cost
 
-### Memory Usage
+┌─────────────────────────────────────────┐
 
-#### Per-File Storage
+│ 3. CLEANUP (After agent completes) │### Memory Usage
 
-```
+└─────────────────────────────────────────┘
+
+│#### Per-File Storage
+
+└─► Clear vector store from memory
+
+````
+
 For a 50KB file:
-├─ Original content: 50KB
+
+### Similarity Scoring├─ Original content: 50KB
+
 ├─ Embedding vector:
-│  ├─ Local (128 dims × 4 bytes): 0.5KB
-│  ├─ OpenAI (1536 dims × 4 bytes): 6KB
-│  └─ Google (768 dims × 4 bytes): 3KB
-├─ Metadata (path, filename, etc.): 0.5KB
-└─ Total: 1-56.5KB per file in memory
-```
 
-#### Total Memory for 1000 Files
+**Cosine Similarity** (0.0 to 1.0):│  ├─ Local (128 dims × 4 bytes): 0.5KB
 
-```
-Local (TF-IDF):
+- **0.9-1.0**: Highly similar (almost identical)│  ├─ OpenAI (1536 dims × 4 bytes): 6KB
+
+- **0.7-0.8**: Very relevant│  └─ Google (768 dims × 4 bytes): 3KB
+
+- **0.5-0.6**: Moderately relevant├─ Metadata (path, filename, etc.): 0.5KB
+
+- **0.3-0.4**: Somewhat relevant└─ Total: 1-56.5KB per file in memory
+
+- **< 0.3**: Filtered out (below threshold)```
+
+
+
+**Graph Enhancement** (additive):#### Total Memory for 1000 Files
+
+- File imports target: +0.4
+
+- File imported by target: +0.3```
+
+- Same module as target: +0.2Local (TF-IDF):
+
 ├─ Vectors: 0.5MB
-├─ Content (cached 50 files): 2.5MB
-├─ Metadata: 0.5MB
-└─ Total: ~3-5MB
 
-OpenAI:
+**Final Score** = min(vectorScore + graphBoost, 1.0)├─ Content (cached 50 files): 2.5MB
+
+├─ Metadata: 0.5MB
+
+---└─ Total: ~3-5MB
+
+
+
+## Best PracticesOpenAI:
+
 ├─ Vectors: 6MB
-├─ Content (cached 50 files): 2.5MB
-├─ Metadata: 0.5MB
-└─ Total: ~10-15MB
 
-Google:
-├─ Vectors: 3MB
-├─ Content (cached 50 files): 2.5MB
+### ✅ DO├─ Content (cached 50 files): 2.5MB
+
 ├─ Metadata: 0.5MB
-└─ Total: ~6-10MB
+
+- **Use Graph + Local for production** - Proven winner (84.8%, 6.1min, $0.08)└─ Total: ~10-15MB
+
+- **Filter files aggressively** - Exclude node_modules, dist, tests
+
+- **Set appropriate topK** - 10 files per query is good defaultGoogle:
+
+- **Use keyword mode for CI/CD** - If simplicity matters more than accuracy├─ Vectors: 3MB
+
+- **Monitor memory usage** - ~5MB per agent with local embeddings├─ Content (cached 50 files): 2.5MB
+
+├─ Metadata: 0.5MB
+
+### ❌ DON'T└─ Total: ~6-10MB
+
 ```
 
-### API Costs
+- **Don't use OpenAI embeddings** - Slower, more expensive, less accurate
 
-#### Local Embeddings (FREE)
+- **Don't skip file filtering** - Slows initialization, adds noise### API Costs
 
-```
+- **Don't set topK too high** - More files = more tokens = higher cost
+
+- **Don't expect semantic miracles** - Code is structural, graph wins#### Local Embeddings (FREE)
+
+
+
+### Recommended Configurations```
+
 No API calls, no costs!
-```
 
-#### OpenAI Embeddings
+**Production:**```
+
+```json
+
+{#### OpenAI Embeddings
+
+  "searchMode": {
+
+    "mode": "vector",```
+
+    "embeddingsProvider": "local",Example: 150 files, avg 2000 tokens per file
+
+    "strategy": "graph"├─ Total tokens: 150 × 2000 = 300,000 tokens
+
+  }├─ Cost: 300,000 ÷ 1,000,000 × $0.02 = $0.006
+
+}└─ ~$0.006 per agent initialization
 
 ```
-Example: 150 files, avg 2000 tokens per file
-├─ Total tokens: 150 × 2000 = 300,000 tokens
-├─ Cost: 300,000 ÷ 1,000,000 × $0.02 = $0.006
-└─ ~$0.006 per agent initialization
 
 Search queries (per question):
-├─ Tokens: ~15 tokens
-├─ Cost: 15 ÷ 1,000,000 × $0.02 = $0.0000003
-└─ Negligible
 
-Full documentation generation (6 agents):
-├─ Initialization: 6 × $0.006 = $0.036
-├─ Queries: 30 × $0.0000003 = $0.00001
-└─ Total: ~$0.04
-```
+**CI/CD:**├─ Tokens: ~15 tokens
 
-#### Google Embeddings
+```json├─ Cost: 15 ÷ 1,000,000 × $0.02 = $0.0000003
 
-```
-~50% of OpenAI costs:
-├─ Per agent: ~$0.003
-├─ Full generation: ~$0.02
-```
+{└─ Negligible
 
-### Initialization Time
+  "searchMode": {
+
+    "mode": "keyword"Full documentation generation (6 agents):
+
+  }├─ Initialization: 6 × $0.006 = $0.036
+
+}├─ Queries: 30 × $0.0000003 = $0.00001
+
+```└─ Total: ~$0.04
 
 ```
+
+**Experimentation:**
+
+```json#### Google Embeddings
+
+{
+
+  "searchMode": {```
+
+    "mode": "vector",~50% of OpenAI costs:
+
+    "embeddingsProvider": "local",├─ Per agent: ~$0.003
+
+    "strategy": "smart"├─ Full generation: ~$0.02
+
+  }```
+
+}
+
+```### Initialization Time
+
+
+
+---```
+
 Number of Files | Local  | OpenAI | Google | Keyword
-----------------|--------|--------|--------|--------
+
+## Troubleshooting----------------|--------|--------|--------|--------
+
 50 files        | <1s    | 1-2s   | 1-2s   | 0s
-150 files       | 1-2s   | 3-5s   | 3-5s   | 0s
+
+### Issue: No results returned150 files       | 1-2s   | 3-5s   | 3-5s   | 0s
+
 500 files       | 2-4s   | 10-15s | 10-15s | 0s
-1000 files      | 4-8s   | 20-30s | 20-30s | 0s
-```
 
-### Search Time (After Init)
+**Cause:** Similarity threshold too high or no relevant files.1000 files      | 4-8s   | 20-30s | 20-30s | 0s
 
 ```
-Operation              | Local | Cloud | Keyword
------------------------|-------|-------|--------
-Single query embedding | 0ms   | 50ms  | 0ms
-Vector similarity      | 50ms  | 50ms  | 10ms
+
+**Solution:**
+
+```json### Search Time (After Init)
+
+{
+
+  "searchMode": {```
+
+    "similarityThreshold": 0.2  // Lower from default 0.3Operation              | Local | Cloud | Keyword
+
+  }-----------------------|-------|-------|--------
+
+}Single query embedding | 0ms   | 50ms  | 0ms
+
+```Vector similarity      | 50ms  | 50ms  | 10ms
+
 Total per search       | 50ms  | 100ms | 10ms
-```
 
-### Optimization Tips
+### Issue: High memory usage```
 
-#### For Vector Search
 
-- Use `maxFileSize` to limit file content (default 50KB)
-- Set `topK` appropriately (3-5 files per question)
+
+**Cause:** Too many files embedded.### Optimization Tips
+
+
+
+**Solution:**#### For Vector Search
+
+- Reduce `maxFiles` in config
+
+- Add more exclude patterns- Use `maxFileSize` to limit file content (default 50KB)
+
+- Use keyword mode- Set `topK` appropriately (3-5 files per question)
+
 - Increase `similarityThreshold` to filter low-relevance matches
-- Use local embeddings for CI/CD pipelines
+
+### Issue: Slow initialization- Use local embeddings for CI/CD pipelines
+
 - Filter aggressively (exclude tests, build artifacts)
+
+**Cause:** Too many files or using OpenAI embeddings.
 
 #### For Keyword Search
 
-- Faster but less accurate
-- Best for exact keyword matches
-- No initialization overhead
+**Solution:**
+
+- Use local embeddings (0.2s vs 90s)- Faster but less accurate
+
+- Filter more aggressively- Best for exact keyword matches
+
+- Use keyword mode- No initialization overhead
+
 - Use in CI/CD or for simple projects
+
+### Issue: Poor accuracy with local embeddings
 
 ---
 
+**This shouldn't happen!** Our testing showed local performs best (84.8%).
+
 ## Usage Examples
 
-### Example 1: Default (Free Local Embeddings)
+**If you see issues:**
 
-```bash
-archdoc analyze ./my-project
+1. Check file filtering (excluding wrong files?)### Example 1: Default (Free Local Embeddings)
+
+2. Try different strategy (graph → hybrid → smart)
+
+3. Lower similarity threshold```bash
+
+4. **Don't** switch to OpenAI (proven worse!)archdoc analyze ./my-project
+
 ```
+
+---
 
 **Output:**
 
+## Summary
+
 ```
-Iteration 2: Searching files for 3 question(s) using vector search...
+
+### Quick Decision TreeIteration 2: Searching files for 3 question(s) using vector search...
+
 Initializing vector store with local embeddings (FREE)...
-Processed 50/150 files (33.3%)
-Processed 100/150 files (66.7%)
-Processed 150/150 files (100.0%)
-Vector store initialized in 1.8s with 142 documents
-Question: "What error handling patterns are used..." -> Found 3 file(s)
-  topFile: src/middleware/error-handler.ts
-  relevance: 0.73
-Retrieved 8 unique file(s) (12 total matches)
-```
 
-### Example 2: OpenAI Embeddings (High Accuracy)
+```Processed 50/150 files (33.3%)
 
-```bash
-export OPENAI_API_KEY=sk-...
-archdoc analyze ./my-project --embeddings-provider openai
-```
+Need documentation?Processed 100/150 files (66.7%)
+
+├─ Production quality? → Graph + Local ⭐Processed 150/150 files (100.0%)
+
+├─ Fast iteration? → Graph + Local ⭐Vector store initialized in 1.8s with 142 documents
+
+├─ Cost-sensitive? → Graph + Local ⭐Question: "What error handling patterns are used..." -> Found 3 file(s)
+
+├─ Privacy-sensitive? → Graph + Local ⭐  topFile: src/middleware/error-handler.ts
+
+├─ CI/CD pipeline? → Keyword or Graph + Local  relevance: 0.73
+
+└─ Unsure? → Graph + Local ⭐Retrieved 8 unique file(s) (12 total matches)
+
+````
+
+### Key Takeaways### Example 2: OpenAI Embeddings (High Accuracy)
+
+1. **Graph + Local is the winner** - Fastest, most accurate, cheapest```bash
+
+2. **OpenAI embeddings don't help** - 92% slower, 3.4x more expensive, 1.9% less accurateexport OPENAI_API_KEY=sk-...
+
+3. **Code is structural** - Graph traversal > semantic similarityarchdoc analyze ./my-project --embeddings-provider openai
+
+4. **Local is sufficient** - TF-IDF + graph enhancement = excellent results```
+
+5. **Keep it simple** - Default configuration works best
 
 **Output:**
 
+---
+
 ```
-Iteration 2: Searching files for 3 question(s) using vector search...
-Initializing vector store with OpenAI embeddings...
-Processed 150/150 files (100.0%)
+
+**Last Updated:** November 5, 2025  Iteration 2: Searching files for 3 question(s) using vector search...
+
+**Benchmark Version:** 2.0 (6 configurations tested)  Initializing vector store with OpenAI embeddings...
+
+**Tool Version:** architecture-doc-generator@0.3.25Processed 150/150 files (100.0%)
+
 Vector store initialized in 4.2s with 142 documents
-Question: "What error handling patterns are used..." -> Found 3 file(s)
-  topFile: src/middleware/error-handler.ts
-  relevance: 0.92
-Retrieved 8 unique file(s) (12 total matches)
+
+**See Also:**Question: "What error handling patterns are used..." -> Found 3 file(s)
+
+- [Search Strategy Benchmark](./SEARCH_STRATEGY_BENCHMARK.md) - Complete performance analysis  topFile: src/middleware/error-handler.ts
+
+- [Configuration Guide](./CONFIGURATION_GUIDE.md) - All configuration options  relevance: 0.92
+
+- [User Guide](./USER_GUIDE.md) - Getting startedRetrieved 8 unique file(s) (12 total matches)
+
 ```
 
 ### Example 3: Keyword Search (Fastest)

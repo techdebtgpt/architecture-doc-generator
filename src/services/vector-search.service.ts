@@ -297,17 +297,21 @@ export class VectorSearchService {
         }
       }
 
-      // Log progress with loader bar
+      // Log progress with loader bar (in-place update)
       const processed = Math.min(i + batchSize, filteredFiles.length);
       const percentage = ((processed / filteredFiles.length) * 100).toFixed(1);
       const barLength = 20;
       const filledLength = Math.round((processed / filteredFiles.length) * barLength);
       const bar = '█'.repeat(filledLength) + '░'.repeat(barLength - filledLength);
 
-      this.logger.info(
-        `📂 Loading files: [${bar}] ${percentage}% (${loadedCount} loaded, ${skippedCount} skipped)`,
+      // Use \r to overwrite the same line instead of creating new lines
+      process.stdout.write(
+        `\r📂 Loading files: [${bar}] ${percentage}% (${loadedCount} loaded, ${skippedCount} skipped)${' '.repeat(10)}`,
       );
     }
+
+    // Clear the progress line
+    process.stdout.write('\n');
 
     if (documents.length === 0) {
       this.logger.warn('No documents loaded - vector store will be empty');
@@ -320,9 +324,19 @@ export class VectorSearchService {
       `✓ Loaded ${documents.length} documents (${loadedCount} files, ${skippedCount} skipped)`,
     );
 
-    // Create vector store with embeddings
+    // Create vector store with embeddings (with batching for OpenAI limits)
     this.logger.info(`🔧 Creating embeddings for ${documents.length} documents...`);
-    this.vectorStore = await MemoryVectorStore.fromDocuments(documents, this.embeddings);
+
+    // OpenAI has an 8192 token limit per embedding request - batch if needed
+    const isOpenAI = this.embeddings.constructor.name === 'OpenAIEmbeddings';
+    const maxTokensPerBatch = isOpenAI ? 7000 : Infinity; // Conservative 8K limit with buffer
+
+    if (isOpenAI && documents.length > 10) {
+      this.logger.info('📦 Using batched embedding for OpenAI (8K token limit per request)');
+      this.vectorStore = await this.createBatchedVectorStore(documents, maxTokensPerBatch);
+    } else {
+      this.vectorStore = await MemoryVectorStore.fromDocuments(documents, this.embeddings);
+    }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     const perfMetrics = perfTracker.end();
@@ -330,6 +344,99 @@ export class VectorSearchService {
       `Vector store initialized in ${duration}s with ${documents.length} documents | ${PerformanceTracker.formatMetrics(perfMetrics)}`,
     );
     this.isInitialized = true;
+  }
+
+  /**
+   * Create vector store with batched embeddings to handle OpenAI token limits
+   * OpenAI has an 8192 token/request limit, so we batch documents accordingly
+   */
+  private async createBatchedVectorStore(
+    documents: Document[],
+    _maxTokensPerBatch: number,
+  ): Promise<MemoryVectorStore> {
+    // Estimate tokens per document (rough estimate: 1 token ≈ 4 chars)
+    const estimateTokens = (doc: Document): number => Math.ceil(doc.pageContent.length / 4);
+
+    // IMPORTANT: OpenAI embeddings API can batch multiple texts per request,
+    // but the TOTAL tokens across all texts must be under 8192 tokens.
+    // We need to truncate each document first, then batch conservatively.
+    const maxTokensPerDoc = 1500; // Conservative per-document limit
+    const maxDocsPerBatch = 5; // Very small batches to stay under 8K total limit
+
+    const processedDocs: Document[] = [];
+
+    // First pass: Truncate any documents that exceed per-document limit
+    for (const doc of documents) {
+      const docTokens = estimateTokens(doc);
+
+      if (docTokens > maxTokensPerDoc) {
+        const maxChars = Math.floor(maxTokensPerDoc * 4 * 0.9); // 90% of limit for safety
+        const truncatedDoc = new Document({
+          pageContent: doc.pageContent.substring(0, maxChars),
+          metadata: { ...doc.metadata, truncated: true },
+        });
+        this.logger.debug(
+          `Truncating ${doc.metadata.path}: ${docTokens} tokens → ${Math.ceil(maxChars / 4)} tokens`,
+        );
+        processedDocs.push(truncatedDoc);
+      } else {
+        processedDocs.push(doc);
+      }
+    }
+
+    // Second pass: Split into batches for API rate limiting
+    const batches: Document[][] = [];
+    for (let i = 0; i < processedDocs.length; i += maxDocsPerBatch) {
+      batches.push(processedDocs.slice(i, i + maxDocsPerBatch));
+    }
+
+    const truncatedCount = processedDocs.filter((d) => d.metadata.truncated).length;
+    if (truncatedCount > 0) {
+      this.logger.info(
+        `📦 Truncated ${truncatedCount} documents to fit ${maxTokensPerDoc} token limit`,
+      );
+    }
+
+    this.logger.info(
+      `📦 Split ${processedDocs.length} documents into ${batches.length} batches (max ${maxDocsPerBatch} docs/batch)`,
+    );
+
+    // Create vector store from first batch
+    let vectorStore: MemoryVectorStore | null = null;
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchTokens = batch.reduce((sum, doc) => sum + estimateTokens(doc), 0);
+
+      // Use \r to overwrite the same line
+      process.stdout.write(
+        `\r📦 Processing batch ${i + 1}/${batches.length}: ${batch.length} documents (~${batchTokens.toLocaleString()} tokens total)${' '.repeat(10)}`,
+      );
+
+      try {
+        if (vectorStore === null) {
+          // Initialize with first batch
+          vectorStore = await MemoryVectorStore.fromDocuments(batch, this.embeddings);
+        } else {
+          // Add subsequent batches
+          await vectorStore.addDocuments(batch);
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to process batch ${i + 1}/${batches.length}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        throw error;
+      }
+    }
+
+    if (!vectorStore) {
+      throw new Error('Failed to create vector store - no batches processed');
+    }
+
+    // Clear the progress line and log completion
+    process.stdout.write('\n');
+    this.logger.info(`✓ Successfully created vector store with ${documents.length} documents`);
+    return vectorStore;
   }
 
   /**

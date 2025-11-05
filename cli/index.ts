@@ -25,6 +25,11 @@ if (fs.existsSync(configPath)) {
       if (config.apiKeys.google) process.env.GOOGLE_API_KEY = config.apiKeys.google;
       if (config.apiKeys.xai) process.env.XAI_API_KEY = config.apiKeys.xai;
     }
+    // Set embeddings keys (separate from LLM API keys)
+    if (config.embeddings) {
+      if (config.embeddings.openai) process.env.OPENAI_EMBEDDINGS_KEY = config.embeddings.openai;
+      if (config.embeddings.google) process.env.GOOGLE_EMBEDDINGS_KEY = config.embeddings.google;
+    }
     // Set LLM provider and model from config
     if (config.llm) {
       if (config.llm.provider) process.env.ARCHDOC_LLM_PROVIDER = config.llm.provider;

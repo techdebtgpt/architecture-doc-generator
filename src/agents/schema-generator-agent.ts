@@ -40,7 +40,12 @@ export interface SchemaField {
   name: string;
   type: string;
   required: boolean;
-  description: string;
+  description?: string; // Optional - not needed for architectural keys
+  isPrimaryKey?: boolean; // Indicates primary key
+  isForeignKey?: boolean; // Indicates foreign key
+  references?: string; // Entity this foreign key references
+  isIndex?: boolean; // Indicates indexed field
+  isUnique?: boolean; // Indicates unique constraint
 }
 
 export interface SchemaRelationship {
@@ -95,65 +100,90 @@ export class SchemaGeneratorAgent extends BaseAgentWorkflow implements Agent {
   }
 
   protected async buildSystemPrompt(_context: AgentContext): Promise<string> {
-    return `You are an expert database architect and API designer specializing in schema documentation.
+    return `You are an expert database architect specializing in schema architecture documentation.
 
-Analyze the provided codebase and extract **schema information** for:
+Analyze the provided codebase and extract **HIGH-LEVEL schema architecture** for:
 
 1. **Database Schemas**: Prisma, TypeORM, Sequelize, SQL DDL
 2. **API Schemas**: DTOs, OpenAPI/Swagger definitions, REST interfaces
 3. **GraphQL Schemas**: Type definitions, queries, mutations
 4. **Type Definitions**: TypeScript interfaces, classes, enums
 
-**Output Format (JSON)**:
-\`\`\`json
+**CRITICAL RULES** - MINIMAL architectural view only:
+- List entity/model names ONLY (no descriptions)
+- Show relationships between entities (one-to-many, many-to-many, etc.)
+- For fields: Include ONLY 2-3 KEY fields per entity:
+  * Primary key (id) - ALWAYS include
+  * Foreign keys (userId, projectId, etc.) - ONLY if exist
+  * NO other fields - not even unique indexes or timestamps
+- DO NOT include regular data fields AT ALL
+- DO NOT add descriptions to fields
+- Maximum 2-3 KEY fields per entity (PK + FKs only)
+
+**Output Format (JSON) - ULTRA-COMPACT**:
+
+Return a JSON with this structure (entities listed like a table):
+
 {
-  "summary": "Brief overview of schemas found",
+  "summary": "Brief architectural overview (1-2 sentences)",
   "schemas": [
     {
-      "type": "database|api|graphql|type-definitions",
-      "name": "Schema Name",
-      "description": "What this schema represents",
-      "diagram": "erDiagram\\n  ENTITY1 ||--o{ ENTITY2 : has",
+      "type": "database",
+      "name": "Main Database Schema",
+      "description": "Core application entities",
+      "diagram": "erDiagram\\n  Organization ||--o{ User : has\\n  User ||--o{ Post : creates",
       "entities": [
-        {
-          "name": "EntityName",
-          "type": "table|model|type|class",
-          "description": "Entity purpose",
-          "fields": [
-            {
-              "name": "fieldName",
-              "type": "string",
-              "required": true,
-              "description": "Field purpose"
-            }
-          ]
-        }
+        {"name": "Organization", "type": "table", "description": "Multi-tenant organizations", "fields": [{"name": "id", "type": "uuid", "required": true, "isPrimaryKey": true}]},
+        {"name": "User", "type": "table", "description": "User accounts", "fields": [{"name": "id", "type": "uuid", "required": true, "isPrimaryKey": true}, {"name": "organizationId", "type": "uuid", "required": true, "isForeignKey": true, "references": "Organization"}]},
+        {"name": "Post", "type": "table", "description": "User posts", "fields": [{"name": "id", "type": "uuid", "required": true, "isPrimaryKey": true}, {"name": "userId", "type": "uuid", "required": true, "isForeignKey": true, "references": "User"}]}
       ],
       "relationships": [
-        {
-          "from": "Entity1",
-          "to": "Entity2",
-          "type": "one-to-one|one-to-many|many-to-many",
-          "description": "Relationship meaning"
-        }
+        {"from": "Organization", "to": "User", "type": "one-to-many", "description": "has members"},
+        {"from": "User", "to": "Post", "type": "one-to-many", "description": "creates"}
       ],
-      "insights": ["Key insight 1", "Key insight 2"]
+      "insights": ["Multi-tenant with organizationId FK pattern", "Simple hierarchical structure"]
     }
-  ],
-  "warnings": ["Any limitations or notes"]
+  ]
 }
-\`\`\`
+
+**CRITICAL OUTPUT RULES**:
+- Keep entities in a flat array (like table rows)
+- Each entity: ONE LINE with 2-3 fields MAX
+- Fields: ONLY id + foreign keys (no other fields)
+- Descriptions: MAX 5 words per entity
+- Focus on entity list + relationships (not field details)
+
+**Field Selection - MINIMAL KEYS ONLY**:
+✅ Include: ONLY id (primary key) + foreign keys (userId, projectId, organizationId, etc.)
+❌ Exclude: ALL other fields - no unique constraints, no indexes, no data fields
+❌ Exclude: name, email, description, title, content, status, timestamps, enums, booleans
+❌ Exclude: createdAt, updatedAt, deletedAt, version, etc.
+🎯 Goal: 2-3 fields per entity maximum (PK + FKs only)
 
 **Mermaid Syntax for Diagrams**:
-- Use \`erDiagram\` for database schemas
-- Use \`classDiagram\` for type definitions
+- Use \`erDiagram\` for database schemas (show entities and relationships)
+- Use \`classDiagram\` for type definitions (show types and inheritance)
 - Include cardinality (||--o{, }o--||, etc.)
+- Keep diagrams simple - focus on structure, not details
 
-Provide **comprehensive schema documentation** with valid Mermaid syntax.
+**Response Length Guidance**:
+- Target: 1,000-2,000 tokens (ULTRA-MINIMAL view)
+- Maximum: 4,000 tokens
+- List 5-15 main entities/models per schema type
+- Include ONLY 2-3 KEY fields per entity (PK + FKs ONLY)
+- Focus on entity names and relationships - skip field details
 
 ${this.getResponseLengthGuidance(_context)}
 
-CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
+**ULTRA-CRITICAL JSON RULES**:
+1. Start with { and end with }
+2. NO markdown code blocks (\`\`\`json)
+3. NO explanations or text outside JSON
+4. Compact format: single-line field objects
+5. Maximum 2-3 fields per entity (PK + FKs)
+6. Keep entity descriptions under 10 words
+7. Focus on entity names and relationships
+8. Target output: 1,500-2,500 tokens total`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
@@ -216,33 +246,34 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
     { min: number; max: number }
   > {
     return {
-      quick: { min: 1000, max: 3000 },
-      normal: { min: 3000, max: 8000 },
-      deep: { min: 8000, max: 14000 },
-      exhaustive: { min: 14000, max: 16000 },
+      quick: { min: 500, max: 1000 },
+      normal: { min: 1000, max: 2000 },
+      deep: { min: 2000, max: 3000 },
+      exhaustive: { min: 3000, max: 4000 },
     };
   }
 
   protected getDepthSpecificGuidance(mode: 'quick' | 'normal' | 'deep' | 'exhaustive'): string {
     const guidance = {
-      quick: '- Focus on primary schemas only\n- Include basic entity relationships',
+      quick:
+        '- Focus on primary schemas only\n- List entity names ONLY\n- 1-2 keys per entity (PK + main FK)',
       normal:
-        '- Include detailed entity descriptions and relationships\n- Provide full Mermaid diagrams',
-      deep: '- Provide exhaustive schema documentation\n- Include all entity fields with detailed descriptions\n- Add comprehensive relationship diagrams',
+        '- Include main entities and relationships\n- 2-3 keys per entity (PK + FKs)\n- Entity names and relationships only',
+      deep: '- Document all schemas and entities\n- 2-3 keys per entity (PK + FKs)\n- Add relationship patterns',
       exhaustive:
-        '- Document every schema, entity, field, and relationship\n- Include validation rules and constraints\n- Add cross-schema dependencies and integration points',
+        '- Comprehensive schema list\n- 2-3 keys per entity (PK + FKs)\n- Cross-schema dependencies',
     };
 
     return guidance[mode];
   }
 
   /**
-   * Schema generator needs MORE output tokens than other agents
-   * Large schemas (e.g., Prisma with 50+ models) can easily exceed 8K tokens
+   * Schema generator token limits ULTRA-MINIMIZED
+   * Only entity names, PK, and FKs - no other fields
    */
   protected getMaxOutputTokens(isQuickMode: boolean, _context: AgentContext): number {
-    // Schema generator uses 2x the default tokens
-    return isQuickMode ? 16000 : 24000;
+    // Ultra-minimal: PK + FKs only, no descriptions
+    return isQuickMode ? 3000 : 4000;
   }
 
   // Removed: identifySchemaFiles - now using getSchemaFiles() from language-config
@@ -503,14 +534,43 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
         markdown += `</details>\n\n`;
 
         if (schema.entities && schema.entities.length > 0) {
-          markdown += `#### Entities\n\n`;
-          markdown += `| Entity | Type | Fields |\n`;
-          markdown += `|--------|------|--------|\n`;
+          markdown += `#### Entities Overview\n\n`;
+          markdown += `| Entity | Type | Description |\n`;
+          markdown += `|--------|------|-------------|\n`;
+
           schema.entities.forEach((entity: SchemaEntity) => {
-            const fieldCount = entity.fields ? entity.fields.length : 0;
-            markdown += `| ${entity.name} | ${entity.type} | ${fieldCount} fields |\n`;
+            const entityType = entity.type || 'table';
+            const description = entity.description || '-';
+            markdown += `| **${entity.name}** | \`${entityType}\` | ${description} |\n`;
           });
           markdown += `\n`;
+
+          markdown += `#### Entity Details\n\n`;
+
+          schema.entities.forEach((entity: SchemaEntity) => {
+            markdown += `##### ${entity.name}\n\n`;
+
+            if (entity.fields && entity.fields.length > 0) {
+              markdown += `**Key Fields:**\n\n`;
+              markdown += `| Field | Type | Role | References |\n`;
+              markdown += `|-------|------|------|------------|\n`;
+
+              entity.fields.forEach((field: SchemaField) => {
+                const roles: string[] = [];
+                if (field.isPrimaryKey) roles.push('🔑 PK');
+                if (field.isForeignKey) roles.push('🔗 FK');
+                if (field.isUnique) roles.push('⭐ Unique');
+                if (field.isIndex) roles.push('📇 Index');
+
+                const role = roles.length > 0 ? roles.join(', ') : '-';
+                const references = field.references ? `→ ${field.references}` : '-';
+                const fieldName = field.required ? '`' + field.name + '`' : field.name;
+
+                markdown += `| ${fieldName} | \`${field.type}\` | ${role} | ${references} |\n`;
+              });
+              markdown += `\n`;
+            }
+          });
         }
 
         if (schema.relationships && schema.relationships.length > 0) {

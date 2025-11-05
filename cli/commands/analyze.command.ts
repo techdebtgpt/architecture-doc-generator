@@ -340,9 +340,12 @@ export async function analyzeProject(
     console.log(chalk.gray('   (Agent progress will be shown below)'));
     console.log('');
 
-    spinner.start(`Waiting for agent execution... \n`);
+    // Stop spinner during agent execution to avoid log spam
+    spinner.stop();
 
     const generationStartTime = Date.now();
+    let lastProgressUpdate = 0;
+    const progressThrottleMs = 2000; // Update progress at most every 2 seconds
 
     let documentation;
     try {
@@ -371,11 +374,21 @@ export async function analyzeProject(
         retrievalStrategy, // Retrieval strategy for hybrid search (vector + graph)
         embeddingsProvider, // Embeddings provider for vector search (local, openai, google)
         onAgentProgress: (current: number, total: number, agentName: string) => {
-          const elapsed = Math.floor((Date.now() - generationStartTime) / 1000);
+          const now = Date.now();
+          // Throttle progress updates to every 2 seconds to avoid log spam
+          if (now - lastProgressUpdate < progressThrottleMs) {
+            return;
+          }
+          lastProgressUpdate = now;
+
+          const elapsed = Math.floor((now - generationStartTime) / 1000);
           const minutes = Math.floor(elapsed / 60);
           const seconds = elapsed % 60;
           const timeStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-          spinner.text = `Running agent ${current}/${total}: ${agentName} [${timeStr}] (see progress logs below)... \n`;
+          // Use \r to overwrite the same line
+          process.stdout.write(
+            `\r${chalk.cyan(`⏳ Running agent ${current}/${total}: ${agentName} [${timeStr}]`)}${' '.repeat(20)} \n`,
+          );
         },
       });
     } catch (error) {
@@ -391,7 +404,9 @@ export async function analyzeProject(
       throw error;
     }
 
-    spinner.succeed('Documentation generation completed!');
+    // Clear the progress line and print completion message
+    process.stdout.write('\n');
+    console.log(chalk.green('✅ Documentation generation completed!'));
 
     // Format and save output
     let outputLocation: string;
