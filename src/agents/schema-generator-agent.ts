@@ -370,141 +370,19 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
-    // Strategy 1: Try parsing the full response
-    try {
-      return LLMJsonParser.parse(result, {
-        contextName: 'schema-generator',
-        logErrors: false, // Don't log yet, we have fallback strategies
-      });
-    } catch (firstError) {
-      this.logger.debug('Initial JSON parse failed, trying truncation strategies', {
-        error: firstError instanceof Error ? firstError.message : String(firstError),
-        responseLength: result.length,
-      });
-
-      // Strategy 2: If response is too large (>100KB), it might be truncated
-      // Try to extract and parse the first valid JSON object
-      if (result.length > 100000) {
-        this.logger.info('Response exceeds 100KB, attempting to extract partial valid JSON', '✂️');
-
-        const extracted = this.extractPartialJson(result);
-        if (extracted) {
-          try {
-            return LLMJsonParser.parse(extracted, {
-              contextName: 'schema-generator',
-              logErrors: false,
-            });
-          } catch {
-            // Continue to fallback
-          }
-        }
-      }
-
-      // Strategy 3: Log error and use fallback
-      this.logger.warn('All JSON parsing strategies failed, using fallback', {
-        error: firstError instanceof Error ? firstError.message : String(firstError),
-        responsePreview: result.substring(0, 500),
-      });
-
-      return {
+    // Use LLMJsonParser with all its strategies (code blocks, cleanup, truncation detection)
+    return LLMJsonParser.parse(result, {
+      contextName: 'schema-generator',
+      logErrors: true,
+      fallback: {
         schemas: [],
         summary:
           'No schema definitions found in the provided codebase. The analysis only includes a single main.ts file, which does not contain schema definitions for databases, APIs, or GraphQL.',
         warnings: [
           'Could not parse LLM response as valid JSON - response may have been truncated or malformed',
         ],
-      };
-    }
-  }
-
-  /**
-   * Extract partial but valid JSON from truncated response
-   * Attempts to find the largest complete JSON structure
-   */
-  private extractPartialJson(text: string): string | null {
-    // Find the start of the JSON object
-    const startIdx = text.indexOf('{');
-    if (startIdx === -1) return null;
-
-    // Try to find matching closing brace by tracking depth
-    let depth = 0;
-    let inString = false;
-    let escapeNext = false;
-
-    for (let i = startIdx; i < text.length; i++) {
-      const char = text[i];
-
-      if (escapeNext) {
-        escapeNext = false;
-        continue;
-      }
-
-      if (char === '\\') {
-        escapeNext = true;
-        continue;
-      }
-
-      if (char === '"') {
-        inString = !inString;
-        continue;
-      }
-
-      if (inString) continue;
-
-      if (char === '{') {
-        depth++;
-      } else if (char === '}') {
-        depth--;
-        if (depth === 0) {
-          // Found complete JSON object
-          return text.substring(startIdx, i + 1);
-        }
-      }
-    }
-
-    // If we didn't find a complete object, try to construct one from partial data
-    // Extract what we have and close any open structures
-    const partial = text.substring(startIdx);
-
-    // Try to intelligently close the JSON by finding the last complete field
-    const lastCompleteField = this.findLastCompleteField(partial);
-    if (lastCompleteField) {
-      return lastCompleteField;
-    }
-
-    return null;
-  }
-
-  /**
-   * Find the last complete field in a truncated JSON string
-   * and properly close the structure
-   */
-  private findLastCompleteField(partial: string): string | null {
-    // Find all complete "fieldName": value pairs
-    const fieldPattern = /"([^"]+)":\s*(?:"[^"]*"|[^,}\]]+|{[^}]*}|\[[^\]]*\])/g;
-    const matches: string[] = [];
-    let match;
-
-    while ((match = fieldPattern.exec(partial)) !== null) {
-      matches.push(match[0]);
-    }
-
-    if (matches.length === 0) return null;
-
-    // Reconstruct JSON with complete fields only
-    let reconstructed = '{\n  ' + matches.join(',\n  ');
-
-    // Close any open arrays or objects
-    const openBraces = (reconstructed.match(/{/g) || []).length;
-    const closeBraces = (reconstructed.match(/}/g) || []).length;
-    const openBrackets = (reconstructed.match(/\[/g) || []).length;
-    const closeBrackets = (reconstructed.match(/\]/g) || []).length;
-
-    // Add missing closing brackets/braces
-    reconstructed += '\n]'.repeat(Math.max(0, openBrackets - closeBrackets));
-    reconstructed += '\n}'.repeat(Math.max(0, openBraces - closeBraces + 1)); // +1 for root object
-
-    return reconstructed;
+      },
+    });
   }
 
   private formatMarkdownReport(analysis: Record<string, unknown>): string {
