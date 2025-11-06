@@ -1,6 +1,6 @@
 {
   "name": "@techdebtgpt/archdoc-generator",
-  "version": "0.3.27",
+  "version": "0.3.28",
   "description": "AI-powered architecture documentation generator with RAG, hybrid retrieval (semantic + structural), and multi-agent workflows using LangChain",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
