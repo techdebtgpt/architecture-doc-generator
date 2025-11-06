@@ -1,7 +1,12 @@
 # 🏗️ ArchDoc Generator
 
 [![npm version](https://img.shields.io/npm/v/@techdebtgpt/archdoc-generator.svg)](https://www.npmjs.com/package/@techdebtgpt/archdoc-generator)
-[![MCP Server](https://img.shields.io/badge/MCP-Server-blueviolet.svg)](docs/MCP_GUIDE.md)
+[![MCP Server](https://img.shields.io/badge/MCP-S---
+
+## 🔧 CLI Usage
+
+### Available Commands-blueviolet.svg)](docs/MCP_GUIDE.md)
+
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
@@ -17,9 +22,9 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 ## 📋 Table of Contents
 
-- [🔥 MCP Server - Use with AI Assistants](#-mcp-server---use-with-ai-assistants-new)
 - [Features](#-features)
 - [Quick Start](#-quick-start)
+- [🔥 MCP Server - Use with AI Assistants](#-mcp-server---use-with-ai-assistants-new)
 - [Search Strategy Performance](#-search-strategy-performance)
 - [CLI Usage](#-cli-usage)
 - [Programmatic Usage](#-programmatic-usage)
@@ -31,6 +36,74 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - [Common Questions](#-common-questions)
 - [Contributing](#-contributing)
 - [License](#-license)
+
+---
+
+## ✨ Features
+
+- 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
+- � **MCP Server Integration** (NEW!): Use with GitHub Copilot, Claude Desktop, or any MCP client for real-time architecture guidance. [See MCP Guide →](docs/MCP_SERVER_GUIDE.md)
+- 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings.
+- �📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
+- 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
+- ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
+- 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
+- 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.
+- 📚 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
+- 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation.
+- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection.
+- 🎨 **Customizable**: Prompt-based agent selection and configuration.
+- 📊 **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
+- 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
+- ➕ **Extensible**: Add support for any language via configuration—no code changes required.
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+# Using npm
+npm install -g @techdebtgpt/archdoc-generator
+
+# Using yarn
+yarn global add @techdebtgpt/archdoc-generator
+
+# Using pnpm
+pnpm add -g @techdebtgpt/archdoc-generator
+```
+
+### Interactive Setup (Recommended)
+
+Run the interactive configuration wizard:
+
+```bash
+archdoc config --init
+```
+
+This will:
+
+1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google).
+2. Ask for your API key.
+3. Create `.archdoc.config.json` with your configuration.
+4. Validate your setup.
+
+### Basic Usage
+
+```bash
+# Analyze current directory
+archdoc analyze
+
+# Analyze specific project
+archdoc analyze /path/to/your/project
+
+# Custom output location
+archdoc analyze --output ./docs
+
+# Verbose output for debugging
+archdoc analyze --verbose
+```
+
+For complete CLI options and advanced usage, see [CLI Usage](#-cli-usage) section below.
 
 ---
 
@@ -118,39 +191,6 @@ The guide covers:
 
 ---
 
-## ✨ Features
-
-- 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
-- � **MCP Server Integration** (NEW!): Use with GitHub Copilot, Claude Desktop, or any MCP client for real-time architecture guidance. [See MCP Guide →](docs/MCP_SERVER_GUIDE.md)
-- 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings.
-- �📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
-- 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
-- ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
-- 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
-- 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.
-- 📚 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
-- 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation.
-- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection.
-- 🎨 **Customizable**: Prompt-based agent selection and configuration.
-- 📊 **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
-- 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
-- ➕ **Extensible**: Add support for any language via configuration—no code changes required.
-
-## 🚀 Quick Start
-
-### Installation
-
-```bash
-# Using npm
-npm install -g @techdebtgpt/archdoc-generator
-
-# Using yarn
-yarn global add @techdebtgpt/archdoc-generator
-
-# Using pnpm
-pnpm add -g @techdebtgpt/archdoc-generator
-```
-
 ## 📊 Vector Search & Embeddings Performance
 
 We benchmarked **6 configurations** (including OpenAI embeddings) on a real-world 6,187-file NestJS project. **Graph + Local embeddings is the clear winner!**
@@ -183,64 +223,7 @@ Also see: [Vector Search Guide](./docs/VECTOR_SEARCH.md) - Complete guide to vec
 
 ---
 
-### Interactive Setup (Recommended)
-
-Run the interactive configuration wizard:
-
-```bash
-archdoc config --init
-```
-
-This will:
-
-1. Prompt you to choose an LLM provider (Anthropic/OpenAI/Google).
-2. Ask for your API key.
-3. Create `.archdoc.config.json` with your configuration.
-4. Validate your setup.
-
-## 🔌 MCP Server Integration (NEW!)
-
-Use ArchDoc with GitHub Copilot, Claude Desktop, or any MCP-compatible client:
-
-```bash
-# 1. Build the project
-npm run build
-
-# 2. Configure MCP client (example for VS Code)
-# Create .vscode/mcp.json:
-{
-  "mcpServers": {
-    "archdoc": {
-      "command": "node",
-      "args": ["./dist/src/mcp-server/index.js"],
-      "env": {
-        "ANTHROPIC_API_KEY": "sk-ant-..."
-      }
-    }
-  }
-}
-
-# 3. Use in Copilot Chat
-# @archdoc generate documentation for this project
-# @archdoc query "What are the main architectural patterns?"
-# @archdoc validate architecture src/services/user-service.ts
-```
-
-**MCP Tools Available**:
-
-- 📝 `generate_documentation` - Full architecture analysis
-- 🔍 `query_documentation` - RAG queries (FREE local embeddings!)
-- 🔄 `update_documentation` - Incremental updates
-- ✅ `validate_architecture` - Check code against patterns
-- 🎨 `check_architecture_patterns` - Pattern detection
-- 📦 `analyze_dependencies` - Dependency analysis
-- 💡 `get_recommendations` - Improvement suggestions
-
-**[📖 Full MCP Guide →](docs/MCP_SERVER_GUIDE.md)** | **[⚙️ Configuration Examples →](docs/MCP_CONFIGURATION_EXAMPLES.md)**
-
----
-
-### Basic Usage
+## � CLI Usage
 
 #### Available Commands
 
@@ -255,7 +238,7 @@ npm run build
 
 > 💡 **Tip**: Run `archdoc help` for a comprehensive guide with examples, configuration options, and common workflows.
 
-#### Documentation Generation
+### Documentation Generation
 
 ```bash
 # Analyze current directory
@@ -283,7 +266,7 @@ archdoc analyze --no-refinement
 archdoc analyze --verbose
 ```
 
-#### C4 Architecture Model Generation
+### C4 Architecture Model Generation
 
 ```bash
 # Generate C4 model for current directory
@@ -344,7 +327,7 @@ archdoc export .arch-docs --format confluence --output ./confluence.md
 archdoc export .arch-docs --format html --template ./my-template.html --output ./custom-docs.html
 ```
 
-#### Vector Search & Hybrid Retrieval
+### Vector Search & Hybrid Retrieval
 
 ```bash
 # Vector search with local embeddings (FREE, default)
@@ -370,7 +353,7 @@ archdoc analyze --search-mode vector --retrieval-strategy hybrid
 # See docs/VECTOR_SEARCH.md for complete documentation
 ```
 
-#### What Files Are Excluded?
+### What Files Are Excluded?
 
 Both **File Scanner** and **Vector Search** automatically exclude common build/dependency folders (language-agnostic):
 
@@ -406,7 +389,7 @@ Both **File Scanner** and **Vector Search** automatically exclude common build/d
 
 **Example**: On a 6,187-file NestJS project, vector search processes ~889 source files (14%) - focusing on actual code, not dependencies.
 
-#### Advanced Usage
+### Advanced Usage
 
 ```bash
 # Incremental updates (preserves existing docs, adds new analysis)
@@ -428,7 +411,7 @@ archdoc analyze --max-cost 10.0  # Stop if cost exceeds $10
 archdoc analyze --refinement-iterations 10 --refinement-threshold 90 --refinement-improvement 15
 ```
 
-## CLI Usage
+### CLI Options Reference
 
 ```bash
 archdoc analyze [path] [options]
