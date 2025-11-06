@@ -2,13 +2,25 @@ import { AgentRegistry } from '../agents/agent-registry';
 import { FileSystemScanner } from '../scanners/file-system-scanner';
 import { Logger } from '../utils/logger';
 import { LLMService } from '../llm/llm-service';
-import { AgentResult, AgentContext } from '../types/agent.types';
+import { AgentResult, AgentContext, AgentExecutionOptions } from '../types/agent.types';
 import { StateGraph, END, StateGraphArgs, MemorySaver } from '@langchain/langgraph';
 import type { ScanResult } from '../types/scanner.types';
+import { ImportScanner } from '../scanners/import-scanner';
+import type { DependencyGraph, ImportInfo, ModuleInfo } from '../scanners/import-scanner';
+
+/**
+ * Iterative refinement configuration
+ */
+export interface IterativeRefinementConfig {
+  enabled: boolean;
+  maxIterations: number;
+  clarityThreshold: number;
+  minImprovement: number;
+}
 
 export interface OrchestratorOptions {
   maxTokens?: number;
-  maxCostDollars?: number;
+  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $5)
   parallel?: boolean;
   userPrompt?: string;
   /**
@@ -18,6 +30,39 @@ export interface OrchestratorOptions {
    * - 'deep' (3): 3-4 questions, 2-3 iterations per level (comprehensive, ~10-15 min)
    */
   depth?: 'quick' | 'normal' | 'deep' | 1 | 2 | 3;
+  iterativeRefinement?: IterativeRefinementConfig;
+  agentOptions?: AgentExecutionOptions;
+  onAgentProgress?: (current: number, total: number, agentName: string) => void;
+  runName?: string; // Custom run name for LangSmith tracing (supports {timestamp}, {agent}, {project})
+  retrievalStrategy?: 'vector' | 'graph' | 'hybrid' | 'smart'; // File retrieval strategy for hybrid search
+  embeddingsProvider?: 'local' | 'openai' | 'google'; // Embeddings provider for vector search (default: local)
+  languageConfig?: {
+    custom?: Record<
+      string,
+      {
+        displayName?: string;
+        filePatterns?: {
+          extensions?: string[];
+          namePatterns?: string[];
+          excludePatterns?: string[];
+        };
+        importPatterns?: Record<string, string>;
+        componentPatterns?: Record<string, string[]>;
+        keywords?: Record<string, string[]>;
+        frameworks?: string[];
+      }
+    >;
+    overrides?: Record<
+      string,
+      {
+        filePatterns?: {
+          extensions?: string[];
+          excludePatterns?: string[];
+        };
+        keywords?: Record<string, string[]>;
+      }
+    >;
+  };
   [key: string]: any;
 }
 
@@ -69,6 +114,27 @@ const C4ModelState: StateGraphArgs<any>['channels'] = {
     },
     default: () => new Map(),
   },
+  // Dependency graph state
+  dependencyGraph: {
+    value: (_: any, y: any) => y,
+    default: () => null,
+  },
+  // Shared vector store (initialized once, reused by all agents)
+  vectorStore: {
+    value: (_: any, y: any) => y,
+    default: () => undefined,
+  },
+  // Orchestrator-level token usage (for synthesis, etc.)
+  orchestratorTokens: {
+    value: (
+      current: { inputTokens: number; outputTokens: number },
+      update: { inputTokens: number; outputTokens: number },
+    ) => ({
+      inputTokens: current.inputTokens + update.inputTokens,
+      outputTokens: current.outputTokens + update.outputTokens,
+    }),
+    default: () => ({ inputTokens: 0, outputTokens: 0 }),
+  },
   c4Model: {
     value: (_: any, y: any) => y,
     default: () => null,
@@ -104,6 +170,21 @@ type C4State = {
   options: OrchestratorOptions;
   scanResult: any;
   agentResults: Map<string, AgentResult>;
+  dependencyGraph: {
+    imports: ImportInfo[];
+    modules: ModuleInfo[];
+    graph: DependencyGraph;
+  } | null;
+  vectorStore:
+    | {
+        searchFiles: (
+          query: string,
+          topK?: number,
+        ) => Promise<Array<{ path: string; score: number }>>;
+        cleanup: () => void;
+      }
+    | undefined;
+  orchestratorTokens: { inputTokens: number; outputTokens: number };
   c4Model: any;
   plantUMLModel: any;
   c4Context: any;
@@ -117,12 +198,17 @@ export class C4ModelOrchestrator {
   private logger = new Logger('C4ModelOrchestrator');
   private workflow: ReturnType<typeof this.buildWorkflow>;
   private checkpointer = new MemorySaver();
-  private llmService = LLMService.getInstance();
+  private llmService: LLMService;
+  private config: any;
 
   constructor(
     private readonly agentRegistry: AgentRegistry,
     private readonly scanner: FileSystemScanner,
+    config?: any,
   ) {
+    this.config = config || {};
+    // Initialize LLM service with config
+    this.llmService = LLMService.getInstance(config);
     this.workflow = this.buildWorkflow();
   }
 
@@ -185,9 +271,18 @@ export class C4ModelOrchestrator {
     projectPath: string,
     options: OrchestratorOptions = {},
   ): Promise<C4ModelOutput> {
+    const startTime = Date.now();
     this.logger.info('Starting C4 model generation...');
 
+    // Apply custom language configuration if provided
+    if (options.languageConfig) {
+      this.logger.debug('Applying custom language configuration...');
+      const { applyLanguageConfig } = await import('../config/language-config');
+      applyLanguageConfig(options.languageConfig);
+    }
+
     // 1. Scan project
+    this.logger.info('Scanning project structure...');
     const scanResult = await this.scanner.scan({
       rootPath: projectPath,
       maxFiles: 10000,
@@ -197,9 +292,153 @@ export class C4ModelOrchestrator {
       followSymlinks: false,
     });
 
-    // 2. Get agents
+    this.logger.info(
+      `📁 Found ${scanResult.totalFiles} files in ${scanResult.totalDirectories} directories`,
+    );
+    if (scanResult.files.length > 0) {
+      this.logger.debug(`   Analyzing ${scanResult.files.length} code files`);
+    }
+
+    // 2. Scan imports and build dependency graph
+    this.logger.info('Analyzing dependencies and imports...');
+    const importScanner = new ImportScanner();
+    const { imports, modules, graph } = await importScanner.scanProject(
+      projectPath,
+      scanResult.files.map((f) => f.relativePath),
+    );
+
+    this.logger.info(
+      `🔗 Found ${imports.length} imports, ${modules.length} modules, ${graph.edges.length} dependencies`,
+    );
+    if (modules.length > 0) {
+      this.logger.debug(
+        `   Top modules: ${modules
+          .slice(0, 3)
+          .map((m) => m.path)
+          .join(', ')}${modules.length > 3 ? ', ...' : ''}`,
+      );
+    }
+
+    // 3. Get agents
     const agents = this.agentRegistry.getAllAgents();
     const agentNames = agents.map((a) => a.getMetadata().name);
+    this.logger.info(`🤖 Registered ${agentNames.length} agents: ${agentNames.join(', ')}`);
+
+    // Validate embeddings API key if vector search mode is enabled
+    if (options.agentOptions?.searchMode === 'vector') {
+      // Determine embeddings provider from options or config (default: local - FREE!)
+      const embeddingsProvider = (
+        options.embeddingsProvider ||
+        this.config.searchMode?.embeddingsProvider ||
+        'local'
+      ).toLowerCase();
+
+      // Check for provider-specific API keys in config
+      const hasOpenAIKey = this.config.apiKeys?.openai;
+      const hasGoogleKey = this.config.apiKeys?.google;
+
+      const providerHasKey =
+        embeddingsProvider === 'local' || // Local embeddings are always available (FREE)
+        (embeddingsProvider === 'openai' && hasOpenAIKey) ||
+        (embeddingsProvider === 'google' && hasGoogleKey) ||
+        embeddingsProvider === 'huggingface'; // Local models don't need key
+
+      if (!providerHasKey) {
+        const providerKeyMap: Record<string, string> = {
+          openai: 'apiKeys.openai',
+          google: 'apiKeys.google',
+          cohere: 'apiKeys.cohere',
+          voyage: 'apiKeys.voyage',
+        };
+
+        const requiredKey = providerKeyMap[embeddingsProvider] || 'API key';
+        const errorMsg = [
+          `❌ Vector search with ${embeddingsProvider} provider requires an API key.`,
+          '',
+          `   Add ${requiredKey} to .archdoc.config.json`,
+          '',
+          '   Or run: archdoc config --init',
+          '   Then select "Enable vector search with embeddings"',
+          '',
+          '   Tip: Use --search-mode keyword for fast, free search (default)',
+        ].join('\n');
+
+        this.logger.error(errorMsg);
+        throw new Error(`Vector search requires ${requiredKey} in config`);
+      }
+    }
+
+    // Initialize shared vector store once if vector search mode is enabled
+    let sharedVectorStore:
+      | {
+          searchFiles: (
+            query: string,
+            topK?: number,
+          ) => Promise<Array<{ path: string; score: number }>>;
+          cleanup: () => void;
+        }
+      | undefined;
+
+    if (options.agentOptions?.searchMode === 'vector') {
+      // Determine embeddings provider from options (default: local - FREE!)
+      const embeddingsProvider = (
+        options.embeddingsProvider ||
+        process.env.EMBEDDINGS_PROVIDER ||
+        'local'
+      ).toLowerCase() as 'local' | 'openai' | 'google' | 'cohere' | 'voyage' | 'huggingface';
+
+      this.logger.info(
+        `🔍 Initializing shared vector store with ${embeddingsProvider} embeddings...`,
+      );
+      const vectorStoreStart = Date.now();
+
+      const { VectorSearchService } = await import('../services/vector-search.service');
+
+      const embeddingsConfig = {
+        provider: embeddingsProvider,
+        // Model can be overridden via EMBEDDINGS_MODEL env var
+        model: process.env.EMBEDDINGS_MODEL,
+      };
+
+      const vectorService = new VectorSearchService(
+        projectPath,
+        { imports, modules, graph },
+        embeddingsConfig,
+      );
+
+      try {
+        const availableFiles = scanResult.files.map((f) => f.path);
+        await vectorService.initialize(availableFiles, {
+          maxFileSize: 100000, // 100KB default
+        });
+        const initTime = Date.now() - vectorStoreStart;
+        this.logger.info(
+          `Vector store initialized in ${(initTime / 1000).toFixed(2)}s (${embeddingsProvider})`,
+          '✅',
+        );
+
+        // Wrap vectorService methods for AgentContext
+        sharedVectorStore = {
+          searchFiles: async (query: string, topK = 10) => {
+            const results = await vectorService.searchFiles(query, { topK });
+            return results.map((result) => ({
+              path: result.path,
+              score: result.relevanceScore || 0,
+            }));
+          },
+          cleanup: () => {
+            // No explicit cleanup needed - garbage collector will handle it
+            this.logger.debug('Vector store cleanup requested (memory will be freed by GC)');
+          },
+        };
+      } catch (error) {
+        this.logger.warn(
+          `Failed to initialize vector store: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        this.logger.info('Falling back to keyword search mode');
+        // Fallback to keyword search by not setting sharedVectorStore
+      }
+    }
 
     // 3. Initial state
     const initialState: C4State = {
@@ -208,6 +447,9 @@ export class C4ModelOrchestrator {
       scanResult,
       agentNames,
       agentResults: new Map(),
+      dependencyGraph: { imports, modules, graph },
+      vectorStore: sharedVectorStore, // Pass shared vector store to agents
+      orchestratorTokens: { inputTokens: 0, outputTokens: 0 },
       c4Model: null,
       plantUMLModel: null,
       c4Context: null,
@@ -235,7 +477,8 @@ export class C4ModelOrchestrator {
       }
     }
 
-    this.logger.info('C4 model generation completed.');
+    const executionTime = Date.now() - startTime;
+    this.logger.info(`C4 model generation completed in ${(executionTime / 1000).toFixed(2)}s`);
     this.logger.debug(
       'Final state c4Model:',
       JSON.stringify({
@@ -262,7 +505,7 @@ export class C4ModelOrchestrator {
       scanResult,
       agentResults: finalState.agentResults || new Map(),
       metadata: {
-        generationDuration: Date.now() - Date.now(),
+        generationDuration: executionTime,
         agentsExecuted: Array.from((finalState.agentResults || new Map()).keys()),
         totalFiles: scanResult.totalFiles,
         totalDirectories: scanResult.totalDirectories,
@@ -303,7 +546,9 @@ export class C4ModelOrchestrator {
     graph.addEdge('aggregateC4Model' as '__start__', 'generatePlantUML' as '__start__');
     graph.addEdge('generatePlantUML' as '__start__', END);
 
-    return graph.compile({ checkpointer: this.checkpointer });
+    return graph.compile({ checkpointer: this.checkpointer }).withConfig({
+      runName: `C4ModelOrchestrator-${Date.now()}`,
+    });
   }
 
   /**
@@ -319,23 +564,35 @@ export class C4ModelOrchestrator {
     questions: string[],
     purpose: string,
   ): Promise<Map<string, AgentResult>> {
-    this.logger.info(`Querying agents for ${purpose} with ${questions.length} questions`);
+    this.logger.info('\n' + '='.repeat(80));
+    this.logger.info(`📊 ${purpose} Analysis`);
+    this.logger.info('='.repeat(80));
+    this.logger.info(`Questions: ${questions.length} | Agents: ${agentNames.length}`);
 
     const results = new Map<string, AgentResult>();
-    const { scanResult, projectPath, agentResults } = state;
+    const { scanResult, projectPath, agentResults, options, dependencyGraph, vectorStore } = state;
+
+    // Get model config for cost calculation
+    const modelConfig = this.llmService.getModelConfig(
+      this.llmService['defaultProvider'],
+      this.llmService['getDefaultModel'](this.llmService['defaultProvider']),
+    );
 
     for (const [index, question] of questions.entries()) {
-      this.logger.info(`   ❓ Q${index + 1}: ${question.substring(0, 100)}...`);
+      this.logger.info(
+        `❓ Question ${index + 1}/${questions.length}: ${question.substring(0, 100)}${question.length > 100 ? '...' : ''}`,
+      );
 
       for (const agentName of agentNames) {
         const agent = this.agentRegistry.getAgent(agentName);
         if (!agent) {
-          this.logger.warn(`Agent ${agentName} not found, skipping`);
+          this.logger.warn(`   ⚠️  Agent ${agentName} not found, skipping`);
           continue;
         }
 
-        this.logger.info(`      🤖 Asking ${agentName}...`);
+        this.logger.info(`🤖 ${agentName}`);
 
+        // Create agent context
         const context: AgentContext = {
           executionId: `c4-${purpose}-${agentName}-q${index}-${Date.now()}`,
           projectPath,
@@ -349,7 +606,12 @@ export class C4ModelOrchestrator {
           previousResults: agentResults,
           config: {
             skipSelfRefinement: true, // Fast analysis for C4
-            maxIterations: 1,
+            // Pass iterative refinement configuration to agents
+            maxIterations: options.iterativeRefinement?.maxIterations || 1,
+            clarityThreshold: options.iterativeRefinement?.clarityThreshold,
+            maxQuestionsPerIteration: options.agentOptions?.maxQuestionsPerIteration,
+            // Pass search mode from agent options
+            searchMode: options.agentOptions?.searchMode,
           },
           languageHints: scanResult.languages.map((lang: any) => ({
             language: lang.language,
@@ -357,20 +619,114 @@ export class C4ModelOrchestrator {
             indicators: [lang.language],
             coverage: lang.percentage,
           })),
-          tokenBudget: 30000,
+          tokenBudget: options.maxTokens || 182000, // Claude Sonnet 4 max: 200K input tokens - 10K safety margin - 8K max output
           scanResult,
           query: question, // Pass question as query for agents to focus on
+          dependencyGraph: dependencyGraph || undefined,
+          vectorStore: vectorStore, // Pass shared vector store (initialized once)
         };
 
-        const result = await agent.execute(context, {
+        // Check if agent can execute (has relevant data)
+        const canExecute = await agent.canExecute(context);
+        if (!canExecute) {
+          this.logger.info(`   ⏭️  Skipped (no relevant data)`);
+          const resultKey = `${agentName}-q${index}`;
+          results.set(resultKey, {
+            agentName,
+            status: 'success' as const,
+            data: {},
+            summary: `No relevant ${agentName} data found in the project`,
+            markdown: '',
+            confidence: 0,
+            tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+            executionTime: 0,
+            errors: [],
+            warnings: [`No relevant data found - ${agentName} analysis skipped`],
+            metadata: { skipped: true, reason: 'No relevant data' },
+          });
+          continue;
+        }
+
+        // Execute agent with runnable config for tracing
+        const customRunName = options.runName
+          ? options.runName
+              .replace('{timestamp}', new Date().toISOString())
+              .replace('{agent}', agentName)
+              .replace('{project}', projectPath.split(/[\\/]/).pop() || 'unknown')
+          : `C4-${purpose}-${agentName}-Q${index + 1}`;
+
+        const agentOptions: AgentExecutionOptions = {
+          ...options.agentOptions,
           skipSelfRefinement: true, // CRITICAL: Skip agent evaluation loop for speed
-        });
+          runnableConfig: {
+            ...options.agentOptions?.runnableConfig,
+            runName: customRunName,
+          },
+        };
 
-        const resultKey = `${agentName}-q${index}`;
-        results.set(resultKey, result);
+        try {
+          const result = await agent.execute(context, agentOptions);
 
-        const summary = result.summary?.substring(0, 100) || 'No summary';
-        this.logger.info(`         ✅ ${summary}...`);
+          // Calculate cost for this agent
+          const cost = this.llmService['tokenManager'].calculateCost(
+            result.tokenUsage.inputTokens,
+            result.tokenUsage.outputTokens,
+            modelConfig.costPerMillionInputTokens,
+            modelConfig.costPerMillionOutputTokens,
+          );
+
+          const resultKey = `${agentName}-q${index}`;
+          results.set(resultKey, result);
+
+          const summary = result.summary?.substring(0, 80) || 'No summary';
+          this.logger.info(`Agent completed successfully`, '✅');
+          this.logger.info(`   📊 Summary: ${summary}${summary.length >= 80 ? '...' : ''}`);
+          this.logger.info(`   ⏱️  Execution time: ${(result.executionTime / 1000).toFixed(2)}s`);
+          this.logger.info(
+            `   💰 Tokens: ${result.tokenUsage.totalTokens.toLocaleString()} (in: ${result.tokenUsage.inputTokens.toLocaleString()}, out: ${result.tokenUsage.outputTokens.toLocaleString()}) | Cost: $${cost.toFixed(4)}`,
+          );
+
+          // Check if total cost exceeds budget
+          const maxCost = options.maxCostDollars || 5.0; // Default $5 budget
+          let totalCost = 0;
+          for (const agentResult of results.values()) {
+            const agentCost = this.llmService['tokenManager'].calculateCost(
+              agentResult.tokenUsage.inputTokens,
+              agentResult.tokenUsage.outputTokens,
+              modelConfig.costPerMillionInputTokens,
+              modelConfig.costPerMillionOutputTokens,
+            );
+            totalCost += agentCost;
+          }
+
+          if (totalCost >= maxCost) {
+            this.logger.warn(
+              `🚨 BUDGET LIMIT REACHED: Total cost $${totalCost.toFixed(2)} >= $${maxCost.toFixed(2)} - Halting execution`,
+            );
+            // Return early to halt execution
+            return results;
+          }
+        } catch (_error) {
+          this.logger.error(`Agent ${agentName} failed`, _error);
+
+          // Store failed result
+          const failedResult: AgentResult = {
+            agentName,
+            status: 'failed',
+            data: {},
+            summary: `Agent failed: ${_error instanceof Error ? (_error as Error).message : String(_error)}`,
+            markdown: `# ${agentName} Failed\n\nError: ${_error instanceof Error ? (_error as Error).message : String(_error)}`,
+            confidence: 0,
+            tokenUsage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+            executionTime: 0,
+            errors: [_error instanceof Error ? (_error as Error).message : String(_error)],
+            warnings: [],
+            metadata: {},
+          };
+
+          const resultKey = `${agentName}-q${index}`;
+          results.set(resultKey, failedResult);
+        }
       }
     }
 
@@ -491,8 +847,23 @@ ${sampleFiles}
 
 Return ONLY valid JSON, no markdown formatting.
 `;
-    const result = await model.invoke(prompt);
+    const result = await model.invoke(prompt, {
+      runName: state.options.runName
+        ? state.options.runName
+            .replace('{timestamp}', new Date().toISOString())
+            .replace('{agent}', 'C4-Context-Generator')
+            .replace('{project}', state.projectPath.split(/[\\/]/).pop() || 'unknown')
+        : 'C4-Context-Generator',
+    });
     let c4Context = null;
+
+    // Track orchestrator token usage
+    const responseUsage =
+      (result as any).usage_metadata || (result as any).response_metadata?.usage || {};
+    const orchestratorTokens = {
+      inputTokens: responseUsage.input_tokens || responseUsage.prompt_tokens || 0,
+      outputTokens: responseUsage.output_tokens || responseUsage.completion_tokens || 0,
+    };
 
     this.logger.debug('=== C4 CONTEXT RAW OUTPUT ===');
     this.logger.debug(result.content.toString().substring(0, 500));
@@ -507,7 +878,7 @@ Return ONLY valid JSON, no markdown formatting.
       this.logger.error('Raw output length:', result.content.toString().length);
     }
 
-    return { c4Context, agentResults: updatedAgentResults };
+    return { c4Context, agentResults: updatedAgentResults, orchestratorTokens };
   }
 
   private async generateC4Containers(state: C4State): Promise<Partial<C4State>> {
@@ -623,8 +994,24 @@ ${sampleFiles}
   ]
 }
 `;
-    const result = await model.invoke(prompt);
+    const result = await model.invoke(prompt, {
+      runName: state.options.runName
+        ? state.options.runName
+            .replace('{timestamp}', new Date().toISOString())
+            .replace('{agent}', 'C4-Containers-Generator')
+            .replace('{project}', state.projectPath.split(/[\\/]/).pop() || 'unknown')
+        : 'C4-Containers-Generator',
+    });
     let c4Containers = null;
+
+    // Track orchestrator token usage
+    const responseUsage =
+      (result as any).usage_metadata || (result as any).response_metadata?.usage || {};
+    const orchestratorTokens = {
+      inputTokens: responseUsage.input_tokens || responseUsage.prompt_tokens || 0,
+      outputTokens: responseUsage.output_tokens || responseUsage.completion_tokens || 0,
+    };
+
     try {
       const cleanedOutput = this.stripMarkdownCodeBlocks(result.content.toString());
       this.logger.debug('=== C4 CONTAINERS CLEANED OUTPUT ===');
@@ -640,7 +1027,7 @@ ${sampleFiles}
       this.logger.debug(result.content.toString().substring(0, 1000));
       this.logger.debug('=== END RAW OUTPUT ===');
     }
-    return { c4Containers, agentResults: updatedAgentResults };
+    return { c4Containers, agentResults: updatedAgentResults, orchestratorTokens };
   }
 
   private async generateC4Components(state: C4State): Promise<Partial<C4State>> {
@@ -764,8 +1151,23 @@ If you cannot identify components, return:
   "relationships": []
 }
 `;
-    const result = await model.invoke(prompt);
+    const result = await model.invoke(prompt, {
+      runName: state.options.runName
+        ? state.options.runName
+            .replace('{timestamp}', new Date().toISOString())
+            .replace('{agent}', 'C4-Components-Generator')
+            .replace('{project}', state.projectPath.split(/[\\/]/).pop() || 'unknown')
+        : 'C4-Components-Generator',
+    });
     let c4Components = null;
+
+    // Track orchestrator token usage
+    const responseUsage =
+      (result as any).usage_metadata || (result as any).response_metadata?.usage || {};
+    const orchestratorTokens = {
+      inputTokens: responseUsage.input_tokens || responseUsage.prompt_tokens || 0,
+      outputTokens: responseUsage.output_tokens || responseUsage.completion_tokens || 0,
+    };
 
     this.logger.debug('=== C4 COMPONENTS RAW OUTPUT ===');
     this.logger.debug(result.content.toString());
@@ -805,7 +1207,7 @@ If you cannot identify components, return:
         relationships: [],
       };
     }
-    return { c4Components, agentResults: updatedAgentResults };
+    return { c4Components, agentResults: updatedAgentResults, orchestratorTokens };
   }
 
   private async aggregateC4Model(state: C4State): Promise<Partial<C4State>> {
@@ -849,7 +1251,7 @@ If you cannot identify components, return:
 
   private async generatePlantUML(state: C4State): Promise<Partial<C4State>> {
     this.logger.info('Generating PlantUML from C4 model...');
-    const { c4Model } = state;
+    const { c4Model, agentResults, orchestratorTokens } = state;
 
     if (!c4Model) {
       this.logger.warn('C4 model is not available, skipping PlantUML generation.');
@@ -883,6 +1285,53 @@ If you cannot identify components, return:
         containers: containersPuml,
         components: componentsPuml,
       };
+
+      // Log final summary with token usage
+      this.logger.info('\n' + '='.repeat(80));
+      this.logger.info('📊 C4 MODEL GENERATION SUMMARY');
+      this.logger.info('='.repeat(80));
+
+      // Calculate total token usage
+      const agentInputTokens = Array.from(agentResults.values()).reduce(
+        (sum, r) => sum + r.tokenUsage.inputTokens,
+        0,
+      );
+      const agentOutputTokens = Array.from(agentResults.values()).reduce(
+        (sum, r) => sum + r.tokenUsage.outputTokens,
+        0,
+      );
+
+      // Include orchestrator tokens (for LLM calls in this orchestrator)
+      const totalInputTokens = agentInputTokens + orchestratorTokens.inputTokens;
+      const totalOutputTokens = agentOutputTokens + orchestratorTokens.outputTokens;
+      const totalTokens = totalInputTokens + totalOutputTokens;
+
+      // Calculate total cost using actual provider/model pricing
+      const modelConfig = this.llmService.getModelConfig(
+        this.llmService['defaultProvider'],
+        this.llmService['getDefaultModel'](this.llmService['defaultProvider']),
+      );
+      const totalCost = this.llmService['tokenManager'].calculateCost(
+        totalInputTokens,
+        totalOutputTokens,
+        modelConfig.costPerMillionInputTokens,
+        modelConfig.costPerMillionOutputTokens,
+      );
+
+      this.logger.info(`✅ Agents completed: ${agentResults.size}`);
+      this.logger.info(
+        `💰 Total tokens: ${totalTokens.toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`,
+      );
+      if (orchestratorTokens.inputTokens > 0 || orchestratorTokens.outputTokens > 0) {
+        this.logger.info(
+          `   ├─ Agent tokens: ${(agentInputTokens + agentOutputTokens).toLocaleString()} (${agentInputTokens.toLocaleString()} in / ${agentOutputTokens.toLocaleString()} out)`,
+        );
+        this.logger.info(
+          `   └─ Orchestrator tokens: ${(orchestratorTokens.inputTokens + orchestratorTokens.outputTokens).toLocaleString()} (${orchestratorTokens.inputTokens.toLocaleString()} in / ${orchestratorTokens.outputTokens.toLocaleString()} out)`,
+        );
+      }
+      this.logger.info(`💵 Total cost: $${totalCost.toFixed(4)}`);
+      this.logger.info('='.repeat(80) + '\n');
 
       return { plantUMLModel };
     } catch (error) {

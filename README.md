@@ -263,8 +263,19 @@ archdoc analyze --verbose
 
 ### C4 Architecture Model Generation
 
+The C4 orchestrator now supports all advanced features from documentation generation, including:
+
+- 🔍 **Vector Search**: Semantic file retrieval with local/OpenAI/Google embeddings
+- 📊 **Dependency Graph**: Built-in import and module analysis
+- 💰 **Cost Tracking**: Real-time token and cost monitoring with budget limits
+- ⚡ **LangSmith Tracing**: Full observability with custom run names
+- 🎯 **Agent Skip Logic**: Automatically skips agents with no relevant data
+
 ```bash
 # Generate C4 model for current directory
+archdoc analyze --c4
+
+# Generate C4 model with vector search (uses config settings)
 archdoc analyze --c4
 
 # Generate C4 model for specific project
@@ -273,9 +284,17 @@ archdoc analyze /path/to/project --c4
 # Custom output location for C4 model
 archdoc analyze --c4 --output ./architecture-docs
 
-# C4 model with verbose output
-archdoc analyze --c4 --verbose
+# C4 model with verbose output and cost limit
+archdoc analyze --c4 --verbose --max-cost 1.0
+
+# Quick analysis (1 question per level, fastest)
+archdoc analyze --c4 --depth quick
+
+# Deep analysis (4 questions per level, comprehensive)
+archdoc analyze --c4 --depth deep
 ```
+
+**Note**: Vector search mode is configured in `.archdoc.config.json` via the `searchMode.mode` setting. The C4 orchestrator will automatically use your configured search mode (vector or keyword) and embeddings provider.
 
 #### Configuration Management
 
