@@ -24,7 +24,9 @@ npm install -g @techdebtgpt/archdoc-generator
 
 ### 2. Setup MCP Configuration
 
-Create `.vscode/mcp.json` in your project:
+**⚠️ IMPORTANT**: Do NOT use VS Code's "Add MCP Server" UI - it auto-generates incorrect configuration!
+
+**Method 1 - Manually create** `.vscode/mcp.json`:
 
 ```json
 {
@@ -37,11 +39,27 @@ Create `.vscode/mcp.json` in your project:
 }
 ```
 
-Or copy from `.vscode/mcp.json.example`:
+**Method 2 - Copy from example**:
 
 ```bash
+# From architecture-doc-generator repo
 cp .vscode/mcp.json.example .vscode/mcp.json
+
+# Or create directly in your project
+mkdir -p .vscode
+cat > .vscode/mcp.json << 'EOF'
+{
+  "servers": {
+    "archdoc": {
+      "command": "archdoc-server-mcp",
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+EOF
 ```
+
+**Why manual creation?** VS Code Copilot analyzes package metadata and generates complex configs with `--project .` args, `${input:api_key}` prompts, and env vars. These interfere with our UI-driven setup flow.
 
 ### 3. Configure via MCP UI
 
@@ -523,13 +541,57 @@ ArchDoc: [Calls detect_patterns tool]
 
 5. Check MCP client logs for detailed errors
 
+### VS Code Auto-Generated Wrong Config
+
+**Symptoms:**
+
+- MCP server fails with "could not determine executable to run"
+- `.vscode/mcp.json` has complex config with `args: ["--project", "."]`, `env` vars, and `${input:api_key}` prompts
+- Setup UI doesn't show all configuration options
+
+**Root Cause:** VS Code Copilot analyzes package metadata and auto-generates "helpful" configuration that conflicts with our UI-driven setup flow.
+
+**Solutions:**
+
+1. **Delete auto-generated config**:
+
+   ```bash
+   rm .vscode/mcp.json
+   ```
+
+2. **Manually create minimal config**:
+
+   ```json
+   {
+     "servers": {
+       "archdoc": {
+         "command": "archdoc-server-mcp",
+         "cwd": "${workspaceFolder}"
+       }
+     }
+   }
+   ```
+
+3. **Key points**:
+   - ❌ NO `args` array
+   - ❌ NO `env` object
+   - ❌ NO `inputs` array
+   - ❌ NO `type: "stdio"` (implied)
+   - ✅ Just `command` and `cwd`
+
+4. Reload VS Code
+
+5. Test with `@archdoc check config`
+
+**Why this happens**: VS Code's MCP discovery tries to be smart by parsing package.json binaries and generating full configs. Our design uses UI-driven configuration instead.
+
 ### Configuration Not Found
 
 **Symptoms:** Server starts but tools fail with "Configuration not found"
 
 **Solutions:**
 
-1. Run `archdoc-mcp` in your project directory
+1. Use `@archdoc setup config` in VS Code chat
 2. Or create `.archdoc.config.json` manually
 3. Ensure config file has valid API key
 

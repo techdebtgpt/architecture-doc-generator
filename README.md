@@ -44,20 +44,35 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 # 1. Install globally
 npm install -g @techdebtgpt/archdoc-generator
 
-# 2. Navigate to your project
+# 2. Create minimal MCP config in your project
 cd /path/to/your/project
+mkdir -p .vscode
+cat > .vscode/mcp.json << 'EOF'
+{
+  "servers": {
+    "archdoc": {
+      "command": "archdoc-server-mcp",
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+EOF
 
-# 3. Run interactive setup wizard
-archdoc-mcp
+# 3. Reload VS Code and configure via UI
+# Use: @archdoc setup config
 ```
 
-The wizard will:
+**⚠️ IMPORTANT**: Do NOT use VS Code's "Add MCP Server" UI - it auto-generates incorrect configuration with args/env/inputs that break the UI-driven setup flow. Always create the config manually as shown above.
 
-- ✅ Configure your LLM provider (Anthropic/OpenAI/Google/xAI)
-- ✅ Set up API keys
-- ✅ Create `.archdoc.config.json` (gitignored automatically)
-- ✅ Create `.vscode/mcp.json` for MCP clients
-- ✅ Enable optional LangSmith tracing
+The UI setup provides:
+
+- ✅ Provider dropdown (Anthropic/OpenAI/Google/xAI)
+- ✅ Model dropdown (15+ models)
+- ✅ API key input
+- ✅ Search mode selection (keyword/vector)
+- ✅ Embeddings provider (local/openai/google)
+- ✅ Retrieval strategy (smart/vector/graph/hybrid)
+- ✅ Optional LangSmith tracing
 
 ### 🤖 What You Can Do with MCP
 

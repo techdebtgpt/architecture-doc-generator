@@ -1,13 +1,12 @@
 {
   "name": "@techdebtgpt/archdoc-generator",
-  "version": "0.3.28",
+  "version": "0.3.29",
   "description": "AI-powered architecture documentation generator with RAG, hybrid retrieval (semantic + structural), and multi-agent workflows using LangChain",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
     "archdoc": "./dist/cli/index.js",
-    "archdoc-server-mcp": "./dist/src/mcp-server/index.js",
-    "archdoc-mcp": "./dist/cli/setup-mcp.js"
+    "archdoc-server-mcp": "./dist/src/mcp-server/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -25,7 +24,6 @@
     "cli:dev": "ts-node cli/index.ts",
     "mcp:dev": "ts-node src/mcp-server/index.ts",
     "mcp:build": "npm run build && node dist/src/mcp-server/index.js",
-    "mcp:setup": "ts-node cli/setup-mcp.ts",
     "example:basic": "ts-node examples/basic-usage.ts",
     "example:custom": "ts-node examples/custom-agent.ts",
     "prepublish:check": "node scripts/pre-publish-check.js"
