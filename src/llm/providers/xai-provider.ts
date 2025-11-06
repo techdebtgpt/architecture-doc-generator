@@ -29,7 +29,7 @@ export class XAIProvider implements ILLMProvider {
   };
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.XAI_API_KEY || '';
+    this.apiKey = apiKey || '';
     this.tokenManager = TokenManager.getInstance();
   }
 

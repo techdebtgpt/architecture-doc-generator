@@ -1,11 +1,13 @@
 {
   "name": "@techdebtgpt/archdoc-generator",
-  "version": "0.3.20",
-  "description": "Language-agnostic AI-powered architecture documentation generator using LangChain and agentic workflows",
+  "version": "0.3.33",
+  "description": "AI-powered architecture documentation generator with RAG, hybrid retrieval (semantic + structural), and multi-agent workflows using LangChain",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "archdoc": "./dist/cli/index.js"
+    "archdoc": "./dist/cli/index.js",
+    "archdoc-mcp-server": "./dist/src/mcp-server/index.js",
+    "archdoc-generate-mcp": "./dist/cli/generate-mcp-json.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -20,7 +22,9 @@
     "prepublishOnly": "npm run build && npm run lint && npm test",
     "prepack": "npm run build",
     "postpack": "echo 'Package created successfully'",
-    "cli:dev": "ts-node src/cli/index.ts",
+    "cli:dev": "ts-node cli/index.ts",
+    "mcp:dev": "ts-node src/mcp-server/index.ts",
+    "mcp:build": "npm run build && node dist/src/mcp-server/index.js",
     "example:basic": "ts-node examples/basic-usage.ts",
     "example:custom": "ts-node examples/custom-agent.ts",
     "prepublish:check": "node scripts/pre-publish-check.js"
@@ -41,6 +45,13 @@
     "multi-agent",
     "multi-language",
     "language-agnostic",
+    "rag",
+    "vector-search",
+    "semantic-search",
+    "embeddings",
+    "hybrid-retrieval",
+    "dependency-graph",
+    "tfidf",
     "typescript",
     "javascript",
     "python",
@@ -74,6 +85,7 @@
     "@langchain/google-genai": "^0.1.12",
     "@langchain/langgraph": "^0.2.74",
     "@langchain/openai": "^0.3.17",
+    "@modelcontextprotocol/sdk": "^1.21.0",
     "chalk": "^4.1.2",
     "commander": "^12.1.0",
     "fast-glob": "^3.3.2",

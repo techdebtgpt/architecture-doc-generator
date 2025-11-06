@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
 import { Logger } from '../../src/utils/logger';
+import { promptFullConfig } from '../utils/config-prompts';
 
 const logger = new Logger('ConfigCommand');
 
@@ -31,7 +32,7 @@ const DEFAULT_CONFIG = {
     maxTokens: 4096,
   },
   scan: {
-    maxFiles: 1000,
+    maxFiles: 10000,
     maxFileSize: 1048576,
     respectGitignore: true,
     excludePatterns: [
@@ -56,6 +57,17 @@ const DEFAULT_CONFIG = {
     ],
     parallel: true,
     timeout: 300000,
+  },
+  searchMode: {
+    mode: 'keyword',
+    embeddingsProvider: 'local',
+    strategy: 'smart',
+    vectorWeight: 0.6,
+    graphWeight: 0.4,
+    includeRelatedFiles: true,
+    maxDepth: 2,
+    similarityThreshold: 0.3,
+    topK: 10,
   },
   refinement: {
     enabled: true,
@@ -94,199 +106,111 @@ function findConfigPath(): string | null {
 async function initializeConfig(): Promise<void> {
   logger.info('🚀 Welcome to ArchDoc Setup!\n');
 
-  // Always create config in root directory
-  const configPath = path.join(process.cwd(), CONFIG_FILE);
-  logger.info(`Creating configuration in: ${CONFIG_FILE}`);
+  const projectPath = process.cwd();
+  const configPath = path.join(projectPath, CONFIG_FILE);
 
   // Check if config already exists
-  if (fs.existsSync(configPath)) {
-    const { shouldOverwrite } = await inquirer.prompt([
+  const existingConfig = fs.existsSync(configPath)
+    ? JSON.parse(fs.readFileSync(configPath, 'utf-8'))
+    : null;
+
+  if (existingConfig) {
+    logger.info('⚠️  Found existing configuration:\n');
+    logger.info(`   Provider: ${existingConfig.llm?.provider || 'Not set'}`);
+    logger.info(`   Model: ${existingConfig.llm?.model || 'Not set'}`);
+    logger.info(`   Vector Search: ${existingConfig.searchMode?.embeddingsProvider || 'Not set'}`);
+    logger.info(`   Tracing: ${existingConfig.tracing?.enabled ? 'Enabled' : 'Disabled'}\n`);
+
+    const { shouldUpdate } = await inquirer.prompt([
       {
         type: 'confirm',
-        name: 'shouldOverwrite',
-        message: 'Config already exists. Overwrite?',
-        default: false,
+        name: 'shouldUpdate',
+        message: 'Update configuration?',
+        default: true,
       },
     ]);
 
-    if (!shouldOverwrite) {
+    if (!shouldUpdate) {
       logger.info('Setup cancelled.');
       return;
     }
+
+    logger.info('Updating configuration...\n');
+  } else {
+    logger.info(`Creating configuration in: ${CONFIG_FILE}`);
   }
 
-  // Start with default config
-  const config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-
-  // Interactive API key setup - MANDATORY
+  // Use shared prompt utility for all configuration
   logger.info('\n📋 LLM Provider Selection (REQUIRED)\n');
+  const { answers, existingConfig: loadedConfig } = await promptFullConfig(projectPath, {
+    includeVectorSearch: true,
+    includeTracing: true,
+    verbose: true,
+  });
 
-  const { provider } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'provider',
-      message: 'Choose your LLM provider:',
-      choices: [
-        {
-          name: 'Anthropic Claude (recommended) - Best quality and accuracy',
-          value: 'anthropic',
-          short: 'Anthropic',
-        },
-        {
-          name: 'OpenAI GPT - Latest and most powerful',
-          value: 'openai',
-          short: 'OpenAI',
-        },
-        {
-          name: 'Google Gemini - Strong reasoning and large context',
-          value: 'google',
-          short: 'Google',
-        },
-        {
-          name: 'xAI Grok - Real-time insights and unique perspective',
-          value: 'xai',
-          short: 'xAI',
-        },
-      ],
-    },
-  ]);
+  // Start with default config or existing config
+  const config = loadedConfig
+    ? JSON.parse(JSON.stringify(loadedConfig))
+    : JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 
-  // Provider-specific configuration with available models
-  const providerInfo = {
-    anthropic: {
-      defaultModel: 'claude-sonnet-4-5-20250929',
-      models: [
-        {
-          name: 'claude-sonnet-4-5-20250929 (recommended) - Latest, best quality',
-          value: 'claude-sonnet-4-5-20250929',
-        },
-        {
-          name: 'claude-haiku-4-5-20251001 - Fastest, most affordable',
-          value: 'claude-haiku-4-5-20251001',
-        },
-        { name: 'claude-opus-4-1-20250805 - Most powerful', value: 'claude-opus-4-1-20250805' },
-        {
-          name: 'claude-sonnet-4-20250514 - Previous generation',
-          value: 'claude-sonnet-4-20250514',
-        },
-      ],
-      keyFormat: 'sk-ant-...',
-      url: 'https://console.anthropic.com/',
-    },
-    openai: {
-      defaultModel: 'gpt-5',
-      models: [
-        { name: 'gpt-5 (recommended) - Latest and most powerful', value: 'gpt-5' },
-        { name: 'gpt-4.1 - Previous generation flagship', value: 'gpt-4.1' },
-        { name: 'gpt-4-turbo - Fast and capable', value: 'gpt-4-turbo' },
-        { name: 'gpt-4 - Stable and reliable', value: 'gpt-4' },
-      ],
-      keyFormat: 'sk-...',
-      url: 'https://platform.openai.com/',
-    },
-    google: {
-      defaultModel: 'gemini-2.5-pro',
-      models: [
-        { name: 'gemini-2.5-pro (recommended) - Best reasoning', value: 'gemini-2.5-pro' },
-        { name: 'gemini-2.5-flash - Fastest multimodal', value: 'gemini-2.5-flash' },
-        { name: 'gemini-2.5-flash-lite - Most efficient', value: 'gemini-2.5-flash-lite' },
-        { name: 'gemini-1.5-pro - Previous generation', value: 'gemini-1.5-pro' },
-      ],
-      keyFormat: 'AIza...',
-      url: 'https://ai.google.dev/',
-    },
-    xai: {
-      defaultModel: 'grok-3-beta',
-      models: [
-        {
-          name: 'grok-3-beta (recommended) - Latest with real-time insights',
-          value: 'grok-3-beta',
-        },
-        { name: 'grok-2 - Stable and reliable', value: 'grok-2' },
-      ],
-      keyFormat: 'xai-...',
-      url: 'https://console.x.ai/',
-    },
-  };
+  // Apply answers from shared prompts
+  config.llm.provider = answers.provider;
+  config.llm.model = answers.selectedModel;
+  if (answers.apiKey) {
+    config.apiKeys[answers.provider] = answers.apiKey;
+  }
 
-  const info = providerInfo[provider as keyof typeof providerInfo];
+  logger.info(`\n✅ Configured to use: ${answers.provider} (${answers.selectedModel})`);
 
-  // Select model for the chosen provider
-  logger.info(`\n🎯 Available ${provider} models:\n`);
-
-  const { selectedModel } = await inquirer.prompt([
-    {
-      type: 'list',
-      name: 'selectedModel',
-      message: `Choose ${provider} model:`,
-      choices: info.models,
-      default: info.defaultModel,
-    },
-  ]);
-
-  // Prompt for API key with validation
-  logger.info(`\nGet your API key at: ${info.url}`);
-
-  const { apiKey } = await inquirer.prompt([
-    {
-      type: 'password',
-      name: 'apiKey',
-      message: `Enter ${provider} API key (${info.keyFormat}):`,
-      validate: (input: string) => {
-        if (!input || input.trim().length === 0) {
-          return 'API key is required';
-        }
-        return true;
-      },
-      mask: '*',
-    },
-  ]);
-
-  // Configure provider
-  config.apiKeys[provider] = apiKey.trim();
-  config.llm.provider = provider;
-  config.llm.model = selectedModel;
-
-  logger.info(`\n✅ Configured to use: ${provider} (${selectedModel})`);
-
-  // LangSmith tracing setup (optional)
-  const { enableTracing } = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'enableTracing',
-      message: 'Enable LangSmith tracing for debugging?',
-      default: false,
-    },
-  ]);
-
-  if (enableTracing) {
-    const tracingAnswers = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'langchainKey',
-        message: 'Enter LangSmith API key (lsv2_pt_...):',
-        mask: '*',
-      },
-      {
-        type: 'input',
-        name: 'projectName',
-        message: 'Enter LangSmith project name:',
-        default: 'archdoc-analysis',
-      },
-    ]);
-
-    config.tracing.enabled = true;
-    if (tracingAnswers.langchainKey.trim()) {
-      config.tracing.apiKey = tracingAnswers.langchainKey.trim();
+  // Apply vector search configuration
+  if (answers.enableVectorSearch && answers.embeddingsProvider) {
+    config.searchMode.mode = 'vector';
+    config.searchMode.embeddingsProvider = answers.embeddingsProvider;
+    if (answers.strategy) {
+      config.searchMode.strategy = answers.strategy;
     }
-    if (tracingAnswers.projectName.trim()) {
-      config.tracing.project = tracingAnswers.projectName.trim();
+    // Only add embeddings key if an API key was provided (not needed for local)
+    if (answers.embeddingsApiKey) {
+      if (!config.apiKeys.embeddings) {
+        config.apiKeys.embeddings = '';
+      }
+      config.apiKeys.embeddings = answers.embeddingsApiKey;
+    }
+    logger.info(`✅ Vector search enabled with ${answers.embeddingsProvider} embeddings`);
+    logger.info(`✅ Search strategy: ${answers.strategy || 'smart'}`);
+
+    if (['cohere', 'voyage', 'huggingface'].includes(answers.embeddingsProvider)) {
+      logger.warn(
+        `\n⚠️  ${answers.embeddingsProvider} embeddings support is not yet fully implemented.`,
+      );
+      logger.warn('   OpenAI and Google providers are currently supported.');
+    }
+
+    logger.info('\n   Use --search-mode vector when running archdoc analyze');
+    logger.info(`   Set EMBEDDINGS_PROVIDER=${answers.embeddingsProvider} to use this provider`);
+  } else {
+    logger.info(
+      '   Skipped - you can enable it later with: archdoc config --set searchMode.embeddingsProvider=openai',
+    );
+  }
+
+  // Apply tracing configuration
+  if (answers.enableTracing) {
+    config.tracing.enabled = true;
+    if (answers.langsmithKey) {
+      config.tracing.apiKey = answers.langsmithKey;
+    }
+    if (answers.langsmithProject) {
+      config.tracing.project = answers.langsmithProject;
     }
   }
 
   // Save configuration
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-  logger.info(`\n✅ Created ${path.relative(process.cwd(), configPath)}`);
+  const isUpdate = !!existingConfig;
+  logger.info(
+    `\n✅ ${isUpdate ? 'Updated' : 'Created'} ${path.relative(process.cwd(), configPath)}`,
+  );
 
   // Suggest adding config file to .gitignore (contains API keys)
   const gitignorePath = path.join(process.cwd(), '.gitignore');
@@ -321,7 +245,7 @@ async function initializeConfig(): Promise<void> {
   logger.info(`  • Tracing: ${config.tracing.enabled ? 'Enabled' : 'Disabled'}`);
   logger.info('\n💡 Tips:');
   logger.info('  • Change provider: archdoc config --set llm.provider=openai');
-  logger.info('  • Change model: archdoc config --set llm.model=gpt-5');
+  logger.info('  • Change model: archdoc config --set llm.model=o1-mini');
   logger.info('  • Update API key: archdoc config --set apiKeys.anthropic=sk-ant-...');
   logger.info('  • View settings: archdoc config --list');
   logger.info('\nNext steps:');

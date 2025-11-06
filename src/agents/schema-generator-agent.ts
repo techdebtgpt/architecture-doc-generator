@@ -17,32 +17,31 @@ export enum SchemaType {
 }
 
 /**
- * Schema documentation result
+ * Schema documentation result (FIELDS REMOVED FOR ARCHITECTURAL VIEW)
  */
 export interface SchemaDocumentation {
   type: SchemaType;
   name: string;
   description: string;
-  diagram: string; // Mermaid ER diagram or class diagram
+  diagram: string; // Mermaid ER or class diagram
   entities: SchemaEntity[];
   relationships: SchemaRelationship[];
   insights: string[];
 }
 
+/**
+ * Simplified entity: name, type, short description ONLY — no fields
+ */
 export interface SchemaEntity {
   name: string;
   type: string;
   description: string;
-  fields: SchemaField[];
+  // ⛔ fields property REMOVED
 }
 
-export interface SchemaField {
-  name: string;
-  type: string;
-  required: boolean;
-  description: string;
-}
-
+/**
+ * Relationship between two entities
+ */
 export interface SchemaRelationship {
   from: string;
   to: string;
@@ -51,41 +50,38 @@ export interface SchemaRelationship {
 }
 
 /**
- * Agent that extracts and documents database schemas, API schemas, and type definitions
+ * Agent that extracts high-level schema architecture (entities + relationships only)
  * Uses self-refinement workflow to iteratively improve schema documentation
  */
 export class SchemaGeneratorAgent extends BaseAgentWorkflow implements Agent {
   public getMetadata(): AgentMetadata {
     return {
       name: 'schema-generator',
-      version: '1.0.0',
+      version: '1.1.0',
       description:
-        'Extracts and documents database schemas (Prisma, TypeORM), API schemas (DTOs, OpenAPI), GraphQL schemas, and TypeScript type definitions with ER and class diagrams',
+        'Documents high-level schema architecture: entities and relationships only (no fields). Supports databases, APIs, GraphQL, and type definitions with Mermaid diagrams.',
       priority: AgentPriority.MEDIUM,
       capabilities: {
         supportsParallel: true,
         requiresFileContents: true,
         dependencies: ['file-structure'],
         supportsIncremental: false,
-        estimatedTokens: 10000,
+        estimatedTokens: 2500,
         supportedLanguages: getSupportedLanguages(),
       },
-      tags: ['schema', 'database', 'api', 'types', 'erd', 'mermaid'],
+      tags: ['schema', 'architecture', 'erd', 'mermaid', 'entities', 'relationships'],
       outputFilename: 'schemas.md',
     };
   }
 
   public async canExecute(context: AgentContext): Promise<boolean> {
-    // Check if there are schema-related files using centralized detection
     const schemaFiles = getSchemaFiles(context.files);
     return schemaFiles.all.length > 0;
   }
 
   public async estimateTokens(context: AgentContext): Promise<number> {
     const schemaFiles = getSchemaFiles(context.files);
-
-    // Base cost + per schema analysis
-    return 4000 + Math.min(schemaFiles.all.length, 30) * 300;
+    return 2000 + Math.min(schemaFiles.all.length, 20) * 100;
   }
 
   // Abstract method implementations
@@ -95,107 +91,95 @@ export class SchemaGeneratorAgent extends BaseAgentWorkflow implements Agent {
   }
 
   protected async buildSystemPrompt(_context: AgentContext): Promise<string> {
-    return `You are an expert database architect and API designer specializing in schema documentation.
+    return `You are a senior system architect documenting only the **high-level schema architecture**.
 
-Analyze the provided codebase and extract **schema information** for:
+### 🎯 GOAL
+Extract **entities** and **relationships** — **NOT fields, attributes, or data details**.
 
-1. **Database Schemas**: Prisma, TypeORM, Sequelize, SQL DDL
-2. **API Schemas**: DTOs, OpenAPI/Swagger definitions, REST interfaces
-3. **GraphQL Schemas**: Type definitions, queries, mutations
-4. **Type Definitions**: TypeScript interfaces, classes, enums
+### 📌 RULES
+- List **entity/model names** only (e.g., User, Post, Organization)
+- For each entity, provide:
+  • \`name\`: exact name from code
+  • \`type\`: "table", "type", "object", or "graphql-type"
+  • \`description\`: 3–6 word summary (e.g., "Tenant organizations")
+- **DO NOT include any fields** — no primary keys, foreign keys, or data attributes
+- **DO NOT describe field types, constraints, or structure**
+- Relationships must specify:
+  • \`from\` and \`to\` entity names (exact match)
+  • \`type\`: "one-to-one", "one-to-many", "many-to-many", "uses", or "extends"
+  • \`description\`: 1–3 word role (e.g., "owns", "creates", "belongs to")
 
-**Output Format (JSON)**:
-\`\`\`json
+### 🖼 DIAGRAMS
+- Use \`erDiagram\` for databases: show entities and cardinality
+  Example: \`erDiagram\\\\n  Organization ||--o{ User : has\`
+- Use \`classDiagram\` for types/interfaces: show inheritance or composition
+- Keep diagrams minimal (5–12 entities)
+
+### 📤 OUTPUT FORMAT (STRICT JSON)
 {
-  "summary": "Brief overview of schemas found",
+  "summary": "One-sentence architecture overview",
   "schemas": [
     {
       "type": "database|api|graphql|type-definitions",
-      "name": "Schema Name",
-      "description": "What this schema represents",
-      "diagram": "erDiagram\\n  ENTITY1 ||--o{ ENTITY2 : has",
+      "name": "Schema name",
+      "description": "4–6 word summary",
+      "diagram": "erDiagram\\\\n  A ||--o{ B : has",
       "entities": [
-        {
-          "name": "EntityName",
-          "type": "table|model|type|class",
-          "description": "Entity purpose",
-          "fields": [
-            {
-              "name": "fieldName",
-              "type": "string",
-              "required": true,
-              "description": "Field purpose"
-            }
-          ]
-        }
+        {"name": "A", "type": "table", "description": "Core entity"},
+        {"name": "B", "type": "table", "description": "Related entity"}
       ],
       "relationships": [
-        {
-          "from": "Entity1",
-          "to": "Entity2",
-          "type": "one-to-one|one-to-many|many-to-many",
-          "description": "Relationship meaning"
-        }
+        {"from": "A", "to": "B", "type": "one-to-many", "description": "owns"}
       ],
-      "insights": ["Key insight 1", "Key insight 2"]
+      "insights": ["Notable pattern"]
     }
-  ],
-  "warnings": ["Any limitations or notes"]
+  ]
 }
-\`\`\`
 
-**Mermaid Syntax for Diagrams**:
-- Use \`erDiagram\` for database schemas
-- Use \`classDiagram\` for type definitions
-- Include cardinality (||--o{, }o--||, etc.)
+### ⛔ ABSOLUTE RESTRICTIONS
+- **NO fields** anywhere in the output
+- **NO markdown**, **NO code blocks**, **NO explanations**
+- Start with \`{\` and end with \`}\`
+- Keep entity descriptions under 6 words
+- Total output: 800–2000 tokens max
 
-Provide **comprehensive schema documentation** with valid Mermaid syntax.
-
-${this.getResponseLengthGuidance(_context)}
-
-CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above. Do NOT include markdown formatting, explanations, or any text outside the JSON object. Start your response with { and end with }.`;
+If you include any field-level data, the output is invalid.`;
   }
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const schemaDetection = getSchemaFiles(context.files);
     const fileCategories = this.categorizeSchemaFiles(schemaDetection.all);
 
-    // Read actual file contents for schema analysis (with token budget management)
-    const schemaContents = await this.readSchemaContents(
-      context,
-      fileCategories,
-      10000, // Max 10K tokens per file type
-    );
+    const schemaContents = await this.readSchemaContents(context, fileCategories, 8000);
 
-    return `Extract schema information from this project:
+    return `Extract high-level schema architecture from this project:
 
 **Project**: ${context.projectPath}
 **Languages**: ${context.languageHints.map((h) => h.language).join(', ')}
 
 **Schema Files Found**:
 - Prisma: ${fileCategories.prisma.length}
-- TypeORM: ${fileCategories.typeorm.length}
-- DTOs: ${fileCategories.dtos.length}
 - GraphQL: ${fileCategories.graphql.length}
+- DTOs: ${fileCategories.dtos.length}
+- TypeORM: ${fileCategories.typeorm.length}
 - Types: ${fileCategories.types.length}
 
 ${schemaContents}
 
-Extract and document all schema definitions with Mermaid diagrams. Respond with ONLY valid JSON - no markdown, no code blocks.`;
+**Instructions**:
+- Identify top-level entities/models only
+- Infer relationships between them
+- **Do NOT extract or list any fields or attributes**
+- Output ONLY valid JSON in the specified architecture-only format`;
   }
 
   protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {
     const result = this.parseAnalysisResult(analysis);
-
-    // CRITICAL: If NO schemas found, prepend marker to analysis text
-    // This signals to base workflow to force-stop iteration
     const schemas = result.schemas as SchemaDocumentation[] | undefined;
     if (!schemas || schemas.length === 0) {
       this.logger.info('No schemas found - will stop after this iteration', '⏹️');
-      // Prepend invisible marker that will be detected by base workflow
       result.__FORCE_STOP__ = true;
     }
-
     return result;
   }
 
@@ -208,7 +192,7 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
 
   protected generateSummary(data: Record<string, unknown>): string {
     const summary = data.summary as string | undefined;
-    return summary || 'Schema documentation completed';
+    return summary || 'Schema architecture documentation completed';
   }
 
   protected getTargetTokenRanges(): Record<
@@ -216,24 +200,30 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
     { min: number; max: number }
   > {
     return {
-      quick: { min: 1000, max: 3000 },
-      normal: { min: 3000, max: 8000 },
-      deep: { min: 8000, max: 14000 },
-      exhaustive: { min: 14000, max: 16000 },
+      quick: { min: 400, max: 800 },
+      normal: { min: 800, max: 1500 },
+      deep: { min: 1500, max: 2200 },
+      exhaustive: { min: 2200, max: 2800 },
     };
   }
 
   protected getDepthSpecificGuidance(mode: 'quick' | 'normal' | 'deep' | 'exhaustive'): string {
     const guidance = {
-      quick: '- Focus on primary schemas only\n- Include basic entity relationships',
-      normal:
-        '- Include detailed entity descriptions and relationships\n- Provide full Mermaid diagrams',
-      deep: '- Provide exhaustive schema documentation\n- Include all entity fields with detailed descriptions\n- Add comprehensive relationship diagrams',
-      exhaustive:
-        '- Document every schema, entity, field, and relationship\n- Include validation rules and constraints\n- Add cross-schema dependencies and integration points',
+      quick: '- Top 5 entities only\n- Core relationships\n- No minor types',
+      normal: '- Main entities (5–10)\n- Clear relationships\n- Short descriptions',
+      deep: '- All major entities\n- Cross-type relationships\n- Meaningful insights',
+      exhaustive: '- Complete entity list\n- All inferred relationships\n- Multi-schema links',
     };
-
     return guidance[mode];
+  }
+
+  protected override getMaxOutputTokens(isQuickMode: boolean, _context: AgentContext): number {
+    // Architecture-only output is much smaller than field-based, but still needs room for:
+    // - Multiple schema types (database, GraphQL, API, types)
+    // - Entity lists (can be 50+ entities in large projects)
+    // - Relationships and Mermaid diagrams
+    // Using default limits to avoid truncation
+    return isQuickMode ? 8000 : 16000;
   }
 
   // Removed: identifySchemaFiles - now using getSchemaFiles() from language-config
@@ -330,51 +320,108 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
   }
 
   private parseAnalysisResult(result: string): Record<string, unknown> {
-    return LLMJsonParser.parse(result, {
-      contextName: 'schema-generator',
-      logErrors: true,
-      fallback: {
+    try {
+      return LLMJsonParser.parse(result, {
+        contextName: 'schema-generator',
+        logErrors: false,
+      });
+    } catch (firstError) {
+      this.logger.debug('Initial JSON parse failed', { error: String(firstError) });
+
+      if (result.length > 100000) {
+        const extracted = this.extractPartialJson(result);
+        if (extracted) {
+          try {
+            return LLMJsonParser.parse(extracted, {
+              contextName: 'schema-generator',
+              logErrors: false,
+            });
+          } catch {
+            // Continue to fallback
+          }
+        }
+      }
+
+      this.logger.warn('All JSON parsing failed, using fallback', {
+        responsePreview: result.substring(0, 500),
+      });
+
+      return {
         schemas: [],
-        summary:
-          'No schema definitions found in the provided codebase. The analysis only includes a single main.ts file, which does not contain schema definitions for databases, APIs, or GraphQL.',
-        warnings: ['Could not parse LLM response as valid JSON - LLM returned markdown instead'],
-      },
-    });
+        summary: 'No schema architecture detected.',
+        warnings: ['Could not parse LLM response as valid JSON.'],
+      };
+    }
+  }
+
+  private extractPartialJson(text: string): string | null {
+    const startIdx = text.indexOf('{');
+    if (startIdx === -1) return null;
+
+    let depth = 0;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = startIdx; i < text.length; i++) {
+      const char = text[i];
+
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) continue;
+
+      if (char === '{') depth++;
+      else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          return text.substring(startIdx, i + 1);
+        }
+      }
+    }
+
+    return null;
   }
 
   private formatMarkdownReport(analysis: Record<string, unknown>): string {
-    // Type-safe accessors
     const summary = analysis.summary as string | undefined;
     const schemas = analysis.schemas as SchemaDocumentation[] | undefined;
     const warnings = analysis.warnings as string[] | undefined;
 
-    let markdown = `# Schema Documentation\n\n`;
-    markdown += `${summary || 'Schema documentation analysis completed'}\n\n`;
+    let markdown = `# Schema Architecture Documentation\n\n`;
+    markdown += `${summary || 'High-level schema architecture extracted.'}\n\n`;
 
     if (schemas && schemas.length > 0) {
-      markdown += `## Extracted Schemas\n\n`;
+      markdown += `## Extracted Architectures\n\n`;
 
       for (const schema of schemas) {
         markdown += `### ${schema.name}\n\n`;
         markdown += `**Type**: ${schema.type}\n\n`;
         markdown += `${schema.description}\n\n`;
 
-        markdown += `#### Diagram\n\n`;
-        markdown += `> 💡 **Tip**: View this diagram with a Mermaid renderer:\n`;
-        markdown += `> - VS Code: Install "Markdown Preview Mermaid Support" extension\n`;
-        markdown += `> - GitHub/GitLab: Automatic rendering in markdown preview\n`;
-        markdown += `> - Online: Copy to [mermaid.live](https://mermaid.live)\n\n`;
-        markdown += `<details>\n<summary>📊 Click to view ${schema.type} diagram</summary>\n\n`;
+        markdown += `#### Architecture Diagram\n\n`;
+        markdown += `> 💡 **Tip**: Render this with a Mermaid viewer (VS Code, GitHub, [mermaid.live](https://mermaid.live))\n\n`;
+        markdown += `<details>\n<summary>📊 View ${schema.type} diagram</summary>\n\n`;
         markdown += `\`\`\`mermaid\n${schema.diagram}\n\`\`\`\n\n`;
         markdown += `</details>\n\n`;
 
         if (schema.entities && schema.entities.length > 0) {
           markdown += `#### Entities\n\n`;
-          markdown += `| Entity | Type | Fields |\n`;
-          markdown += `|--------|------|--------|\n`;
-          schema.entities.forEach((entity: SchemaEntity) => {
-            const fieldCount = entity.fields ? entity.fields.length : 0;
-            markdown += `| ${entity.name} | ${entity.type} | ${fieldCount} fields |\n`;
+          markdown += `| Entity | Type | Description |\n`;
+          markdown += `|--------|------|-------------|\n`;
+          schema.entities.forEach((entity) => {
+            markdown += `| **${entity.name}** | \`${entity.type}\` | ${entity.description} |\n`;
           });
           markdown += `\n`;
         }
@@ -382,8 +429,8 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
         if (schema.relationships && schema.relationships.length > 0) {
           markdown += `#### Relationships\n\n`;
           markdown += `| From | To | Type | Description |\n`;
-          markdown += `|------|-------|------|-------------|\n`;
-          schema.relationships.forEach((rel: SchemaRelationship) => {
+          markdown += `|------|----|------|-------------|\n`;
+          schema.relationships.forEach((rel) => {
             markdown += `| ${rel.from} | ${rel.to} | ${rel.type} | ${rel.description} |\n`;
           });
           markdown += `\n`;
@@ -391,19 +438,19 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
 
         if (schema.insights && schema.insights.length > 0) {
           markdown += `#### Key Insights\n\n`;
-          schema.insights.forEach((insight: string) => {
+          schema.insights.forEach((insight) => {
             markdown += `- ${insight}\n`;
           });
           markdown += `\n`;
         }
       }
     } else {
-      markdown += `_No schemas identified in the codebase._\n\n`;
+      markdown += `_No schema architecture identified._\n\n`;
     }
 
     if (warnings && warnings.length > 0) {
       markdown += `## Warnings\n\n`;
-      warnings.forEach((warning: string) => {
+      warnings.forEach((warning) => {
         markdown += `- ⚠️ ${warning}\n`;
       });
       markdown += `\n`;
@@ -423,7 +470,7 @@ Extract and document all schema definitions with Mermaid diagrams. Respond with 
       {
         filename: 'schemas.md',
         content: markdown,
-        title: 'Schema Documentation',
+        title: 'Schema Architecture Documentation',
         category: 'documentation',
         order: metadata.priority,
       },

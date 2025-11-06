@@ -11,25 +11,47 @@ import { PatternDetectorAgent } from '../../src/agents/pattern-detector-agent';
 import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agent';
 import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
+import { KPIAnalyzerAgent } from '../../src/agents/kpi-analyzer-agent';
 
 /**
  * Check if API keys are configured
+ * Reads from .archdoc.config.json in current directory
  */
 export async function checkConfiguration(): Promise<boolean> {
-  const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-  const hasXAIKey = !!process.env.XAI_API_KEY;
-  const hasGoogleKey = !!process.env.GOOGLE_API_KEY;
+  // Try to read config file from current directory
+  const configPath = path.join(process.cwd(), '.archdoc.config.json');
 
-  if (!hasAnthropicKey && !hasOpenAIKey && !hasXAIKey && !hasGoogleKey) {
-    console.log(chalk.red('\n❌ No LLM API keys configured!\n'));
-    console.log(chalk.yellow('You need at least one API key to use ArchDoc:'));
-    console.log(chalk.gray('  • Anthropic Claude (recommended): https://console.anthropic.com/'));
-    console.log(chalk.gray('  • OpenAI GPT-4: https://platform.openai.com/'));
-    console.log(chalk.gray('  • xAI Grok: https://x.ai/api'));
-    console.log(chalk.gray('  • Google Gemini: https://ai.google.dev/\n'));
+  try {
+    const configContent = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
 
-    console.log(chalk.cyan('Quick setup:'));
+    const hasAnthropicKey = !!config.apiKeys?.anthropic;
+    const hasOpenAIKey = !!config.apiKeys?.openai;
+    const hasXAIKey = !!config.apiKeys?.xai;
+    const hasGoogleKey = !!config.apiKeys?.google;
+
+    if (!hasAnthropicKey && !hasOpenAIKey && !hasXAIKey && !hasGoogleKey) {
+      console.log(chalk.red('\n❌ No LLM API keys configured in .archdoc.config.json!\n'));
+      console.log(chalk.yellow('You need at least one API key to use ArchDoc:'));
+      console.log(chalk.gray('  • Anthropic Claude (recommended): https://console.anthropic.com/'));
+      console.log(chalk.gray('  • OpenAI GPT-4: https://platform.openai.com/'));
+      console.log(chalk.gray('  • xAI Grok: https://x.ai/api'));
+      console.log(chalk.gray('  • Google Gemini: https://ai.google.dev/\n'));
+
+      console.log(chalk.cyan('Quick setup:'));
+      console.log(chalk.white('  1. Run: ') + chalk.green('archdoc config --init'));
+      console.log(chalk.white('  2. Follow the interactive setup\n'));
+
+      return false;
+    }
+
+    return true;
+  } catch (_error) {
+    // Config file doesn't exist or can't be read
+    console.log(chalk.red('\n❌ No configuration file found!\n'));
+    console.log(chalk.yellow('You need to create .archdoc.config.json'));
+
+    console.log(chalk.cyan('\nQuick setup:'));
     console.log(chalk.white('  1. Run: ') + chalk.green('archdoc config --init'));
     console.log(chalk.white('  2. Follow the interactive setup\n'));
 
@@ -40,8 +62,6 @@ export async function checkConfiguration(): Promise<boolean> {
 
     return false;
   }
-
-  return true;
 }
 
 /**
@@ -98,6 +118,7 @@ export function registerAgents(spinner: Ora): AgentRegistry {
   agentRegistry.register(new FlowVisualizationAgent());
   agentRegistry.register(new SchemaGeneratorAgent());
   agentRegistry.register(new SecurityAnalyzerAgent());
+  agentRegistry.register(new KPIAnalyzerAgent()); // NEW: Repository KPI analysis with LLM
 
   const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
   spinner.succeed(`Registered ${availableAgents.length} agents: ${availableAgents.join(', ')}`);

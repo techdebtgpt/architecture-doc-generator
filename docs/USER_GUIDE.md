@@ -154,16 +154,15 @@ You can configure the generator by creating a `.archdoc.config.json` file in you
 
 ### Environment Variables
 
-You can also use environment variables to configure the generator, which is useful for CI/CD environments.
+> **⚠️ DEPRECATED**: Environment variables for API keys and LLM settings are **NO LONGER** supported. Use `.archdoc.config.json` instead.
 
-- `ANTHROPIC_API_KEY`: Your API key for Anthropic Claude.
-- `OPENAI_API_KEY`: Your API key for OpenAI.
-- `GOOGLE_API_KEY`: Your API key for Google Gemini.
-- `XAI_API_KEY`: Your API key for xAI Grok.
-- `DEFAULT_LLM_PROVIDER`: The default LLM provider to use.
-- `DEFAULT_LLM_MODEL`: The default LLM model to use.
+The **only** environment variables still supported are for LangSmith tracing:
+
 - `LANGCHAIN_TRACING_V2`: Set to `true` to enable LangSmith tracing.
 - `LANGCHAIN_API_KEY`: Your API key for LangSmith.
+- `LANGCHAIN_PROJECT`: Your LangSmith project name.
+
+For all other configuration (API keys, LLM provider, etc.), use `.archdoc.config.json`. See the [Configuration Guide](./CONFIGURATION_GUIDE.md) for details.
 
 ## ✨ Usage Examples
 
@@ -197,7 +196,43 @@ archdoc analyze --prompt "analyze dependencies and security vulnerabilities"
 You can specify a different LLM provider and model for the analysis.
 
 ```bash
-archdoc analyze --provider openai --model gpt-5
+# OpenAI models (provider: openai)
+archdoc analyze --provider openai --model o1-mini              # $3/$12 per million - Cost-effective reasoning (default)
+archdoc analyze --provider openai --model o1-preview           # $15/$60 per million - Advanced reasoning
+archdoc analyze --provider openai --model gpt-4o               # $2.50/$10 per million - Multimodal flagship
+archdoc analyze --provider openai --model gpt-4o-mini          # $0.15/$0.60 per million - Fast and cheap
+archdoc analyze --provider openai --model gpt-4-turbo          # $10/$30 per million - GPT-4 Turbo
+archdoc analyze --provider openai --model gpt-4-turbo-preview  # $10/$30 per million - GPT-4 Turbo Preview
+archdoc analyze --provider openai --model gpt-4                # $30/$60 per million - Legacy GPT-4
+archdoc analyze --provider openai --model gpt-3.5-turbo        # $0.50/$1.50 per million - Fast and cheap legacy
+
+# Anthropic Claude models (provider: anthropic)
+archdoc analyze --provider anthropic --model claude-sonnet-4-5-20250929      # $3/$15 per million - Latest Sonnet (default)
+archdoc analyze --provider anthropic --model claude-opus-4-1-20250805        # $15/$75 per million - Most capable
+archdoc analyze --provider anthropic --model claude-haiku-4-5-20251001       # $0.25/$1.25 per million - Fast and cheap
+archdoc analyze --provider anthropic --model claude-sonnet-4-20250514        # $3/$15 per million - Sonnet 4
+archdoc analyze --provider anthropic --model claude-sonnet-4-20250514-thinking  # $3/$15 per million - Sonnet 4 with thinking
+archdoc analyze --provider anthropic --model claude-opus-4-20250514          # $15/$75 per million - Opus 4
+archdoc analyze --provider anthropic --model claude-opus-4-20250514-thinking # $15/$75 per million - Opus 4 with thinking
+archdoc analyze --provider anthropic --model claude-3-7-sonnet-latest        # $3/$15 per million - Claude 3.7 Sonnet
+archdoc analyze --provider anthropic --model claude-3-7-sonnet-20250219      # $3/$15 per million - Claude 3.7 Sonnet (dated)
+archdoc analyze --provider anthropic --model claude-3-5-sonnet-latest        # $3/$15 per million - Claude 3.5 Sonnet
+archdoc analyze --provider anthropic --model claude-3-5-sonnet-20241022      # $3/$15 per million - Claude 3.5 Sonnet (Oct 2024)
+archdoc analyze --provider anthropic --model claude-3-5-sonnet-20240620      # $3/$15 per million - Claude 3.5 Sonnet (June 2024)
+archdoc analyze --provider anthropic --model claude-3-5-haiku-20241022       # $0.80/$4 per million - Claude 3.5 Haiku
+archdoc analyze --provider anthropic --model claude-3-opus-20240229          # $15/$75 per million - Claude 3 Opus (legacy)
+
+# Google Gemini models (provider: google)
+archdoc analyze --provider google --model gemini-2.5-pro         # $1/$4 per million - Most capable (default)
+archdoc analyze --provider google --model gemini-2.5-flash       # $0.05/$0.20 per million - Fast and cheap
+archdoc analyze --provider google --model gemini-2.5-flash-lite  # $0.025/$0.10 per million - Ultra fast and cheap
+archdoc analyze --provider google --model gemini-1.5-pro         # $1.25/$5 per million - Previous generation
+archdoc analyze --provider google --model gemini-1.5-flash       # $0.075/$0.30 per million - Previous fast model
+archdoc analyze --provider google --model gemini-pro             # $0.50/$1.50 per million - Legacy model
+
+# xAI Grok models (provider: xai)
+archdoc analyze --provider xai --model grok-3-beta               # $5/$15 per million - Latest Grok (default)
+archdoc analyze --provider xai --model grok-2                    # $2/$10 per million - Grok 2
 ```
 
 ## 🚨 Troubleshooting

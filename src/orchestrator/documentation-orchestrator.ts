@@ -91,6 +91,21 @@ const DocumentationState = Annotation.Root({
     default: () => null,
   }),
 
+  // Shared vector store (initialized once, reused by all agents)
+  vectorStore: Annotation<
+    | {
+        searchFiles: (
+          query: string,
+          topK?: number,
+        ) => Promise<Array<{ path: string; score: number }>>;
+        cleanup: () => void;
+      }
+    | undefined
+  >({
+    reducer: (_, update) => update,
+    default: () => undefined,
+  }),
+
   // Output state
   output: Annotation<DocumentationOutput | null>({
     reducer: (_, update) => update,
@@ -99,6 +114,15 @@ const DocumentationState = Annotation.Root({
   executionTime: Annotation<number>({
     reducer: (_, update) => update,
     default: () => 0,
+  }),
+
+  // Orchestrator-level token usage (for synthesis, recommendations, etc.)
+  orchestratorTokens: Annotation<{ inputTokens: number; outputTokens: number }>({
+    reducer: (current, update) => ({
+      inputTokens: current.inputTokens + update.inputTokens,
+      outputTokens: current.outputTokens + update.outputTokens,
+    }),
+    default: () => ({ inputTokens: 0, outputTokens: 0 }),
   }),
 });
 
@@ -127,6 +151,8 @@ export interface OrchestratorOptions {
   agentOptions?: AgentExecutionOptions;
   onAgentProgress?: (current: number, total: number, agentName: string) => void;
   runName?: string; // Custom run name for LangSmith tracing (supports {timestamp}, {agent}, {project})
+  retrievalStrategy?: 'vector' | 'graph' | 'hybrid' | 'smart'; // File retrieval strategy for hybrid search
+  embeddingsProvider?: 'local' | 'openai' | 'google'; // Embeddings provider for vector search (default: local)
   languageConfig?: {
     custom?: Record<
       string,
@@ -164,12 +190,17 @@ export class DocumentationOrchestrator {
   private logger = new Logger('DocumentationOrchestrator');
   private workflow: ReturnType<typeof this.buildWorkflow>;
   private checkpointer = new MemorySaver();
-  private llmService = LLMService.getInstance();
+  private llmService: LLMService;
+  private config: any;
 
   constructor(
     private readonly agentRegistry: AgentRegistry,
     private readonly scanner: FileSystemScanner,
+    config?: any,
   ) {
+    this.config = config || {};
+    // Initialize LLM service with config
+    this.llmService = LLMService.getInstance(config);
     this.workflow = this.buildWorkflow();
   }
 
@@ -251,6 +282,122 @@ export class DocumentationOrchestrator {
 
     this.logger.info(`Found ${agentNames.length} agents: ${agentNames.join(', ')}`);
 
+    // Validate embeddings API key if vector search mode is enabled
+    if (options.agentOptions?.searchMode === 'vector') {
+      // Determine embeddings provider from options or config (default: local - FREE!)
+      const embeddingsProvider = (
+        options.embeddingsProvider ||
+        this.config.searchMode?.embeddingsProvider ||
+        'local'
+      ).toLowerCase();
+
+      // Check for provider-specific API keys in config
+      const hasOpenAIKey = this.config.apiKeys?.openai;
+      const hasGoogleKey = this.config.apiKeys?.google;
+
+      const providerHasKey =
+        embeddingsProvider === 'local' || // Local embeddings are always available (FREE)
+        (embeddingsProvider === 'openai' && hasOpenAIKey) ||
+        (embeddingsProvider === 'google' && hasGoogleKey) ||
+        embeddingsProvider === 'huggingface'; // Local models don't need key
+
+      if (!providerHasKey) {
+        const providerKeyMap: Record<string, string> = {
+          openai: 'apiKeys.openai',
+          google: 'apiKeys.google',
+          cohere: 'apiKeys.cohere',
+          voyage: 'apiKeys.voyage',
+        };
+
+        const requiredKey = providerKeyMap[embeddingsProvider] || 'API key';
+        const errorMsg = [
+          `❌ Vector search with ${embeddingsProvider} provider requires an API key.`,
+          '',
+          `   Add ${requiredKey} to .archdoc.config.json`,
+          '',
+          '   Or run: archdoc config --init',
+          '   Then select "Enable vector search with embeddings"',
+          '',
+          '   Tip: Use --search-mode keyword for fast, free search (default)',
+        ].join('\n');
+
+        this.logger.error(errorMsg);
+        throw new Error(`Vector search requires ${requiredKey} in config`);
+      }
+    }
+
+    // Initialize shared vector store once if vector search mode is enabled
+    let sharedVectorStore:
+      | {
+          searchFiles: (
+            query: string,
+            topK?: number,
+          ) => Promise<Array<{ path: string; score: number }>>;
+          cleanup: () => void;
+        }
+      | undefined;
+
+    if (options.agentOptions?.searchMode === 'vector') {
+      // Determine embeddings provider from options (default: local - FREE!)
+      const embeddingsProvider = (
+        options.embeddingsProvider ||
+        process.env.EMBEDDINGS_PROVIDER ||
+        'local'
+      ).toLowerCase() as 'local' | 'openai' | 'google' | 'cohere' | 'voyage' | 'huggingface';
+
+      this.logger.info(
+        `🔍 Initializing shared vector store with ${embeddingsProvider} embeddings...`,
+      );
+      const vectorStoreStart = Date.now();
+
+      const { VectorSearchService } = await import('../services/vector-search.service');
+
+      const embeddingsConfig = {
+        provider: embeddingsProvider,
+        // Model can be overridden via EMBEDDINGS_MODEL env var
+        model: process.env.EMBEDDINGS_MODEL,
+      };
+
+      const vectorService = new VectorSearchService(
+        projectPath,
+        { imports, modules, graph },
+        embeddingsConfig,
+      );
+
+      try {
+        const availableFiles = scanResult.files.map((f) => f.path);
+        await vectorService.initialize(availableFiles, {
+          maxFileSize: 100000, // 100KB default
+        });
+        const initTime = Date.now() - vectorStoreStart;
+        this.logger.info(
+          `Vector store initialized in ${(initTime / 1000).toFixed(2)}s (${embeddingsProvider})`,
+          '✅',
+        );
+
+        // Wrap vectorService methods for AgentContext
+        sharedVectorStore = {
+          searchFiles: async (query: string, topK = 10) => {
+            const results = await vectorService.searchFiles(query, { topK });
+            return results.map((result) => ({
+              path: result.path,
+              score: result.relevanceScore || 0,
+            }));
+          },
+          cleanup: () => {
+            // No explicit cleanup needed - garbage collector will handle it
+            this.logger.debug('Vector store cleanup requested (memory will be freed by GC)');
+          },
+        };
+      } catch (error) {
+        this.logger.warn(
+          `Failed to initialize vector store: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        this.logger.info('Falling back to keyword search mode');
+        // Fallback to keyword search by not setting sharedVectorStore
+      }
+    }
+
     // Initial state
     const initialState = {
       scanResult,
@@ -262,6 +409,7 @@ export class DocumentationOrchestrator {
       refinementAttempts: new Map(),
       clarityScores: new Map(),
       dependencyGraph: { imports, modules, graph },
+      vectorStore: sharedVectorStore, // Pass shared vector store to agents
       output: null,
       executionTime: 0,
     };
@@ -659,7 +807,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
    * orchestrator just executes them sequentially
    */
   private buildWorkflow() {
-    const graph = new StateGraph(DocumentationState);
+    const graph = new StateGraph(DocumentationState, {});
 
     // Define nodes
     graph.addNode('executeAgent', this.executeAgentNode.bind(this));
@@ -683,7 +831,9 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     // End after synthesis
     graph.addEdge('synthesizeRecommendations' as '__start__', END);
 
-    return graph.compile({ checkpointer: this.checkpointer });
+    return graph.compile({ checkpointer: this.checkpointer }).withConfig({
+      runName: `DocumentationOrchestrator-${Date.now()}`,
+    });
   }
 
   /**
@@ -767,6 +917,8 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
         maxIterations: options.iterativeRefinement?.maxIterations,
         clarityThreshold: options.iterativeRefinement?.clarityThreshold,
         maxQuestionsPerIteration: options.agentOptions?.maxQuestionsPerIteration,
+        // Pass search mode from agent options
+        searchMode: options.agentOptions?.searchMode,
       },
       query: options.userPrompt, // Pass user's focus area to enhance agent analysis
       // Claude Sonnet 4 max: 200K input tokens - 10K safety margin - 8K max output = 182K budget
@@ -776,6 +928,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       existingDocs, // Pass existing documentation for incremental mode
       isIncrementalMode: options.incrementalMode || false,
       refinementGaps, // Pass parsed gaps for targeted improvements
+      vectorStore: state.vectorStore, // Pass shared vector store (initialized once)
     };
 
     // Check if agent can execute (has relevant data)
@@ -1025,15 +1178,32 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       (sum, r) => sum + r.executionTime,
       0,
     );
-    const totalInputTokens = Array.from(agentResults.values()).reduce(
+    const agentInputTokens = Array.from(agentResults.values()).reduce(
       (sum, r) => sum + r.tokenUsage.inputTokens,
       0,
     );
-    const totalOutputTokens = Array.from(agentResults.values()).reduce(
+    const agentOutputTokens = Array.from(agentResults.values()).reduce(
       (sum, r) => sum + r.tokenUsage.outputTokens,
       0,
     );
-    const totalCost = (totalInputTokens / 1_000_000) * 3 + (totalOutputTokens / 1_000_000) * 15;
+
+    // Include orchestrator tokens (synthesis, recommendations, etc.)
+    const totalInputTokens = agentInputTokens + state.orchestratorTokens.inputTokens;
+    const totalOutputTokens = agentOutputTokens + state.orchestratorTokens.outputTokens;
+    const totalTokens = totalInputTokens + totalOutputTokens;
+
+    // Calculate total cost using actual provider/model pricing
+    const modelConfig = this.llmService.getModelConfig(
+      this.llmService['defaultProvider'],
+      this.llmService['getDefaultModel'](this.llmService['defaultProvider']),
+    );
+    const totalCost = this.llmService['tokenManager'].calculateCost(
+      totalInputTokens,
+      totalOutputTokens,
+      modelConfig.costPerMillionInputTokens,
+      modelConfig.costPerMillionOutputTokens,
+    );
+
     const avgTokensPerAgent =
       agentResults.size > 0 ? Math.round(totalTokenUsage.totalTokens / agentResults.size) : 0;
 
@@ -1043,8 +1213,16 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     this.logger.info(`✅ Agents completed: ${agentResults.size}`);
     this.logger.info(`⏱️  Total time: ${(totalExecutionTime / 1000 / 60).toFixed(1)}m`);
     this.logger.info(
-      `💰 Total tokens: ${totalTokenUsage.totalTokens.toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`,
+      `💰 Total tokens: ${totalTokens.toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`,
     );
+    if (state.orchestratorTokens.inputTokens > 0 || state.orchestratorTokens.outputTokens > 0) {
+      this.logger.info(
+        `   ├─ Agent tokens: ${(agentInputTokens + agentOutputTokens).toLocaleString()} (${agentInputTokens.toLocaleString()} in / ${agentOutputTokens.toLocaleString()} out)`,
+      );
+      this.logger.info(
+        `   └─ Orchestrator tokens: ${(state.orchestratorTokens.inputTokens + state.orchestratorTokens.outputTokens).toLocaleString()} (${state.orchestratorTokens.inputTokens.toLocaleString()} in / ${state.orchestratorTokens.outputTokens.toLocaleString()} out)`,
+      );
+    }
     this.logger.info(`💵 Total cost: $${totalCost.toFixed(4)}`);
     this.logger.info(`📈 Avg tokens per agent: ${avgTokensPerAgent.toLocaleString()}`);
     this.logger.info('='.repeat(80));
@@ -1060,6 +1238,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       { name: 'flow-visualization', emoji: '🔄', label: 'Data Flow' },
       { name: 'schema-generator', emoji: '🗄️', label: 'Schema' },
       { name: 'security-analyzer', emoji: '🔒', label: 'Security Analysis' },
+      { name: 'kpi-analyzer', emoji: '📊', label: 'KPI Analysis' },
     ];
 
     for (const { name, emoji, label } of agentHighlights) {
@@ -1177,6 +1356,14 @@ ${allImprovements.slice(0, 30).join('\n')}
 
       const recommendationsMarkdown = response.content as string;
 
+      // Track orchestrator token usage
+      const responseUsage =
+        (response as any).usage_metadata || (response as any).response_metadata?.usage || {};
+      const orchestratorTokens = {
+        inputTokens: responseUsage.input_tokens || responseUsage.prompt_tokens || 0,
+        outputTokens: responseUsage.output_tokens || responseUsage.completion_tokens || 0,
+      };
+
       // Add to output as a custom section
       if (output?.customSections) {
         output.customSections.set('recommendations', {
@@ -1201,13 +1388,18 @@ ${allImprovements.slice(0, 30).join('\n')}
       }
 
       this.logger.info('✅ Recommendations synthesized successfully');
+
+      return {
+        ...state,
+        orchestratorTokens,
+      };
     } catch (error) {
       this.logger.warn('⚠️  Failed to synthesize recommendations', {
         error: error instanceof Error ? error.message : String(error),
       });
-    }
 
-    return state;
+      return state;
+    }
   }
 
   /**

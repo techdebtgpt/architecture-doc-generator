@@ -70,8 +70,8 @@ export class FileSystemScanner implements IScanner {
 
     // Process each file
     for (const entry of entries) {
-      if (files.length >= (options.maxFiles || 1000)) {
-        warnings.push(`Reached maximum file limit of ${options.maxFiles || 1000}`);
+      if (files.length >= (options.maxFiles || 10000)) {
+        warnings.push(`Reached maximum file limit of ${options.maxFiles || 10000}`);
         break;
       }
 

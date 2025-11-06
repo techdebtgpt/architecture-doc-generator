@@ -52,7 +52,7 @@ export class GoogleProvider implements ILLMProvider {
   };
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.GOOGLE_API_KEY || '';
+    this.apiKey = apiKey || '';
     this.tokenManager = TokenManager.getInstance();
   }
 

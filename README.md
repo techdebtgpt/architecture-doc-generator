@@ -1,15 +1,17 @@
 # 🏗️ ArchDoc Generator
 
 [![npm version](https://img.shields.io/npm/v/@techdebtgpt/archdoc-generator.svg)](https://www.npmjs.com/package/@techdebtgpt/archdoc-generator)
+[![MCP Server](https://img.shields.io/badge/MCP-Server-blueviolet.svg)](docs/MCP_GUIDE.md)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](CODE_OF_CONDUCT.md)
-[![Security Policy](https://img.shields.io/badge/Security-Policy-red.svg)](SECURITY.md)
+[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.0-4baaaa.svg)](.github/CODE_OF_CONDUCT.md)
+[![Security Policy](https://img.shields.io/badge/Security-Policy-red.svg)](.github/SECURITY.md)
 [![Website](https://img.shields.io/badge/Website-techdebtgpt.com-blue)](https://techdebtgpt.com)
 [![GitHub stars](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator)](https://github.com/techdebtgpt/architecture-doc-generator)
 
-> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows.
+> 🤖 **AI-powered architecture documentation generator with MCP Server support**
+> Use as CLI tool OR integrate with Claude Desktop/GitHub Copilot via Model Context Protocol
 
 ArchDoc Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, security, and data flows.
 
@@ -17,6 +19,8 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 - [Features](#-features)
 - [Quick Start](#-quick-start)
+- [🔥 MCP Server - Use with AI Assistants](#-mcp-server---use-with-ai-assistants-new)
+- [Search Strategy Performance](#-search-strategy-performance)
 - [CLI Usage](#-cli-usage)
 - [Programmatic Usage](#-programmatic-usage)
 - [Configuration](#-configuration)
@@ -24,19 +28,27 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - [Available Agents](#-available-agents)
 - [Architecture Highlights](#️-architecture-highlights)
 - [Supported Languages](#-supported-languages)
+- [Common Questions](#-common-questions)
 - [Contributing](#-contributing)
 - [License](#-license)
 
+---
+
 ## ✨ Features
 
-- 🤖 **7 Specialized Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, and Security.
+- 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
+- � **MCP Server Integration** (NEW!): Use with GitHub Copilot, Claude Desktop, or any MCP client for real-time architecture guidance. [See MCP Guide →](docs/MCP_SERVER_GUIDE.md)
+- 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings.
+- �📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
+- 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
+- ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
-- 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, GPT-5, Gemini 2.5, or Grok 3.
-- 📊 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, and security.
-- 📝 **Markdown Output**: Clean, version-controllable documentation.
-- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks.
+- 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.
+- 📚 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
+- 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation.
+- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection.
 - 🎨 **Customizable**: Prompt-based agent selection and configuration.
-- 📈 **LangSmith Tracing**: Full observability of AI workflows.
+- 📊 **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
 - 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
 - ➕ **Extensible**: Add support for any language via configuration—no code changes required.
 
@@ -72,17 +84,156 @@ This will:
 
 ### Basic Usage
 
+```bash
+# Analyze current directory
+archdoc analyze
+
+# Analyze specific project
+archdoc analyze /path/to/your/project
+
+# Custom output location
+archdoc analyze --output ./docs
+
+# Verbose output for debugging
+archdoc analyze --verbose
+```
+
+For complete CLI options and advanced usage, see [CLI Usage](#-cli-usage) section below.
+
+---
+
+## 🔥 MCP Server - Use with AI Assistants (NEW!)
+
+**ArchDoc now provides an MCP (Model Context Protocol) server** that integrates with AI assistants like Claude Desktop, GitHub Copilot (when supported), and other MCP-compatible clients.
+
+### 🚀 Quick MCP Setup
+
+```bash
+# 1. Install globally
+npm install -g @techdebtgpt/archdoc-generator
+
+# 2. Create minimal MCP config in your project
+cd /path/to/your/project
+mkdir -p .vscode
+cat > .vscode/mcp.json << 'EOF'
+{
+  "servers": {
+    "archdoc": {
+      "command": "archdoc-server-mcp",
+      "cwd": "${workspaceFolder}"
+    }
+  }
+}
+EOF
+
+# 3. Reload VS Code and configure via UI
+# Use: @archdoc setup config
+```
+
+**⚠️ IMPORTANT**: Do NOT use VS Code's "Add MCP Server" UI - it auto-generates incorrect configuration with args/env/inputs that break the UI-driven setup flow. Always create the config manually as shown above.
+
+The UI setup provides:
+
+- ✅ Provider dropdown (Anthropic/OpenAI/Google/xAI)
+- ✅ Model dropdown (15+ models)
+- ✅ API key input
+- ✅ Search mode selection (keyword/vector)
+- ✅ Embeddings provider (local/openai/google)
+- ✅ Retrieval strategy (smart/vector/graph/hybrid)
+- ✅ Optional LangSmith tracing
+
+### 🤖 What You Can Do with MCP
+
+Once configured, ask your AI assistant:
+
+- **"Generate architecture documentation for this project"** - Full docs generation
+- **"Search for authentication logic"** - RAG-powered semantic search (FREE local embeddings)
+- **"Analyze the dependency graph"** - Dependency analysis
+- **"What design patterns are used?"** - Pattern detection
+- **"Show me the data models"** - Schema extraction
+- **"Visualize control flows"** - Flow diagrams
+- **"Analyze security vulnerabilities"** - Security review
+
+### 📱 Supported MCP Clients
+
+| Client              | Status           | Configuration                                                    |
+| ------------------- | ---------------- | ---------------------------------------------------------------- |
+| **Claude Desktop**  | ✅ Available Now | [See MCP Guide](docs/MCP_GUIDE.md#claude-desktop--available-now) |
+| **VS Code/Copilot** | 🔜 Coming Soon   | Auto-discovers `.vscode/mcp.json`                                |
+| **Custom Clients**  | ✅ MCP SDK       | [See MCP Guide](docs/MCP_GUIDE.md#other-mcp-clients)             |
+
+### 🔍 FREE Local Vector Search
+
+The MCP server includes **built-in semantic search** with **FREE local TF-IDF embeddings**:
+
+- ❌ **No OpenAI API key required** for vector search
+- ⚡ **Fast** - Local processing, no network calls
+- 🎯 **Accurate** - Optimized for code analysis
+- 💰 **Cost-effective** - Zero cost for embeddings
+
+### 📚 Complete MCP Documentation
+
+**➡️ [Read the Full MCP Guide](docs/MCP_GUIDE.md)**
+
+The guide covers:
+
+- Complete installation steps
+- Client-specific configuration (Claude Desktop, VS Code, custom)
+- All 8 available MCP tools
+- RAG vector search details
+- Troubleshooting and FAQ
+- Advanced configuration
+
+---
+
+## 📊 Vector Search & Embeddings Performance
+
+We benchmarked **6 configurations** (including OpenAI embeddings) on a real-world 6,187-file NestJS project. **Graph + Local embeddings is the clear winner!**
+
+**Quick Comparison**:
+
+| Configuration        | Speed           | Cost         | Accuracy     | Winner?    |
+| -------------------- | --------------- | ------------ | ------------ | ---------- |
+| **Graph + Local** ⭐ | **6.1 min** ⚡  | **$0.08** 💰 | **84.8%** 🎯 | **YES** ✅ |
+| Hybrid + Local       | 6.4 min         | $0.09        | 84.3%        | Good       |
+| Smart + Local        | 6.3 min         | $0.08        | 84.6%        | Good       |
+| Keyword-only         | 7.3 min         | $0.09        | 84.6%        | Fallback   |
+| **OpenAI** ❌        | **11.7 min** ⚠️ | **$0.29** ⚠️ | **82.9%** ⚠️ | **NO**     |
+
+**Key Findings:**
+
+- ✅ Graph + Local: **Fastest, cheapest, most accurate** (best overall)
+- ❌ OpenAI: **92% slower, 3.4x more expensive, 1.9% less accurate** (NOT recommended)
+- 🆓 Local embeddings (free) outperform OpenAI embeddings (paid) for code analysis
+
+**📖 Complete Analysis**: See **[Search Strategy Benchmark](./docs/SEARCH_STRATEGY_BENCHMARK.md)** for:
+
+- Per-agent clarity scores (8 agents × 6 configurations)
+- Why Graph + Local won (structural > semantic for code)
+- Why OpenAI underperformed (8192 token limit, context loss, batching overhead)
+- Configuration examples for all use cases
+- Memory usage and technical deep-dive
+
+Also see: [Vector Search Guide](./docs/VECTOR_SEARCH.md) - Complete guide to vector search with integrated recommendations
+
+---
+
+## � CLI Usage
+
 #### Available Commands
 
 | Command                 | Description                          | Example                                   |
 | ----------------------- | ------------------------------------ | ----------------------------------------- |
+| `archdoc help`          | Show comprehensive help              | `archdoc help`                            |
 | `archdoc analyze`       | Generate comprehensive documentation | `archdoc analyze /path/to/project`        |
 | `archdoc analyze --c4`  | Generate C4 architecture model       | `archdoc analyze --c4`                    |
 | `archdoc config --init` | Interactive configuration setup      | `archdoc config --init`                   |
 | `archdoc config --list` | Show current configuration           | `archdoc config --list`                   |
 | `archdoc export`        | Export docs to different formats     | `archdoc export .arch-docs --format html` |
 
-#### Documentation Generation
+> 💡 **Tip**: Run `archdoc help` for a comprehensive guide with examples, configuration options, and common workflows.
+
+### Documentation Generation
 
 ```bash
 # Analyze current directory
@@ -110,7 +261,7 @@ archdoc analyze --no-refinement
 archdoc analyze --verbose
 ```
 
-#### C4 Architecture Model Generation
+### C4 Architecture Model Generation
 
 ```bash
 # Generate C4 model for current directory
@@ -171,7 +322,69 @@ archdoc export .arch-docs --format confluence --output ./confluence.md
 archdoc export .arch-docs --format html --template ./my-template.html --output ./custom-docs.html
 ```
 
-#### Advanced Usage
+### Vector Search & Hybrid Retrieval
+
+```bash
+# Vector search with local embeddings (FREE, default)
+archdoc analyze --search-mode vector
+
+# Keyword search (faster, simpler)
+archdoc analyze --search-mode keyword
+
+# Hybrid retrieval (semantic + structural)
+archdoc analyze --search-mode vector --retrieval-strategy hybrid
+
+# Configure in .archdoc.config.json for persistence:
+{
+  "searchMode": {
+    "mode": "vector",
+    "embeddingsProvider": "local",
+    "strategy": "hybrid",
+    "vectorWeight": 0.6,
+    "graphWeight": 0.4
+  }
+}
+
+# See docs/VECTOR_SEARCH.md for complete documentation
+```
+
+### What Files Are Excluded?
+
+Both **File Scanner** and **Vector Search** automatically exclude common build/dependency folders (language-agnostic):
+
+**Default Exclusions** (applies to all languages):
+
+- **Dependencies**: `node_modules/`, `vendor/`, `target/`, `packages/`, `bower_components/`
+- **Build outputs**: `dist/`, `build/`, `out/`, `bin/`, `obj/`, `target/`
+- **Test files**: `.test.`, `.spec.`, `__tests__/`, `test_`, `*_test.*`
+- **Version control**: `.git/`, `.svn/`, `.hg/`
+- **Generated code**: Coverage reports, logs, OS files (`.DS_Store`, `Thumbs.db`)
+
+**Gitignore Support**:
+
+- Automatically honors `.gitignore` patterns (default: `respectGitignore: true`)
+- Works with all languages (not just JavaScript/Node.js)
+
+**Customize Exclusions** in `.archdoc.config.json`:
+
+```json
+{
+  "scan": {
+    "excludePatterns": [
+      "**/node_modules/**", // JavaScript/TypeScript
+      "**/vendor/**", // PHP, Go
+      "**/target/**", // Java, Rust
+      "**/venv/**", // Python virtual env
+      "**/my-custom-folder/**" // Your own exclusions
+    ],
+    "respectGitignore": true // Honor .gitignore (default: true)
+  }
+}
+```
+
+**Example**: On a 6,187-file NestJS project, vector search processes ~889 source files (14%) - focusing on actual code, not dependencies.
+
+### Advanced Usage
 
 ```bash
 # Incremental updates (preserves existing docs, adds new analysis)
@@ -193,7 +406,7 @@ archdoc analyze --max-cost 10.0  # Stop if cost exceeds $10
 archdoc analyze --refinement-iterations 10 --refinement-threshold 90 --refinement-improvement 15
 ```
 
-## CLI Usage
+### CLI Options Reference
 
 ```bash
 archdoc analyze [path] [options]
@@ -317,17 +530,25 @@ The tool generates a multi-file documentation structure:
 
 ```
 .arch-docs/
-├── index.md              # Table of contents
-├── metadata.md           # Generation metadata
+├── index.md              # Table of contents with smart navigation
+├── architecture.md       # High-level system design
 ├── file-structure.md     # Project organization
 ├── dependencies.md       # External & internal deps
-├── patterns.md           # Design patterns
+├── patterns.md           # Design patterns detected
+├── code-quality.md       # Quality metrics (if data exists)
 ├── flows.md              # Data & control flows
 ├── schemas.md            # Data models
-├── architecture.md       # High-level design
-├── security.md           # Security analysis
-└── recommendations.md    # Improvement suggestions
+├── security.md           # Security vulnerability analysis
+├── recommendations.md    # Improvement suggestions
+├── kpi.md                # Repository health KPI dashboard (NEW!)
+├── metadata.md           # Generation metadata + performance metrics
+└── changelog.md          # Documentation update history
 ```
+
+**What's New:**
+
+- **`kpi.md`**: LLM-generated repository health dashboard with actionable insights on code quality, testing coverage, architecture health, dependency management, and technical debt.
+- **Generation Performance Metrics**: Added to `metadata.md` showing agent confidence scores, execution times, token efficiency, and cost breakdown.
 
 ### C4 Architecture Model
 
@@ -349,17 +570,51 @@ When using `--c4`, generates structured architecture diagrams:
 
 ## 🤖 Available Agents
 
-Each agent specializes in a specific analysis task:
+Each agent specializes in a specific analysis task using LLM-powered intelligence:
 
-| Agent                     | Purpose                            | Priority |
-| ------------------------- | ---------------------------------- | -------- |
-| **File Structure**        | Project organization, entry points | HIGH     |
-| **Dependency Analyzer**   | External deps, internal imports    | HIGH     |
-| **Architecture Analyzer** | High-level design                  | HIGH     |
-| **Pattern Detector**      | Design patterns, conventions       | MEDIUM   |
-| **Flow Visualization**    | Control & data flows               | MEDIUM   |
-| **Schema Generator**      | Data models, interfaces            | MEDIUM   |
-| **Security Analyzer**     | Vulnerabilities, auth, crypto      | MEDIUM   |
+| Agent                     | Purpose                                    | Priority    | Output File         | Notes                           |
+| ------------------------- | ------------------------------------------ | ----------- | ------------------- | ------------------------------- |
+| **File Structure**        | Project organization, entry points         | HIGH        | `file-structure.md` | Always runs                     |
+| **Dependency Analyzer**   | External deps, internal imports            | HIGH        | `dependencies.md`   | Always runs                     |
+| **Architecture Analyzer** | High-level design, components              | HIGH        | `architecture.md`   | Always runs                     |
+| **Pattern Detector**      | Design patterns, anti-patterns             | MEDIUM      | `patterns.md`       | Always runs                     |
+| **Flow Visualization**    | Control & data flows with diagrams         | MEDIUM      | `flows.md`          | Always runs                     |
+| **Schema Generator**      | Data models, interfaces, type definitions  | MEDIUM      | `schemas.md`        | **Only if schemas detected** ⚠️ |
+| **Security Analyzer**     | Vulnerabilities, auth, secrets, crypto     | MEDIUM      | `security.md`       | Always runs                     |
+| **KPI Analyzer** ⭐ NEW   | Repository health, executive KPI dashboard | MEDIUM-HIGH | `kpi.md`            | Always runs                     |
+
+**⚠️ Schema Generator Smart Behavior:**
+
+The Schema Generator agent is **intelligent** - it only generates output when it detects actual schema files:
+
+**Detects:**
+
+- ✅ **Database**: Prisma schemas (`.prisma`), TypeORM entities (`@Entity`), Sequelize models
+- ✅ **API**: DTOs (`.dto.ts`), OpenAPI/Swagger definitions
+- ✅ **GraphQL**: Type definitions (`.graphql`, `.gql`)
+- ✅ **Types**: TypeScript interfaces, type definitions (focused schema files only)
+
+**Behavior:**
+
+- If **NO schemas found**: Generates `schemas.md` with "No schema definitions found" message
+- If **schemas found**: Generates comprehensive documentation with Mermaid ER/class diagrams
+- Uses `__FORCE_STOP__` to avoid unnecessary LLM calls when no schemas exist
+
+**Why "No schemas"?**
+
+- Project may use embedded types in service/controller files (not dedicated schema files)
+- Database-less projects (e.g., static site generators, CLI tools)
+- API-only projects using inline interfaces
+
+This is **not a failure** - it's smart detection saving you tokens and cost! 💰
+
+**KPI Analyzer Features:**
+
+- 📊 Overall repository health score (0-100%)
+- 🎯 Component scores: Code quality, testing, architecture, dependencies, complexity
+- 📈 Detailed metrics with ASCII visualizations
+- 💡 8+ actionable insights with prioritized action items
+- 🚀 Executive-friendly language with quantifiable targets
 
 ## 🏗️ Architecture Highlights
 
@@ -481,8 +736,8 @@ We welcome contributions! See the **[Contributing Guide](./docs/CONTRIBUTING.md)
 
 ### Community Guidelines
 
-- **[Code of Conduct](./CODE_OF_CONDUCT.md)** - Our pledge to foster an open and welcoming environment
-- **[Security Policy](./SECURITY.md)** - How to report security vulnerabilities responsibly
+- **[Code of Conduct](./.github/CODE_OF_CONDUCT.md)** - Our pledge to foster an open and welcoming environment
+- **[Security Policy](./.github/SECURITY.md)** - How to report security vulnerabilities responsibly
 - **[Issue Templates](./.github/ISSUE_TEMPLATE/)** - Bug reports, feature requests, and more
 - **[Pull Request Template](./.github/PULL_REQUEST_TEMPLATE.md)** - Guidelines for submitting changes
 
@@ -494,7 +749,94 @@ We welcome contributions! See the **[Contributing Guide](./docs/CONTRIBUTING.md)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
 - **🐛 Issues**: [Report Issues](https://github.com/techdebtgpt/architecture-doc-generator/issues)
 
-## �📄 License
+## ❓ Common Questions
+
+### Q: Why does Schema Generator say "No schema definitions found"?
+
+**A:** This is **not a failure** - it's smart detection! The Schema Generator only generates output when it detects dedicated schema files:
+
+**What it detects**:
+
+- ✅ **Prisma**: `schema.prisma`, `*.prisma`
+- ✅ **TypeORM**: `@Entity()`, `*.entity.ts`
+- ✅ **DTOs**: `*.dto.ts`, API schemas
+- ✅ **GraphQL**: `*.graphql`, `*.gql`
+- ✅ **OpenAPI**: `swagger.json`, `openapi.yaml`
+
+**Common causes of "No schemas"**:
+
+1. **Analyzing subdirectory only** - Schema files in `prisma/` won't be found if you run on `src/` only
+   - ❌ `archdoc analyze ./src` (misses `./prisma/schema.prisma`)
+   - ✅ `archdoc analyze .` (includes all directories)
+
+2. **Embedded types** - Types in service/controller files (not dedicated schema files)
+3. **Database-less projects** - Static sites, CLI tools, frontend-only apps
+4. **Inline interfaces** - TypeScript interfaces mixed with business logic
+
+**Solution**: Run analysis from project root, not subdirectories.
+
+### Q: What files are excluded from vector search?
+
+**A:** Vector search automatically excludes:
+
+- **Dependencies**: `node_modules/`, `vendor/`, `target/`
+- **Build outputs**: `dist/`, `build/`, `out/`, `bin/`, `obj/`
+- **Test files**: `.test.`, `.spec.`, `__tests__/`, `test_`
+- **Git**: `.git/` (and respects `.gitignore` by default)
+
+From 6,187 total files, only ~889 source files (14%) are indexed for optimal performance.
+
+### Q: Which search strategy should I use?
+
+**A:** For **production**, use **Hybrid** (default):
+
+- Combines semantic similarity (60%) + dependency graph (40%)
+- Best balance of quality and performance
+- Only 7% slower than vector-only, but 28% better architectural insights
+
+For **fast iteration**, use **Vector-only** or **Smart**.
+
+### Q: How much does it cost?
+
+**A:** Using local embeddings (FREE) with Claude Haiku:
+
+- Small project (1K files): ~$0.10-0.20
+- Medium project (5K files): ~$0.35-0.45
+- Large project (10K+ files): ~$0.60-0.80
+
+**Tip:** Use `--depth quick` to reduce cost by ~30%.
+
+### Q: Can I use it on private/closed-source code?
+
+**A:** Yes! Your code is only sent to the LLM provider (Anthropic/OpenAI/Google) and is **not** stored or shared. Use local embeddings (`embeddingsProvider: "local"`) for completely offline semantic search.
+
+### Q: How do I add support for my custom language?
+
+**A:** No code changes needed! Add to `.archdoc.config.json`:
+
+```json
+{
+  "languages": {
+    "custom": {
+      "myLanguage": {
+        "displayName": "My Language",
+        "filePatterns": {
+          "extensions": [".mylang"]
+        },
+        "importPatterns": {
+          "myImport": "^import\\s+([^;]+);"
+        }
+      }
+    }
+  }
+}
+```
+
+See [Custom Language Guide](./docs/CUSTOM_LANGUAGES.md) for details.
+
+---
+
+## 📄 License
 
 Apache License 2.0 - see the [LICENSE](./LICENSE) file for details.
 

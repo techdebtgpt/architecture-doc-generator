@@ -100,6 +100,50 @@ export interface AgentContext {
       }>;
     };
   };
+
+  /** Shared vector store (initialized once per generation, reused across agents) */
+  vectorStore?: {
+    searchFiles: (query: string, topK?: number) => Promise<Array<{ path: string; score: number }>>;
+    cleanup: () => void;
+  };
+
+  /** Hybrid retrieval service (combines vector search + dependency graph) */
+  hybridRetrieval?: {
+    retrieve: (
+      query: string,
+      config?: {
+        strategy?: 'vector' | 'graph' | 'hybrid' | 'smart';
+        topK?: number;
+        vectorWeight?: number;
+        graphWeight?: number;
+        includeRelatedFiles?: boolean;
+        maxDepth?: number;
+        similarityThreshold?: number;
+      },
+    ) => Promise<
+      Array<{
+        path: string;
+        content: string;
+        relevanceScore: number;
+        matchReasons: string[];
+        relationships?: {
+          imports: string[];
+          importedBy: string[];
+          sameModule: string[];
+        };
+        rank: number;
+      }>
+    >;
+    getStats: () => {
+      hasVectorStore: boolean;
+      hasDependencyGraph: boolean;
+      graphStats?: {
+        totalNodes: number;
+        totalEdges: number;
+        modules: number;
+      };
+    };
+  };
 }
 
 /**
@@ -303,6 +347,9 @@ export interface AgentExecutionOptions {
 
   /** Skip self-refinement workflow for faster execution (quick mode) */
   skipSelfRefinement?: boolean;
+
+  /** Search mode for file retrieval: 'vector' (semantic, slower but more accurate) or 'keyword' (fast, less accurate) */
+  searchMode?: 'vector' | 'keyword';
 }
 
 /**
