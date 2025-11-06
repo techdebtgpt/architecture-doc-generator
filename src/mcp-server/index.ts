@@ -136,10 +136,84 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'setup_config',
         description:
-          'Guide user to set up .archdoc.config.json using the interactive wizard. Call this if config is missing or invalid.',
+          'Create or update .archdoc.config.json with user-provided configuration. This tool accepts all configuration options and creates the config file.',
         inputSchema: {
           type: 'object',
-          properties: {},
+          properties: {
+            provider: {
+              type: 'string',
+              enum: ['anthropic', 'openai', 'google', 'xai'],
+              description: 'LLM provider to use',
+            },
+            model: {
+              type: 'string',
+              enum: [
+                // Anthropic models
+                'claude-sonnet-4-20250514',
+                'claude-3-7-sonnet-20250219',
+                'claude-3-5-sonnet-20241022',
+                'claude-3-5-haiku-20241022',
+                'claude-3-opus-20240229',
+                // OpenAI models
+                'gpt-4o',
+                'gpt-4o-mini',
+                'gpt-4-turbo',
+                'gpt-4',
+                'o1-preview',
+                'o1-mini',
+                // Google models
+                'gemini-2.0-flash-exp',
+                'gemini-1.5-pro-latest',
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-flash-8b-latest',
+                // xAI models
+                'grok-beta',
+                'grok-2-latest',
+              ],
+              description:
+                'Model to use. Choose based on your provider: Anthropic (claude-*), OpenAI (gpt-*, o1-*), Google (gemini-*), xAI (grok-*)',
+            },
+            apiKey: {
+              type: 'string',
+              description: 'API key for the selected provider',
+            },
+            searchMode: {
+              type: 'string',
+              enum: ['keyword', 'vector'],
+              description:
+                'File search mode: keyword (traditional matching, FREE), vector (semantic similarity, FREE local embeddings). Default: keyword',
+            },
+            embeddingsProvider: {
+              type: 'string',
+              enum: ['local', 'openai', 'google'],
+              description:
+                'Embeddings provider for vector search: local (FREE TF-IDF, works offline), openai (text-embedding-3-small), google (text-embedding-004). Default: local',
+            },
+            embeddingsApiKey: {
+              type: 'string',
+              description:
+                'API key for embeddings provider (required if embeddingsProvider is openai or google)',
+            },
+            retrievalStrategy: {
+              type: 'string',
+              enum: ['smart', 'vector', 'graph', 'hybrid'],
+              description:
+                'Retrieval strategy: smart (auto-detect), vector (semantic only), graph (structural only), hybrid (both). Default: smart',
+            },
+            enableTracing: {
+              type: 'boolean',
+              description: 'Enable LangSmith tracing for debugging (default: false)',
+            },
+            tracingApiKey: {
+              type: 'string',
+              description: 'LangSmith API key (required if enableTracing is true)',
+            },
+            tracingProject: {
+              type: 'string',
+              description: 'LangSmith project name (required if enableTracing is true)',
+            },
+          },
+          required: ['provider', 'model', 'apiKey'],
         },
       },
       {
@@ -506,61 +580,164 @@ async function handleCheckConfig(_args: any) {
 
 /**
  * Tool: setup_config
- * Guides user to run archdoc-mcp setup wizard
+ * Creates or updates .archdoc.config.json with user-provided configuration
  */
-async function handleSetupConfig(_args: any) {
+async function handleSetupConfig(args: any) {
   const projectPath = process.cwd();
   const configPath = path.join(projectPath, '.archdoc.config.json');
 
-  const instructions = `📋 **ArchDoc Configuration Setup**
+  const {
+    provider,
+    model,
+    apiKey,
+    searchMode = 'keyword',
+    embeddingsProvider,
+    embeddingsApiKey,
+    retrievalStrategy = 'smart',
+    enableTracing = false,
+    tracingApiKey,
+    tracingProject,
+  } = args;
 
-To configure ArchDoc, you need to run the interactive setup wizard in a terminal.
+  // Validate required fields
+  if (!provider || !model || !apiKey) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: '❌ Error: Missing required fields. Please provide `provider`, `model`, and `apiKey`.',
+        },
+      ],
+      isError: true,
+    };
+  }
 
-**Steps:**
+  // Validate embeddings API key if using non-local provider
+  if (
+    searchMode === 'vector' &&
+    embeddingsProvider &&
+    embeddingsProvider !== 'local' &&
+    !embeddingsApiKey
+  ) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ Error: embeddingsApiKey is required when using ${embeddingsProvider} embeddings provider.`,
+        },
+      ],
+      isError: true,
+    };
+  }
 
-1. Open a terminal in your project directory:
-   \`\`\`
-   ${projectPath}
-   \`\`\`
+  // Load existing config or create new
+  let existingConfig: any = {};
+  try {
+    const existingContent = await fs.readFile(configPath, 'utf-8');
+    existingConfig = JSON.parse(existingContent);
+  } catch {
+    // No existing config, start fresh
+  }
 
-2. Run the setup wizard:
-   \`\`\`bash
-   npx @techdebtgpt/archdoc-generator mcp-server
-   \`\`\`
+  // Determine embeddings provider (prioritize user input, then existing, then default)
+  const finalEmbeddingsProvider =
+    embeddingsProvider ||
+    (searchMode === 'vector' ? existingConfig.llm?.embeddingsProvider || 'local' : undefined);
 
-   Or if installed globally:
-   \`\`\`bash
-   archdoc-mcp
-   \`\`\`
+  // Build API keys object
+  const apiKeys: any = {
+    ...existingConfig.apiKeys,
+    [provider]: apiKey,
+  };
 
-3. The wizard will prompt you for:
-   - LLM provider (anthropic, openai, google, xai)
-   - API key
-   - LangSmith tracing (optional)
+  // Add embeddings API key if provided
+  if (embeddingsApiKey && finalEmbeddingsProvider && finalEmbeddingsProvider !== 'local') {
+    apiKeys.embeddings = embeddingsApiKey;
+  }
 
-4. Configuration will be saved to:
-   \`${configPath}\`
+  // Build new config
+  const config: any = {
+    llm: {
+      provider,
+      model,
+      temperature: existingConfig.llm?.temperature || 0.2,
+      maxTokens: existingConfig.llm?.maxTokens || 4096,
+      embeddingsProvider: finalEmbeddingsProvider,
+    },
+    apiKeys,
+    searchMode: {
+      mode: searchMode,
+      strategy: retrievalStrategy,
+      vectorWeight: existingConfig.searchMode?.vectorWeight ?? 0.6,
+      graphWeight: existingConfig.searchMode?.graphWeight ?? 0.4,
+      includeRelatedFiles: existingConfig.searchMode?.includeRelatedFiles ?? true,
+      maxDepth: existingConfig.searchMode?.maxDepth ?? 2,
+      similarityThreshold: existingConfig.searchMode?.similarityThreshold ?? 0.3,
+      topK: existingConfig.searchMode?.topK ?? 10,
+    },
+    tracing: {
+      enabled: enableTracing,
+      apiKey: tracingApiKey || existingConfig.tracing?.apiKey || '',
+      project: tracingProject || existingConfig.tracing?.project || 'archdoc-analysis',
+    },
+    // Preserve other existing config
+    ...existingConfig,
+  };
 
-5. Reload VS Code to apply changes
+  // Ensure llm, apiKeys, and searchMode are at top level (override spread)
+  config.llm = {
+    provider,
+    model,
+    temperature: existingConfig.llm?.temperature || 0.2,
+    maxTokens: existingConfig.llm?.maxTokens || 4096,
+    embeddingsProvider: finalEmbeddingsProvider,
+  };
+  config.apiKeys = apiKeys;
+  config.searchMode = {
+    mode: searchMode,
+    strategy: retrievalStrategy,
+    vectorWeight: existingConfig.searchMode?.vectorWeight ?? 0.6,
+    graphWeight: existingConfig.searchMode?.graphWeight ?? 0.4,
+    includeRelatedFiles: existingConfig.searchMode?.includeRelatedFiles ?? true,
+    maxDepth: existingConfig.searchMode?.maxDepth ?? 2,
+    similarityThreshold: existingConfig.searchMode?.similarityThreshold ?? 0.3,
+    topK: existingConfig.searchMode?.topK ?? 10,
+  };
 
-**Why can't this be done in MCP?**
-- API keys should not be passed through MCP client configuration
-- Interactive prompts provide better UX for setup
-- Configuration is stored securely in \`.archdoc.config.json\`
+  // Write config
+  await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
 
-After setup, use \`check_config\` tool to verify configuration is valid!`;
+  const summary = `✅ **Configuration ${existingConfig.llm ? 'Updated' : 'Created'} Successfully!**
+
+**Location**: ${configPath}
+
+**LLM Settings**:
+- Provider: ${provider}
+- Model: ${model}
+- API Key: ${apiKey.substring(0, 10)}...${apiKey.slice(-4)}
+
+**Search Configuration**:
+- Mode: ${searchMode}
+- Strategy: ${retrievalStrategy}${finalEmbeddingsProvider && searchMode === 'vector' ? `\n- Embeddings: ${finalEmbeddingsProvider}` : ''}
+
+**Tracing**: ${enableTracing ? `Enabled (${tracingProject || 'archdoc-analysis'})` : 'Disabled'}
+
+**Next Steps**:
+1. The configuration has been saved
+2. You can now use other tools like \`generate_documentation\`
+3. Use \`check_config\` to verify the configuration anytime
+
+💡 **Tip**: Your API key is stored locally in \`.archdoc.config.json\`. Make sure this file is in your \`.gitignore\`!`;
 
   return {
     content: [
       {
         type: 'text',
-        text: instructions,
+        text: summary,
       },
     ],
   };
-}
-
-/**
+} /**
  * Tool: generate_documentation
  */
 async function handleGenerateDocumentation(args: any) {

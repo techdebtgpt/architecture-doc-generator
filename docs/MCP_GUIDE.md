@@ -22,54 +22,58 @@ ArchDoc provides an **MCP (Model Context Protocol) server** that enables AI assi
 npm install -g @techdebtgpt/archdoc-generator
 ```
 
-### 2. Run Interactive Setup
+### 2. Setup MCP Configuration
 
-Navigate to your project directory and run:
-
-```bash
-archdoc-mcp
-```
-
-This will:
-
-1. Prompt you to configure LLM provider (Anthropic/OpenAI/Google/xAI)
-2. Ask for API key
-3. Optionally configure LangSmith tracing
-4. Create `.archdoc.config.json` in your project
-5. Create `.vscode/mcp.json` for MCP client configuration
-6. Add `.archdoc.config.json` to `.gitignore`
-
-**Example interactive session:**
-
-```
-? Select LLM provider: Anthropic
-? Enter Anthropic API key: sk-ant-...
-? Enable LangSmith tracing? Yes
-? Enter LangSmith API key: lsv2_pt_...
-? Enter LangSmith project name: my-project-docs
-
-✅ Configuration saved to .archdoc.config.json
-✅ MCP configuration saved to .vscode/mcp.json
-✅ Added .archdoc.config.json to .gitignore
-```
-
-### 3. Connect Your MCP Client
-
-The setup wizard created `.vscode/mcp.json` which looks like:
+Create `.vscode/mcp.json` in your project:
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "archdoc": {
       "command": "archdoc-server-mcp",
-      "description": "ArchDoc MCP Server - AI-powered architecture documentation generator with RAG",
-      "disabled": false
+      "cwd": "${workspaceFolder}"
     }
   }
 }
 ```
 
-**The MCP client will automatically start the server when needed.**
+Or copy from `.vscode/mcp.json.example`:
+
+```bash
+cp .vscode/mcp.json.example .vscode/mcp.json
+```
+
+### 3. Configure via MCP UI
+
+Reload VS Code, then use the MCP tools:
+
+1. **Check configuration**: `@archdoc check config`
+2. **Setup configuration**: `@archdoc setup config`
+   - Choose provider (anthropic/openai/google/xai)
+   - Select model from dropdown (15+ models)
+   - Enter API key
+   - Configure search mode (keyword/vector)
+   - Choose embeddings provider (local/openai/google)
+   - Select retrieval strategy (smart/vector/graph/hybrid)
+   - Optional: Enable LangSmith tracing
+
+**Example UI configuration:**
+
+```
+Provider: anthropic
+Model: claude-sonnet-4-20250514
+API Key: sk-ant-...
+Search Mode: vector
+Embeddings Provider: local (FREE)
+Retrieval Strategy: smart
+Enable Tracing: Yes
+Tracing API Key: lsv2_pt_...
+Tracing Project: my-project-docs
+
+✅ Configuration saved to .archdoc.config.json
+```
+
+**The MCP server automatically uses the workspace root (no path configuration needed!).**
 
 ---
 
@@ -90,7 +94,7 @@ Claude Desktop has native MCP support.
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "archdoc": {
       "command": "archdoc-server-mcp"
     }
@@ -100,7 +104,12 @@ Claude Desktop has native MCP support.
 
 3. Restart Claude Desktop
 
-4. Test in chat:
+4. Configure via chat:
+   - "Check my archdoc configuration"
+   - "Setup archdoc config" (opens UI form)
+   - Choose provider, model, API key from dropdowns
+
+5. Test in chat:
    - "Generate architecture documentation for this project"
    - "Search the codebase for authentication logic"
    - "Analyze the dependency graph"
@@ -140,9 +149,7 @@ The ArchDoc MCP server provides 9 specialized tools:
 
 Check if `.archdoc.config.json` exists and is valid. Returns detailed setup instructions if missing or invalid.
 
-**Parameters:**
-
-- `projectPath` (optional): Path to project directory (default: current directory)
+**Parameters:** None (automatically uses workspace root)
 
 **Example prompts:**
 
@@ -156,7 +163,36 @@ Check if `.archdoc.config.json` exists and is valid. Returns detailed setup inst
 - Validation issues (missing fields, invalid API keys)
 - Setup instructions if config is missing
 
-### 2. `generate_documentation`
+### 2. `setup_config`
+
+Create or update `.archdoc.config.json` with UI-driven configuration. Opens a form in VS Code with dropdowns for all options.
+
+**Parameters:**
+
+- `provider` (required): LLM provider - anthropic/openai/google/xai
+- `model` (required): Model from dropdown (15+ models)
+- `apiKey` (required): API key for selected provider
+- `searchMode` (optional): keyword or vector (default: keyword)
+- `embeddingsProvider` (optional): local/openai/google (default: local)
+- `embeddingsApiKey` (optional): Required if embeddingsProvider is not local
+- `retrievalStrategy` (optional): smart/vector/graph/hybrid (default: smart)
+- `enableTracing` (optional): Enable LangSmith tracing
+- `tracingApiKey` (optional): LangSmith API key
+- `tracingProject` (optional): LangSmith project name
+
+**Example prompts:**
+
+- "Setup archdoc configuration"
+- "Configure archdoc with Anthropic Claude"
+- "Update my archdoc API key"
+
+**Returns:**
+
+- Success confirmation with settings summary
+- Location of created config file
+- Next steps (ready to generate documentation)
+
+### 3. `generate_documentation`
 
 Generate comprehensive architecture documentation for the project.
 
@@ -172,7 +208,7 @@ Generate comprehensive architecture documentation for the project.
 - "Create docs in ./docs/architecture folder"
 - "Generate only file structure and dependency analysis"
 
-### 3. `search_codebase`
+### 4. `query_documentation`
 
 Semantic search across codebase with RAG (FREE local embeddings).
 
@@ -187,7 +223,7 @@ Semantic search across codebase with RAG (FREE local embeddings).
 - "Find database connection code"
 - "Show me error handling patterns"
 
-### 4. `analyze_file_structure`
+### 5. `update_documentation`
 
 Analyze project organization and directory structure.
 
@@ -199,7 +235,7 @@ Analyze project organization and directory structure.
 - "Show me the file organization"
 - "What's the project layout?"
 
-### 5. `analyze_dependencies`
+### 6. `check_architecture_patterns`
 
 Analyze project dependencies and module relationships.
 
@@ -211,7 +247,7 @@ Analyze project dependencies and module relationships.
 - "Show me the dependency graph"
 - "What packages does this use?"
 
-### 6. `detect_patterns`
+### 7. `analyze_dependencies`
 
 Detect design patterns and architectural patterns in code.
 
@@ -223,7 +259,7 @@ Detect design patterns and architectural patterns in code.
 - "What patterns are used here?"
 - "Analyze architectural patterns"
 
-### 7. `visualize_flows`
+### 8. `get_recommendations`
 
 Generate control flow and data flow diagrams.
 
@@ -235,7 +271,7 @@ Generate control flow and data flow diagrams.
 - "Show me data flows"
 - "Generate flow diagrams"
 
-### 8. `generate_schemas`
+### 9. `validate_architecture`
 
 Extract and document data models/schemas.
 
@@ -246,19 +282,6 @@ Extract and document data models/schemas.
 - "Generate database schemas"
 - "Show me data models"
 - "Document the API schemas"
-
-### 9. `get_file_contents`
-
-Retrieve contents of specific files.
-
-**Parameters:**
-
-- `filePaths` (required): Array of file paths to retrieve
-
-**Example prompts:**
-
-- "Show me src/main.ts"
-- "Get the contents of package.json and tsconfig.json"
 
 ---
 
@@ -373,15 +396,14 @@ For full control, use `archdoc config --init` which includes:
 
 ## MCP Client Configuration (.vscode/mcp.json)
 
-Generated automatically by `archdoc-mcp`:
+Create manually or copy from `.vscode/mcp.json.example`:
 
 ```json
 {
-  "mcpServers": {
+  "servers": {
     "archdoc": {
       "command": "archdoc-server-mcp",
-      "description": "ArchDoc MCP Server - AI-powered architecture documentation generator with RAG",
-      "disabled": false
+      "cwd": "${workspaceFolder}"
     }
   }
 }
@@ -389,11 +411,14 @@ Generated automatically by `archdoc-mcp`:
 
 **Fields:**
 
-- `command`: The binary to execute (must be in PATH or absolute path)
-- `description`: Shows in MCP client UI
-- `disabled`: Set to `true` to temporarily disable
+- `command`: The binary to execute (must be in PATH or use `npx @techdebtgpt/archdoc-generator`)
+- `cwd`: Working directory - use `${workspaceFolder}` for VS Code workspace root
 
-**The server uses `process.cwd()` to detect project path automatically.**
+**No additional configuration needed!** The server:
+
+- Automatically detects workspace root via `process.cwd()`
+- Looks for `.archdoc.config.json` in workspace root
+- Prompts you to configure via UI if config is missing
 
 ---
 
