@@ -1,5 +1,5 @@
 // Core exports
-export { LLMService } from './llm/llm-service';
+export { LLMService, type LLMServiceConfig } from './llm/llm-service';
 export { TokenManager } from './llm/token-manager';
 export * from './llm/llm-provider.interface';
 

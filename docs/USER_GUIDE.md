@@ -154,16 +154,15 @@ You can configure the generator by creating a `.archdoc.config.json` file in you
 
 ### Environment Variables
 
-You can also use environment variables to configure the generator, which is useful for CI/CD environments.
+> **⚠️ DEPRECATED**: Environment variables for API keys and LLM settings are **NO LONGER** supported. Use `.archdoc.config.json` instead.
 
-- `ANTHROPIC_API_KEY`: Your API key for Anthropic Claude.
-- `OPENAI_API_KEY`: Your API key for OpenAI.
-- `GOOGLE_API_KEY`: Your API key for Google Gemini.
-- `XAI_API_KEY`: Your API key for xAI Grok.
-- `DEFAULT_LLM_PROVIDER`: The default LLM provider to use.
-- `DEFAULT_LLM_MODEL`: The default LLM model to use.
+The **only** environment variables still supported are for LangSmith tracing:
+
 - `LANGCHAIN_TRACING_V2`: Set to `true` to enable LangSmith tracing.
 - `LANGCHAIN_API_KEY`: Your API key for LangSmith.
+- `LANGCHAIN_PROJECT`: Your LangSmith project name.
+
+For all other configuration (API keys, LLM provider, etc.), use `.archdoc.config.json`. See the [Configuration Guide](./CONFIGURATION_GUIDE.md) for details.
 
 ## ✨ Usage Examples
 

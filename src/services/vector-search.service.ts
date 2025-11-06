@@ -52,28 +52,23 @@ export function createEmbeddings(config: EmbeddingsConfig): Embeddings {
     }
 
     case 'openai': {
-      const apiKey =
-        config.apiKey || process.env.OPENAI_EMBEDDINGS_KEY || process.env.OPENAI_API_KEY;
-      if (!apiKey) {
-        throw new Error(
-          'OpenAI embeddings require OPENAI_EMBEDDINGS_KEY or OPENAI_API_KEY environment variable',
-        );
+      if (!config.apiKey) {
+        throw new Error('OpenAI embeddings require apiKey in config');
       }
       return new OpenAIEmbeddings({
         modelName: config.model || 'text-embedding-3-small',
         maxRetries: 3,
-        openAIApiKey: apiKey,
+        openAIApiKey: config.apiKey,
       });
     }
 
     case 'google': {
-      const apiKey = config.apiKey || process.env.GOOGLE_API_KEY;
-      if (!apiKey) {
-        throw new Error('Google embeddings require GOOGLE_API_KEY environment variable');
+      if (!config.apiKey) {
+        throw new Error('Google embeddings require apiKey in config');
       }
       return new GoogleGenerativeAIEmbeddings({
         modelName: config.model || 'text-embedding-004',
-        apiKey,
+        apiKey: config.apiKey,
       });
     }
 

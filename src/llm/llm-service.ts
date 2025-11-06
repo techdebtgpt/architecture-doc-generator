@@ -11,6 +11,25 @@ import { TokenManager } from './token-manager';
 import { LLMProvider, LLMRequestOptions, LLMResponse, TokenUsageDetails } from '../types/llm.types';
 import { Logger } from '../utils/logger';
 
+export interface LLMServiceConfig {
+  apiKeys?: {
+    anthropic?: string;
+    openai?: string;
+    google?: string;
+    xai?: string;
+  };
+  llm?: {
+    provider?: string;
+    model?: string;
+  };
+  tracing?: {
+    enabled?: boolean;
+    apiKey?: string;
+    project?: string;
+    endpoint?: string;
+  };
+}
+
 /**
  * Main LLM service for managing multiple providers
  */
@@ -21,45 +40,57 @@ export class LLMService {
   private defaultProvider: LLMProvider;
   private chatHistories: Map<string, BaseChatMessageHistory> = new Map();
   private logger = new Logger('LLMService');
+  private config?: LLMServiceConfig;
 
-  private constructor() {
+  private constructor(config?: LLMServiceConfig) {
+    this.config = config;
     this.tokenManager = TokenManager.getInstance();
 
     // Configure LangSmith tracing if enabled
     this.configureLangSmith();
 
-    // Initialize providers
-    this.providers.set(LLMProvider.ANTHROPIC, new AnthropicProvider());
-    this.providers.set(LLMProvider.OPENAI, new OpenAIProvider());
-    this.providers.set(LLMProvider.GOOGLE, new GoogleProvider());
-    this.providers.set(LLMProvider.XAI, new XAIProvider());
+    // Initialize providers with API keys from config
+    const apiKeys = config?.apiKeys || {};
+    this.providers.set(LLMProvider.ANTHROPIC, new AnthropicProvider(apiKeys.anthropic));
+    this.providers.set(LLMProvider.OPENAI, new OpenAIProvider(apiKeys.openai));
+    this.providers.set(LLMProvider.GOOGLE, new GoogleProvider(apiKeys.google));
+    this.providers.set(LLMProvider.XAI, new XAIProvider(apiKeys.xai));
 
     // Set default provider based on configuration
-    this.defaultProvider = this.getDefaultProviderFromEnv();
+    this.defaultProvider = this.getDefaultProviderFromConfig();
   }
 
   /**
    * Configure LangSmith tracing
+   * Note: LangChain SDK reads from process.env, so we must set these environment variables
    */
   private configureLangSmith(): void {
-    // Check if LangSmith is enabled
-    if (process.env.LANGCHAIN_TRACING_V2 === 'true') {
-      process.env.LANGCHAIN_ENDPOINT =
-        process.env.LANGCHAIN_ENDPOINT || 'https://api.smith.langchain.com';
-      process.env.LANGCHAIN_PROJECT = process.env.LANGCHAIN_PROJECT || 'archdoc-generator';
-      process.env.LANGCHAIN_CALLBACKS_BACKGROUND =
-        process.env.LANGCHAIN_CALLBACKS_BACKGROUND || 'true';
+    const tracingConfig = this.config?.tracing;
+
+    if (tracingConfig?.enabled) {
+      process.env.LANGCHAIN_TRACING_V2 = 'true';
+      process.env.LANGCHAIN_ENDPOINT = tracingConfig.endpoint || 'https://api.smith.langchain.com';
+      process.env.LANGCHAIN_PROJECT = tracingConfig.project || 'archdoc-generator';
+      process.env.LANGCHAIN_CALLBACKS_BACKGROUND = 'true';
+
+      if (tracingConfig.apiKey) {
+        process.env.LANGCHAIN_API_KEY = tracingConfig.apiKey;
+      }
 
       this.logger.info(`✅ LangSmith tracing enabled - Project: ${process.env.LANGCHAIN_PROJECT}`);
     }
   }
 
   /**
-   * Get singleton instance
+   * Get singleton instance with optional configuration
+   * @param config - Optional configuration (API keys, LLM settings, tracing)
    */
-  public static getInstance(): LLMService {
+  public static getInstance(config?: LLMServiceConfig): LLMService {
     if (!LLMService.instance) {
-      LLMService.instance = new LLMService();
+      LLMService.instance = new LLMService(config);
+    } else if (config) {
+      // Recreate instance if config is provided (allows reconfiguration)
+      LLMService.instance = new LLMService(config);
     }
     return LLMService.instance;
   }
@@ -294,8 +325,8 @@ Standalone Question:`;
 
   // Private helper methods
 
-  private getDefaultProviderFromEnv(): LLMProvider {
-    const provider = process.env.ARCHDOC_LLM_PROVIDER?.toLowerCase();
+  private getDefaultProviderFromConfig(): LLMProvider {
+    const provider = this.config?.llm?.provider?.toLowerCase();
 
     switch (provider) {
       case 'openai':
@@ -311,15 +342,20 @@ Standalone Question:`;
   }
 
   private getDefaultModel(provider: LLMProvider): string {
+    // Use model from config if provided, otherwise use provider default
+    if (this.config?.llm?.model) {
+      return this.config.llm.model;
+    }
+
     switch (provider) {
       case LLMProvider.ANTHROPIC:
-        return process.env.ARCHDOC_LLM_MODEL || 'claude-sonnet-4-5-20250929';
+        return 'claude-sonnet-4-5-20250929';
       case LLMProvider.OPENAI:
-        return process.env.ARCHDOC_LLM_MODEL || 'gpt-4o-mini';
+        return 'gpt-4o-mini';
       case LLMProvider.GOOGLE:
-        return process.env.ARCHDOC_LLM_MODEL || 'gemini-2.5-pro';
+        return 'gemini-2.5-pro';
       case LLMProvider.XAI:
-        return process.env.ARCHDOC_LLM_MODEL || 'grok-3-beta';
+        return 'grok-3-beta';
       default:
         return 'claude-sonnet-4-5-20250929';
     }

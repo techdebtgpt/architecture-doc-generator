@@ -69,7 +69,7 @@ export class OpenAIProvider implements ILLMProvider {
   };
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.OPENAI_API_KEY || '';
+    this.apiKey = apiKey || '';
     this.tokenManager = TokenManager.getInstance();
   }
 

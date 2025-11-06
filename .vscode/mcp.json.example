@@ -1,0 +1,33 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/mcp.json",
+  "mcpServers": {
+    "archdoc": {
+      "command": "node",
+      "args": ["/absolute/path/to/architecture-doc-generator/dist/src/mcp-server/index.js"],
+      "description": "ArchDoc MCP Server - AI-powered architecture documentation generator with RAG",
+      "disabled": false
+    }
+  }
+}
+
+// SETUP INSTRUCTIONS:
+//
+// 1. Copy this file to .vscode/mcp.json (remove .example)
+// 2. Update the path above to point to your installation
+// 3. Create .archdoc.config.json in your project root:
+//
+//    {
+//      "llm": {
+//        "provider": "anthropic",
+//        "model": "claude-sonnet-4-20250514"
+//      },
+//      "apiKeys": {
+//        "anthropic": "sk-ant-api-03-YOUR-KEY-HERE"
+//      }
+//    }
+//
+// 4. Restart VS Code
+// 5. Use: @archdoc generate documentation
+//
+// The MCP server automatically loads .archdoc.config.json from your project.
+// Same config works for both CLI and MCP!

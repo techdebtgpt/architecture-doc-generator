@@ -75,48 +75,48 @@ For project-specific settings, create a `.archdoc.config.json` file in your proj
 
 ## 🌐 Environment Variables
 
-Environment variables are useful for CI/CD pipelines or for overriding settings without modifying the configuration file.
+> **⚠️ BREAKING CHANGE**: Environment variables are **NO LONGER** used as fallbacks for API keys or LLM settings. All configuration must be provided in `.archdoc.config.json`.
 
-### Required Variables
+### LangSmith Tracing (Only Remaining Use)
 
-You must provide an API key for at least one LLM provider.
-
-- `ANTHROPIC_API_KEY`: Your API key for Anthropic Claude.
-- `OPENAI_API_KEY`: Your API key for OpenAI.
-- `GOOGLE_API_KEY`: Your API key for Google Gemini.
-- `XAI_API_KEY`: Your API key for xAI Grok.
-
-### Optional Variables
-
-- `DEFAULT_LLM_PROVIDER`: Sets the default LLM provider (`anthropic`, `openai`, `google`, `xai`).
-- `DEFAULT_LLM_MODEL`: Sets the default LLM model to use. Each provider has different models available:
-
-  **OpenAI** (default: `o1-mini`):
-  - `o1-mini`, `o1-preview` - Reasoning models
-  - `gpt-4o`, `gpt-4o-mini` - Multimodal models
-  - `gpt-4-turbo`, `gpt-4-turbo-preview` - GPT-4 Turbo
-  - `gpt-4`, `gpt-3.5-turbo` - Legacy models
-
-  **Anthropic** (default: `claude-sonnet-4-5-20250929`):
-  - `claude-sonnet-4-5-20250929`, `claude-opus-4-1-20250805`, `claude-haiku-4-5-20251001` - Latest Claude 4.5/4.1
-  - `claude-sonnet-4-20250514`, `claude-opus-4-20250514` - Claude 4 (with/without `-thinking`)
-  - `claude-3-7-sonnet-latest`, `claude-3-7-sonnet-20250219` - Claude 3.7
-  - `claude-3-5-sonnet-latest`, `claude-3-5-sonnet-20241022`, `claude-3-5-sonnet-20240620` - Claude 3.5 Sonnet
-  - `claude-3-5-haiku-20241022` - Claude 3.5 Haiku
-  - `claude-3-opus-20240229` - Claude 3 Opus (legacy)
-
-  **Google** (default: `gemini-2.5-pro`):
-  - `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite` - Gemini 2.5
-  - `gemini-1.5-pro`, `gemini-1.5-flash` - Gemini 1.5
-  - `gemini-pro` - Legacy Gemini
-
-  **xAI** (default: `grok-3-beta`):
-  - `grok-3-beta` - Latest Grok
-  - `grok-2` - Grok 2
+The **only** environment variables still used are for LangSmith tracing (required by LangChain SDK):
 
 - `LANGCHAIN_TRACING_V2`: Set to `true` to enable LangSmith tracing.
 - `LANGCHAIN_API_KEY`: Your API key for LangSmith.
 - `LANGCHAIN_PROJECT`: The project name for LangSmith tracing.
+
+**Recommended approach**: Configure tracing in `.archdoc.config.json` instead:
+
+```json
+{
+  "tracing": {
+    "enabled": true,
+    "apiKey": "lsv2_pt_...",
+    "project": "my-project"
+  }
+}
+```
+
+### Migration Guide
+
+If you were using environment variables for API keys (e.g., `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`), you must now add them to your `.archdoc.config.json`:
+
+```json
+{
+  "apiKeys": {
+    "anthropic": "sk-ant-...",
+    "openai": "sk-proj-...",
+    "google": "AIza...",
+    "xai": "xai-..."
+  },
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5-20250929"
+  }
+}
+```
+
+See the **Configuration File** section below for complete examples.
 
 ## � Vector Search Configuration
 

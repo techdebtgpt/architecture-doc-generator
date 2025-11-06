@@ -5,7 +5,9 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "archdoc": "./dist/cli/index.js"
+    "archdoc": "./dist/cli/index.js",
+    "archdoc-server-mcp": "./dist/src/mcp-server/index.js",
+    "archdoc-mcp": "./dist/cli/setup-mcp.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -20,7 +22,10 @@
     "prepublishOnly": "npm run build && npm run lint && npm test",
     "prepack": "npm run build",
     "postpack": "echo 'Package created successfully'",
-    "cli:dev": "ts-node src/cli/index.ts",
+    "cli:dev": "ts-node cli/index.ts",
+    "mcp:dev": "ts-node src/mcp-server/index.ts",
+    "mcp:build": "npm run build && node dist/src/mcp-server/index.js",
+    "mcp:setup": "ts-node cli/setup-mcp.ts",
     "example:basic": "ts-node examples/basic-usage.ts",
     "example:custom": "ts-node examples/custom-agent.ts",
     "prepublish:check": "node scripts/pre-publish-check.js"
@@ -81,6 +86,7 @@
     "@langchain/google-genai": "^0.1.12",
     "@langchain/langgraph": "^0.2.74",
     "@langchain/openai": "^0.3.17",
+    "@modelcontextprotocol/sdk": "^1.21.0",
     "chalk": "^4.1.2",
     "commander": "^12.1.0",
     "fast-glob": "^3.3.2",

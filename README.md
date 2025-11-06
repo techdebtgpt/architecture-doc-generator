@@ -1,6 +1,7 @@
 # 🏗️ ArchDoc Generator
 
 [![npm version](https://img.shields.io/npm/v/@techdebtgpt/archdoc-generator.svg)](https://www.npmjs.com/package/@techdebtgpt/archdoc-generator)
+[![MCP Server](https://img.shields.io/badge/MCP-Server-blueviolet.svg)](docs/MCP_GUIDE.md)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
@@ -9,12 +10,14 @@
 [![Website](https://img.shields.io/badge/Website-techdebtgpt.com-blue)](https://techdebtgpt.com)
 [![GitHub stars](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator)](https://github.com/techdebtgpt/architecture-doc-generator)
 
-> AI-powered architecture documentation generator for any codebase using LangChain and multi-agent workflows.
+> 🤖 **AI-powered architecture documentation generator with MCP Server support**
+> Use as CLI tool OR integrate with Claude Desktop/GitHub Copilot via Model Context Protocol
 
 ArchDoc Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, security, and data flows.
 
 ## 📋 Table of Contents
 
+- [🔥 MCP Server - Use with AI Assistants](#-mcp-server---use-with-ai-assistants-new)
 - [Features](#-features)
 - [Quick Start](#-quick-start)
 - [Search Strategy Performance](#-search-strategy-performance)
@@ -29,19 +32,92 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - [Contributing](#-contributing)
 - [License](#-license)
 
+---
+
+## 🔥 MCP Server - Use with AI Assistants (NEW!)
+
+**ArchDoc now provides an MCP (Model Context Protocol) server** that integrates with AI assistants like Claude Desktop, GitHub Copilot (when supported), and other MCP-compatible clients.
+
+### 🚀 Quick MCP Setup
+
+```bash
+# 1. Install globally
+npm install -g @techdebtgpt/archdoc-generator
+
+# 2. Navigate to your project
+cd /path/to/your/project
+
+# 3. Run interactive setup wizard
+archdoc-mcp
+```
+
+The wizard will:
+
+- ✅ Configure your LLM provider (Anthropic/OpenAI/Google/xAI)
+- ✅ Set up API keys
+- ✅ Create `.archdoc.config.json` (gitignored automatically)
+- ✅ Create `.vscode/mcp.json` for MCP clients
+- ✅ Enable optional LangSmith tracing
+
+### 🤖 What You Can Do with MCP
+
+Once configured, ask your AI assistant:
+
+- **"Generate architecture documentation for this project"** - Full docs generation
+- **"Search for authentication logic"** - RAG-powered semantic search (FREE local embeddings)
+- **"Analyze the dependency graph"** - Dependency analysis
+- **"What design patterns are used?"** - Pattern detection
+- **"Show me the data models"** - Schema extraction
+- **"Visualize control flows"** - Flow diagrams
+- **"Analyze security vulnerabilities"** - Security review
+
+### 📱 Supported MCP Clients
+
+| Client              | Status           | Configuration                                                    |
+| ------------------- | ---------------- | ---------------------------------------------------------------- |
+| **Claude Desktop**  | ✅ Available Now | [See MCP Guide](docs/MCP_GUIDE.md#claude-desktop--available-now) |
+| **VS Code/Copilot** | 🔜 Coming Soon   | Auto-discovers `.vscode/mcp.json`                                |
+| **Custom Clients**  | ✅ MCP SDK       | [See MCP Guide](docs/MCP_GUIDE.md#other-mcp-clients)             |
+
+### 🔍 FREE Local Vector Search
+
+The MCP server includes **built-in semantic search** with **FREE local TF-IDF embeddings**:
+
+- ❌ **No OpenAI API key required** for vector search
+- ⚡ **Fast** - Local processing, no network calls
+- 🎯 **Accurate** - Optimized for code analysis
+- 💰 **Cost-effective** - Zero cost for embeddings
+
+### 📚 Complete MCP Documentation
+
+**➡️ [Read the Full MCP Guide](docs/MCP_GUIDE.md)**
+
+The guide covers:
+
+- Complete installation steps
+- Client-specific configuration (Claude Desktop, VS Code, custom)
+- All 8 available MCP tools
+- RAG vector search details
+- Troubleshooting and FAQ
+- Advanced configuration
+
+---
+
 ## ✨ Features
 
 - 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
-- 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
+- � **MCP Server Integration** (NEW!): Use with GitHub Copilot, Claude Desktop, or any MCP client for real-time architecture guidance. [See MCP Guide →](docs/MCP_SERVER_GUIDE.md)
+- 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings.
+- �📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
 - 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
 - ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
 - 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.
-- � **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
+- 📚 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
 - 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation.
 - 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection.
 - 🎨 **Customizable**: Prompt-based agent selection and configuration.
-- � **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
+- 📊 **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
 - 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
 - ➕ **Extensible**: Add support for any language via configuration—no code changes required.
 
@@ -106,6 +182,48 @@ This will:
 2. Ask for your API key.
 3. Create `.archdoc.config.json` with your configuration.
 4. Validate your setup.
+
+## 🔌 MCP Server Integration (NEW!)
+
+Use ArchDoc with GitHub Copilot, Claude Desktop, or any MCP-compatible client:
+
+```bash
+# 1. Build the project
+npm run build
+
+# 2. Configure MCP client (example for VS Code)
+# Create .vscode/mcp.json:
+{
+  "mcpServers": {
+    "archdoc": {
+      "command": "node",
+      "args": ["./dist/src/mcp-server/index.js"],
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-..."
+      }
+    }
+  }
+}
+
+# 3. Use in Copilot Chat
+# @archdoc generate documentation for this project
+# @archdoc query "What are the main architectural patterns?"
+# @archdoc validate architecture src/services/user-service.ts
+```
+
+**MCP Tools Available**:
+
+- 📝 `generate_documentation` - Full architecture analysis
+- 🔍 `query_documentation` - RAG queries (FREE local embeddings!)
+- 🔄 `update_documentation` - Incremental updates
+- ✅ `validate_architecture` - Check code against patterns
+- 🎨 `check_architecture_patterns` - Pattern detection
+- 📦 `analyze_dependencies` - Dependency analysis
+- 💡 `get_recommendations` - Improvement suggestions
+
+**[📖 Full MCP Guide →](docs/MCP_SERVER_GUIDE.md)** | **[⚙️ Configuration Examples →](docs/MCP_CONFIGURATION_EXAMPLES.md)**
+
+---
 
 ### Basic Usage
 

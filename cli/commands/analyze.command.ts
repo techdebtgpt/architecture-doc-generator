@@ -204,7 +204,27 @@ export async function analyzeProject(
       );
     }
 
-    // Register all agents
+    // Load config file BEFORE registering agents (agents need LLMService with config)
+    let userConfig: any = {};
+    try {
+      const configPath = path.join(process.cwd(), '.archdoc.config.json');
+      const configContent = await fs.readFile(configPath, 'utf-8');
+      userConfig = JSON.parse(configContent);
+
+      // Initialize LLMService with config BEFORE agents are constructed
+      const { LLMService } = await import('../../src/llm/llm-service');
+      LLMService.getInstance(userConfig);
+
+      if (options.verbose) {
+        console.log(chalk.blue('\n📄 Config loaded from: ' + configPath));
+      }
+    } catch (_error) {
+      if (options.verbose) {
+        console.log(chalk.yellow('\n⚠️  No config file found, using defaults'));
+      }
+    }
+
+    // Register all agents (after LLMService is initialized with config)
     const agentRegistry = registerAgents(spinner);
     const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
 
@@ -225,33 +245,15 @@ export async function analyzeProject(
       }
     }
 
-    // Initialize orchestrator
-    spinner.start('Initializing documentation orchestrator... \n');
-    const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
-    spinner.succeed('Orchestrator initialized successfully');
-
-    // Load config file if exists
-    let userConfig: any = {};
-    try {
-      const configPath = path.join(process.cwd(), '.archdoc.config.json');
-      const configContent = await fs.readFile(configPath, 'utf-8');
-      userConfig = JSON.parse(configContent);
-
-      if (options.verbose) {
-        console.log(chalk.gray(`\n📄 Config loaded from: ${configPath}`));
-        console.log(chalk.gray(`   searchMode: ${JSON.stringify(userConfig.searchMode)}`));
-      }
-    } catch (_error) {
-      // Config file doesn't exist or invalid - use defaults
-      if (options.verbose) {
-        console.log(
-          chalk.gray(
-            `\n📄 No config file found at: ${path.join(process.cwd(), '.archdoc.config.json')}`,
-          ),
-        );
-        console.log(chalk.gray('   Using defaults'));
-      }
+    // Display searchMode if verbose (config already loaded above)
+    if (options.verbose && userConfig.searchMode) {
+      console.log(chalk.gray(`   searchMode: ${JSON.stringify(userConfig.searchMode)}`));
     }
+
+    // Initialize orchestrator with config
+    spinner.start('Initializing documentation orchestrator... \n');
+    const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, userConfig);
+    spinner.succeed('Orchestrator initialized successfully');
 
     // Determine depth mode configuration
     const depthMode = options.depth || 'normal';

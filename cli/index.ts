@@ -1,64 +1,7 @@
 #!/usr/bin/env node
 
-// Load ArchDoc configuration
-// Looks for .archdoc.config.json in: root folder first, then .arch-docs/ folder
 import * as path from 'path';
 import * as fs from 'fs';
-
-const cwd = process.cwd();
-const CONFIG_FILE = '.archdoc.config.json';
-
-// Try root .archdoc.config.json first
-let configPath = path.join(cwd, CONFIG_FILE);
-if (!fs.existsSync(configPath)) {
-  // Fallback to .arch-docs/.archdoc.config.json
-  configPath = path.join(cwd, '.arch-docs', CONFIG_FILE);
-}
-
-if (fs.existsSync(configPath)) {
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    // Set environment variables from config file
-    if (config.apiKeys) {
-      if (config.apiKeys.anthropic) process.env.ANTHROPIC_API_KEY = config.apiKeys.anthropic;
-      if (config.apiKeys.openai) process.env.OPENAI_API_KEY = config.apiKeys.openai;
-      if (config.apiKeys.google) process.env.GOOGLE_API_KEY = config.apiKeys.google;
-      if (config.apiKeys.xai) process.env.XAI_API_KEY = config.apiKeys.xai;
-    }
-    // Set embeddings keys (separate from LLM API keys)
-    if (config.embeddings) {
-      if (config.embeddings.openai) process.env.OPENAI_EMBEDDINGS_KEY = config.embeddings.openai;
-      if (config.embeddings.google) process.env.GOOGLE_EMBEDDINGS_KEY = config.embeddings.google;
-    }
-    // Set LLM provider and model from config
-    if (config.llm) {
-      if (config.llm.provider) process.env.ARCHDOC_LLM_PROVIDER = config.llm.provider;
-      if (config.llm.model) process.env.ARCHDOC_LLM_MODEL = config.llm.model;
-    }
-    if (config.tracing) {
-      if (config.tracing.enabled) {
-        process.env.LANGCHAIN_TRACING_V2 = 'true';
-        // Warn if API key is missing
-        if (!config.tracing.apiKey && !process.env.LANGCHAIN_API_KEY) {
-          console.warn(
-            '\n⚠️  Warning: LangSmith tracing is enabled but no API key provided.\n' +
-              '   Set tracing.apiKey in config or LANGCHAIN_API_KEY environment variable.\n',
-          );
-        }
-      }
-      if (config.tracing.apiKey) process.env.LANGCHAIN_API_KEY = config.tracing.apiKey;
-      if (config.tracing.project) process.env.LANGCHAIN_PROJECT = config.tracing.project;
-      if (config.tracing.endpoint) process.env.LANGCHAIN_ENDPOINT = config.tracing.endpoint;
-      if (config.tracing.runName) process.env.ARCHDOC_RUN_NAME = config.tracing.runName;
-    }
-  } catch (_err) {
-    // Ignore parse errors, config will use defaults or explicit env vars
-  }
-}
-
-// Note: Environment variables can still be set explicitly (for CI/CD)
-// They take precedence over .archdoc.config.json values
-
 import { Command } from 'commander';
 import { analyzeProject } from './commands/analyze.command';
 import { registerConfigCommand } from './commands/config.command';

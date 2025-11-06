@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking Changes
+
+- **⚠️ Environment Variables No Longer Supported**: Environment variables for API keys and LLM settings are **NO LONGER** used as fallbacks. All configuration must be provided in `.archdoc.config.json`.
+  - **Migration Required**: If using `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc., move them to config file:
+    ```json
+    {
+      "apiKeys": {
+        "anthropic": "sk-ant-...",
+        "openai": "sk-proj-...",
+        "google": "AIza...",
+        "xai": "xai-..."
+      }
+    }
+    ```
+  - **Exception**: LangSmith tracing still uses environment variables (`LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`, `LANGCHAIN_PROJECT`) as required by LangChain SDK
+  - **Rationale**: Direct config passing is cleaner, more explicit, and eliminates hidden fallback behavior
+
 ### Added
 
 - **C4 Architecture Model Generation**: New `--c4` flag to generate structured C4 architecture diagrams

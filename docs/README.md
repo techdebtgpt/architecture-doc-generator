@@ -15,6 +15,10 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 - [**Vector Search Guide**](./VECTOR_SEARCH.md): ⭐ Complete guide to vector search with integrated recommendations. Covers RAG-based search, embeddings providers (local/OpenAI), retrieval strategies (Graph/Hybrid/Vector/Smart), and when to use each.
 - [**🏆 Search Strategy Benchmark**](./SEARCH_STRATEGY_BENCHMARK.md): Comprehensive real-world benchmark of 6 configurations on tech-debt-api showing **Graph + Local as winner** (84.8%, 6.1min, $0.0841). Includes detailed per-agent analysis and why OpenAI underperformed.
 
+### 🤖 MCP Server (Model Context Protocol)
+
+- [**🔥 MCP Guide**](./MCP_GUIDE.md): ⭐ **Complete guide to using ArchDoc as an MCP server** with Claude Desktop or other MCP clients. Covers setup, configuration, 8 available tools, RAG vector search, troubleshooting, and advanced topics.
+
 ### 🔧 Integration & Development
 
 - [**API Reference**](./API.md): Documentation for the programmatic API, allowing you to integrate ArchDoc Generator into your own applications.

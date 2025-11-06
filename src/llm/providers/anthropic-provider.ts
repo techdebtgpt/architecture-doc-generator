@@ -101,7 +101,7 @@ export class AnthropicProvider implements ILLMProvider {
   };
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.ANTHROPIC_API_KEY || '';
+    this.apiKey = apiKey || '';
     this.tokenManager = TokenManager.getInstance();
     this.logger = new Logger('AnthropicProvider');
 

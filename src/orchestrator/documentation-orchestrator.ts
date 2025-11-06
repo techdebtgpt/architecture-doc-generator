@@ -190,12 +190,17 @@ export class DocumentationOrchestrator {
   private logger = new Logger('DocumentationOrchestrator');
   private workflow: ReturnType<typeof this.buildWorkflow>;
   private checkpointer = new MemorySaver();
-  private llmService = LLMService.getInstance();
+  private llmService: LLMService;
+  private config: any;
 
   constructor(
     private readonly agentRegistry: AgentRegistry,
     private readonly scanner: FileSystemScanner,
+    config?: any,
   ) {
+    this.config = config || {};
+    // Initialize LLM service with config
+    this.llmService = LLMService.getInstance(config);
     this.workflow = this.buildWorkflow();
   }
 
@@ -279,17 +284,16 @@ export class DocumentationOrchestrator {
 
     // Validate embeddings API key if vector search mode is enabled
     if (options.agentOptions?.searchMode === 'vector') {
-      // Determine embeddings provider from options (default: local - FREE!)
+      // Determine embeddings provider from options or config (default: local - FREE!)
       const embeddingsProvider = (
         options.embeddingsProvider ||
-        process.env.EMBEDDINGS_PROVIDER ||
+        this.config.searchMode?.embeddingsProvider ||
         'local'
       ).toLowerCase();
 
-      // Check for provider-specific API keys
-      const hasOpenAIKey =
-        process.env.OPENAI_EMBEDDINGS_KEY || process.env.OPENAI_API_KEY || process.env.OPENAI_KEY;
-      const hasGoogleKey = process.env.GOOGLE_API_KEY || process.env.GOOGLE_EMBEDDINGS_KEY;
+      // Check for provider-specific API keys in config
+      const hasOpenAIKey = this.config.apiKeys?.openai;
+      const hasGoogleKey = this.config.apiKeys?.google;
 
       const providerHasKey =
         embeddingsProvider === 'local' || // Local embeddings are always available (FREE)
@@ -299,17 +303,17 @@ export class DocumentationOrchestrator {
 
       if (!providerHasKey) {
         const providerKeyMap: Record<string, string> = {
-          openai: 'OPENAI_EMBEDDINGS_KEY or OPENAI_API_KEY',
-          google: 'GOOGLE_API_KEY or GOOGLE_EMBEDDINGS_KEY',
-          cohere: 'COHERE_API_KEY',
-          voyage: 'VOYAGE_API_KEY',
+          openai: 'apiKeys.openai',
+          google: 'apiKeys.google',
+          cohere: 'apiKeys.cohere',
+          voyage: 'apiKeys.voyage',
         };
 
         const requiredKey = providerKeyMap[embeddingsProvider] || 'API key';
         const errorMsg = [
           `❌ Vector search with ${embeddingsProvider} provider requires an API key.`,
           '',
-          `   Set the environment variable: ${requiredKey}`,
+          `   Add ${requiredKey} to .archdoc.config.json`,
           '',
           '   Or run: archdoc config --init',
           '   Then select "Enable vector search with embeddings"',
@@ -318,7 +322,7 @@ export class DocumentationOrchestrator {
         ].join('\n');
 
         this.logger.error(errorMsg);
-        throw new Error(`Vector search requires ${requiredKey} environment variable`);
+        throw new Error(`Vector search requires ${requiredKey} in config`);
       }
     }
 

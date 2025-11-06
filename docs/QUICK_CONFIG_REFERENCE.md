@@ -99,13 +99,27 @@ Manage your configuration directly from the command line.
 
 ## 🌐 Environment Variables
 
-For CI/CD or to override the config file, use environment variables.
+> **⚠️ DEPRECATED**: Environment variables are **NO LONGER** supported for API keys or LLM settings. Use `.archdoc.config.json` instead.
 
-- `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `XAI_API_KEY`: API keys for your chosen LLM provider.
-- `DEFAULT_LLM_PROVIDER`: Default LLM provider.
-- `DEFAULT_LLM_MODEL`: Default LLM model.
+### LangSmith Tracing Only
+
+The **only** environment variables still supported are for LangSmith tracing:
+
 - `LANGCHAIN_TRACING_V2`: Set to `true` to enable LangSmith tracing.
 - `LANGCHAIN_API_KEY`: Your LangSmith API key.
+- `LANGCHAIN_PROJECT`: Your LangSmith project name.
+
+**Recommended**: Configure tracing in `.archdoc.config.json` instead:
+
+```json
+{
+  "tracing": {
+    "enabled": true,
+    "apiKey": "lsv2_pt_...",
+    "project": "my-project"
+  }
+}
+```
 
 ## 🤖 LLM Providers
 
