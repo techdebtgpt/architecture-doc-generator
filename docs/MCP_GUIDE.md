@@ -134,9 +134,29 @@ await client.connect(transport);
 
 ## Available MCP Tools
 
-The ArchDoc MCP server provides 8 specialized tools:
+The ArchDoc MCP server provides 9 specialized tools:
 
-### 1. `generate_documentation`
+### 1. `check_config`
+
+Check if `.archdoc.config.json` exists and is valid. Returns detailed setup instructions if missing or invalid.
+
+**Parameters:**
+
+- `projectPath` (optional): Path to project directory (default: current directory)
+
+**Example prompts:**
+
+- "Check my archdoc configuration"
+- "Is my config valid?"
+- "Show me my archdoc setup"
+
+**Returns:**
+
+- Configuration status (provider, model, API key preview)
+- Validation issues (missing fields, invalid API keys)
+- Setup instructions if config is missing
+
+### 2. `generate_documentation`
 
 Generate comprehensive architecture documentation for the project.
 
@@ -152,7 +172,7 @@ Generate comprehensive architecture documentation for the project.
 - "Create docs in ./docs/architecture folder"
 - "Generate only file structure and dependency analysis"
 
-### 2. `search_codebase`
+### 3. `search_codebase`
 
 Semantic search across codebase with RAG (FREE local embeddings).
 
@@ -167,7 +187,7 @@ Semantic search across codebase with RAG (FREE local embeddings).
 - "Find database connection code"
 - "Show me error handling patterns"
 
-### 3. `analyze_file_structure`
+### 4. `analyze_file_structure`
 
 Analyze project organization and directory structure.
 
@@ -179,7 +199,7 @@ Analyze project organization and directory structure.
 - "Show me the file organization"
 - "What's the project layout?"
 
-### 4. `analyze_dependencies`
+### 5. `analyze_dependencies`
 
 Analyze project dependencies and module relationships.
 
@@ -191,7 +211,7 @@ Analyze project dependencies and module relationships.
 - "Show me the dependency graph"
 - "What packages does this use?"
 
-### 5. `detect_patterns`
+### 6. `detect_patterns`
 
 Detect design patterns and architectural patterns in code.
 
@@ -203,7 +223,7 @@ Detect design patterns and architectural patterns in code.
 - "What patterns are used here?"
 - "Analyze architectural patterns"
 
-### 6. `visualize_flows`
+### 7. `visualize_flows`
 
 Generate control flow and data flow diagrams.
 
@@ -215,7 +235,7 @@ Generate control flow and data flow diagrams.
 - "Show me data flows"
 - "Generate flow diagrams"
 
-### 7. `generate_schemas`
+### 8. `generate_schemas`
 
 Extract and document data models/schemas.
 
@@ -227,7 +247,7 @@ Extract and document data models/schemas.
 - "Show me data models"
 - "Document the API schemas"
 
-### 8. `get_file_contents`
+### 9. `get_file_contents`
 
 Retrieve contents of specific files.
 

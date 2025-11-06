@@ -125,45 +125,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: 'config_init',
-        description: 'Initialize configuration for a project (creates .archdoc.config.json)',
+        name: 'check_config',
+        description:
+          'Check if .archdoc.config.json exists and is valid. Returns setup instructions if missing or invalid.',
         inputSchema: {
           type: 'object',
-          properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project directory',
-            },
-            provider: {
-              type: 'string',
-              enum: ['anthropic', 'openai', 'google', 'xai'],
-              description: 'LLM provider to use (default: anthropic)',
-            },
-            apiKey: {
-              type: 'string',
-              description: 'API key for the LLM provider',
-            },
-            enableTracing: {
-              type: 'boolean',
-              description: 'Enable LangSmith tracing (default: false)',
-            },
-          },
-          required: ['projectPath'],
+          properties: {},
+        },
+      },
+      {
+        name: 'setup_config',
+        description:
+          'Guide user to set up .archdoc.config.json using the interactive wizard. Call this if config is missing or invalid.',
+        inputSchema: {
+          type: 'object',
+          properties: {},
         },
       },
       {
         name: 'generate_documentation',
-        description: 'Generate comprehensive architecture documentation for a project',
+        description: 'Generate comprehensive architecture documentation for the current project',
         inputSchema: {
           type: 'object',
           properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project to analyze',
-            },
             outputDir: {
               type: 'string',
-              description: 'Output directory (default: <project>/.arch-docs)',
+              description: 'Output directory (default: .arch-docs)',
             },
             depth: {
               type: 'string',
@@ -186,7 +173,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Maximum cost budget in dollars (default: 5.0)',
             },
           },
-          required: ['projectPath'],
+          required: [],
         },
       },
       {
@@ -195,10 +182,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project with existing documentation',
-            },
             question: {
               type: 'string',
               description: 'Question to answer from documentation',
@@ -208,7 +191,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: 'Number of relevant sections to retrieve (default: 5)',
             },
           },
-          required: ['projectPath', 'question'],
+          required: ['question'],
         },
       },
       {
@@ -217,10 +200,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project',
-            },
             prompt: {
               type: 'string',
               description:
@@ -228,10 +207,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             existingDocsPath: {
               type: 'string',
-              description: 'Path to existing documentation (default: <project>/.arch-docs)',
+              description: 'Path to existing documentation (default: .arch-docs)',
             },
           },
-          required: ['projectPath', 'prompt'],
+          required: ['prompt'],
         },
       },
       {
@@ -240,17 +219,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project',
-            },
             filePaths: {
               type: 'array',
               items: { type: 'string' },
               description: 'Optional: Specific files to analyze',
             },
           },
-          required: ['projectPath'],
+          required: [],
         },
       },
       {
@@ -259,35 +234,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project',
-            },
             includeDevDeps: {
               type: 'boolean',
               description: 'Include dev dependencies (default: true)',
             },
           },
-          required: ['projectPath'],
+          required: [],
         },
       },
       {
         name: 'get_recommendations',
-        description: 'Get improvement recommendations for a project',
+        description: 'Get improvement recommendations for the project',
         inputSchema: {
           type: 'object',
           properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project',
-            },
             focusArea: {
               type: 'string',
               enum: ['security', 'performance', 'maintainability', 'all'],
               description: 'Focus area for recommendations (default: all)',
             },
           },
-          required: ['projectPath'],
+          required: [],
         },
       },
       {
@@ -296,16 +263,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
-            projectPath: {
-              type: 'string',
-              description: 'Path to the project with existing documentation',
-            },
             filePath: {
               type: 'string',
               description: 'File to validate against architecture',
             },
           },
-          required: ['projectPath', 'filePath'],
+          required: ['filePath'],
         },
       },
     ],
@@ -376,8 +339,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
-      case 'config_init':
-        return await handleConfigInit(args);
+      case 'check_config':
+        return await handleCheckConfig(args);
+
+      case 'setup_config':
+        return await handleSetupConfig(args);
 
       case 'generate_documentation':
         return await handleGenerateDocumentation(args);
@@ -419,41 +385,176 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 /**
- * Tool: config_init
- * Creates .archdoc.config.json with the same structure as CLI config
+ * Tool: check_config
+ * Checks if .archdoc.config.json exists and is valid
  */
-async function handleConfigInit(args: any) {
-  const { projectPath, provider = 'anthropic', apiKey, enableTracing = false } = args;
-
+async function handleCheckConfig(_args: any) {
+  const projectPath = process.cwd(); // Always use current working directory
   const configPath = path.join(projectPath, '.archdoc.config.json');
 
-  // Use same config structure as CLI (see cli/index.ts and .archdoc.config.example.json)
-  const config: any = {
-    llm: {
-      provider,
-      model:
-        provider === 'anthropic'
-          ? 'claude-sonnet-4-20250514'
-          : provider === 'openai'
-            ? 'gpt-4o'
-            : undefined,
-    },
-    apiKeys: {
-      [provider]: apiKey || '',
-    },
-    tracing: {
-      enabled: enableTracing,
-      project: 'archdoc-mcp',
-    },
-  };
+  try {
+    await fs.access(configPath);
 
-  await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    // Read and validate config
+    const configContent = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+
+    let status = '✅ **Configuration Found and Valid**\n\n';
+    const issues: string[] = [];
+    const recommendations: string[] = [];
+
+    // Check required fields
+    if (!config.llm?.provider) {
+      issues.push('❌ Missing `llm.provider` field');
+    } else {
+      status += `**Provider**: ${config.llm.provider}\n`;
+    }
+
+    if (!config.llm?.model) {
+      recommendations.push('⚠️  Consider setting `llm.model` explicitly');
+    } else {
+      status += `**Model**: ${config.llm.model}\n`;
+    }
+
+    if (!config.apiKeys) {
+      issues.push('❌ Missing `apiKeys` object');
+    } else {
+      const provider = config.llm?.provider;
+      if (provider && (!config.apiKeys[provider] || config.apiKeys[provider].length === 0)) {
+        issues.push(`❌ No API key configured for provider "${provider}"`);
+      } else if (provider) {
+        const keyPreview =
+          config.apiKeys[provider].substring(0, 10) + '...' + config.apiKeys[provider].slice(-4);
+        status += `**API Key**: ${keyPreview}\n`;
+      }
+    }
+
+    if (config.tracing?.enabled) {
+      status += `**Tracing**: Enabled (${config.tracing.project || 'N/A'})\n`;
+    }
+
+    status += '\n';
+
+    if (issues.length > 0) {
+      status += '## Issues Found:\n\n' + issues.join('\n') + '\n\n';
+      status += '**Action Required**: Fix these issues in `.archdoc.config.json` or run:\n';
+      status += '```bash\narchdoc-mcp\n```\n';
+    } else {
+      status += '✅ Configuration is ready to use!\n\n';
+      if (recommendations.length > 0) {
+        status += '## Recommendations:\n\n' + recommendations.join('\n') + '\n';
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: status,
+        },
+      ],
+    };
+  } catch (_error) {
+    const helpText = `❌ **No Configuration Found**
+
+**Location**: ${configPath}
+
+**Setup Instructions**:
+
+1. Navigate to your project directory:
+   \`\`\`bash
+   cd ${projectPath}
+   \`\`\`
+
+2. Run the setup wizard:
+   \`\`\`bash
+   archdoc-mcp
+   \`\`\`
+
+   Or use the \`config_init\` tool to create a minimal config.
+
+3. Add your API key to \`.archdoc.config.json\`
+
+**Required Fields**:
+- \`llm.provider\` - LLM provider (anthropic, openai, google, xai)
+- \`llm.model\` - Model to use
+- \`apiKeys.{provider}\` - Your API key
+
+**Example**:
+\`\`\`json
+{
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-20250514"
+  },
+  "apiKeys": {
+    "anthropic": "sk-ant-..."
+  }
+}
+\`\`\``;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: helpText,
+        },
+      ],
+    };
+  }
+}
+
+/**
+ * Tool: setup_config
+ * Guides user to run archdoc-mcp setup wizard
+ */
+async function handleSetupConfig(_args: any) {
+  const projectPath = process.cwd();
+  const configPath = path.join(projectPath, '.archdoc.config.json');
+
+  const instructions = `📋 **ArchDoc Configuration Setup**
+
+To configure ArchDoc, you need to run the interactive setup wizard in a terminal.
+
+**Steps:**
+
+1. Open a terminal in your project directory:
+   \`\`\`
+   ${projectPath}
+   \`\`\`
+
+2. Run the setup wizard:
+   \`\`\`bash
+   npx @techdebtgpt/archdoc-generator mcp-server
+   \`\`\`
+
+   Or if installed globally:
+   \`\`\`bash
+   archdoc-mcp
+   \`\`\`
+
+3. The wizard will prompt you for:
+   - LLM provider (anthropic, openai, google, xai)
+   - API key
+   - LangSmith tracing (optional)
+
+4. Configuration will be saved to:
+   \`${configPath}\`
+
+5. Reload VS Code to apply changes
+
+**Why can't this be done in MCP?**
+- API keys should not be passed through MCP client configuration
+- Interactive prompts provide better UX for setup
+- Configuration is stored securely in \`.archdoc.config.json\`
+
+After setup, use \`check_config\` tool to verify configuration is valid!`;
 
   return {
     content: [
       {
         type: 'text',
-        text: `✅ Configuration created at ${configPath}\n\nNext steps:\n1. Edit .archdoc.config.json and add your API key\n2. Run 'generate_documentation' tool`,
+        text: instructions,
       },
     ],
   };
@@ -463,14 +564,9 @@ async function handleConfigInit(args: any) {
  * Tool: generate_documentation
  */
 async function handleGenerateDocumentation(args: any) {
-  const {
-    projectPath,
-    outputDir,
-    depth = 'normal',
-    focusArea,
-    selectiveAgents,
-    maxCostDollars = 5.0,
-  } = args;
+  const { outputDir, depth = 'normal', focusArea, selectiveAgents, maxCostDollars = 5.0 } = args;
+
+  const projectPath = process.cwd(); // Always use current working directory
 
   logger.info(`Generating documentation for ${projectPath}...`);
 
@@ -538,7 +634,8 @@ async function handleGenerateDocumentation(args: any) {
  * Tool: query_documentation
  */
 async function handleQueryDocumentation(args: any) {
-  const { projectPath, question, topK = 5 } = args;
+  const { question, topK = 5 } = args;
+  const projectPath = process.cwd();
 
   const docsPath = path.join(projectPath, '.arch-docs');
 
@@ -593,7 +690,8 @@ async function handleQueryDocumentation(args: any) {
  * Tool: update_documentation
  */
 async function handleUpdateDocumentation(args: any) {
-  const { projectPath, prompt, existingDocsPath } = args;
+  const { prompt, existingDocsPath } = args;
+  const projectPath = process.cwd();
 
   const docsPath = existingDocsPath || path.join(projectPath, '.arch-docs');
 
@@ -639,8 +737,8 @@ async function handleUpdateDocumentation(args: any) {
 /**
  * Tool: check_architecture_patterns
  */
-async function handleCheckPatterns(args: any) {
-  const { projectPath } = args;
+async function handleCheckPatterns(_args: any) {
+  const projectPath = process.cwd();
 
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
@@ -679,8 +777,8 @@ async function handleCheckPatterns(args: any) {
 /**
  * Tool: analyze_dependencies
  */
-async function handleAnalyzeDependencies(args: any) {
-  const { projectPath } = args;
+async function handleAnalyzeDependencies(_args: any) {
+  const projectPath = process.cwd();
 
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
@@ -720,7 +818,8 @@ async function handleAnalyzeDependencies(args: any) {
  * Tool: get_recommendations
  */
 async function handleGetRecommendations(args: any) {
-  const { projectPath, focusArea = 'all' } = args;
+  const { focusArea = 'all' } = args;
+  const projectPath = process.cwd();
 
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
@@ -765,7 +864,8 @@ async function handleGetRecommendations(args: any) {
  * Tool: validate_architecture
  */
 async function handleValidateArchitecture(args: any) {
-  const { projectPath, filePath } = args;
+  const { filePath } = args;
+  const projectPath = process.cwd();
 
   const docsPath = path.join(projectPath, '.arch-docs');
 
@@ -851,6 +951,42 @@ ${fileContent.substring(0, 3000)}
  */
 async function main() {
   logger.info('Starting ArchDoc MCP Server...');
+
+  // Check if .archdoc.config.json exists in current working directory
+  const projectPath = process.cwd();
+  const configPath = path.join(projectPath, '.archdoc.config.json');
+
+  try {
+    await fs.access(configPath);
+    logger.info(`✅ Found configuration at ${configPath}`);
+
+    // Validate config has required fields
+    const configContent = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+
+    if (!config.apiKeys || !config.llm?.provider) {
+      logger.warn(
+        '⚠️  Configuration incomplete. Please run "archdoc-mcp" to complete setup or add API keys to .archdoc.config.json',
+      );
+    } else {
+      const provider = config.llm.provider;
+      const hasApiKey = config.apiKeys[provider] && config.apiKeys[provider].length > 0;
+
+      if (!hasApiKey) {
+        logger.warn(
+          `⚠️  No API key found for provider "${provider}". Add it to .archdoc.config.json or run "archdoc-mcp" to configure.`,
+        );
+      } else {
+        logger.info(
+          `✅ Configuration valid - Provider: ${provider}, Model: ${config.llm.model || 'default'}`,
+        );
+      }
+    }
+  } catch (_error) {
+    logger.warn(
+      `⚠️  No configuration found at ${configPath}. Run "archdoc-mcp" in your project directory to set up.`,
+    );
+  }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

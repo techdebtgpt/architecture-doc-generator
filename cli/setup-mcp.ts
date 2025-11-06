@@ -91,14 +91,17 @@ async function setupMCP() {
     }
 
     // Use archdoc-server-mcp binary (globally installed or via npm link)
-    // No args needed - MCP server will use process.cwd()
+    // Pass project path as working directory - MCP server will find .archdoc.config.json there
     const mcpConfig = {
       mcpServers: {
         archdoc: {
           command: 'archdoc-server-mcp',
+          args: [],
+          env: {},
+          cwd: projectPath,
+          disabled: false,
           description:
             'ArchDoc MCP Server - AI-powered architecture documentation generator with RAG',
-          disabled: false,
         },
       },
     };
@@ -107,6 +110,33 @@ async function setupMCP() {
 
     console.log(chalk.green('✅ MCP client configuration created!\n'));
     console.log(chalk.dim(`   File: ${mcpConfigPath}\n`));
+    console.log(chalk.yellow('\n⚠️  Important:\n'));
+    console.log(
+      chalk.dim('   The MCP server reads configuration from .archdoc.config.json in your project.'),
+    );
+    console.log(
+      chalk.dim('   Do NOT add provider/model/API key inputs to mcp.json - they are not needed!\n'),
+    );
+  } else {
+    console.log(chalk.yellow('\n⚠️  Existing MCP configuration found.\n'));
+    console.log(
+      chalk.dim('   If you see provider/model prompts in VS Code, replace mcp.json with:\n'),
+    );
+    console.log(
+      chalk.cyan(`
+{
+  "mcpServers": {
+    "archdoc": {
+      "command": "archdoc-server-mcp",
+      "args": [],
+      "env": {},
+      "cwd": "${projectPath}",
+      "disabled": false,
+      "description": "ArchDoc MCP Server - AI-powered architecture documentation generator with RAG"
+    }
+  }
+}\n`),
+    );
   }
 
   // Add .archdoc.config.json to .gitignore
@@ -117,6 +147,34 @@ async function setupMCP() {
       gitignoreContent += '\n# ArchDoc configuration (contains API keys)\n.archdoc.config.json\n';
       fs.writeFileSync(gitignorePath, gitignoreContent, 'utf-8');
       console.log(chalk.green('✅ Added .archdoc.config.json to .gitignore\n'));
+    }
+  }
+
+  // Check if existing mcp.json has incorrect inputs configuration
+  if (fs.existsSync(mcpConfigPath)) {
+    try {
+      const existingMcpConfig = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf-8'));
+      const archdocServer =
+        existingMcpConfig.mcpServers?.archdoc || existingMcpConfig.servers?.archdoc;
+
+      if (
+        archdocServer &&
+        (existingMcpConfig.inputs ||
+          archdocServer.args?.some((arg: string) => arg.includes('${input:')))
+      ) {
+        console.log(chalk.bold.red('\n⚠️  WARNING: Incorrect MCP Configuration Detected!\n'));
+        console.log(chalk.yellow('Your mcp.json has input prompts for provider/model/API keys.'));
+        console.log(
+          chalk.yellow('This is incorrect - the MCP server reads from .archdoc.config.json!\n'),
+        );
+        console.log(
+          chalk.cyan(
+            'Please replace your .vscode/mcp.json with the correct configuration shown above.\n',
+          ),
+        );
+      }
+    } catch (_error) {
+      // Ignore parsing errors
     }
   }
 
