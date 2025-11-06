@@ -205,24 +205,8 @@ export async function analyzeProject(
     }
 
     // Load config file BEFORE registering agents (agents need LLMService with config)
-    let userConfig: any = {};
-    try {
-      const configPath = path.join(process.cwd(), '.archdoc.config.json');
-      const configContent = await fs.readFile(configPath, 'utf-8');
-      userConfig = JSON.parse(configContent);
-
-      // Initialize LLMService with config BEFORE agents are constructed
-      const { LLMService } = await import('../../src/llm/llm-service');
-      LLMService.getInstance(userConfig);
-
-      if (options.verbose) {
-        console.log(chalk.blue('\n📄 Config loaded from: ' + configPath));
-      }
-    } catch (_error) {
-      if (options.verbose) {
-        console.log(chalk.yellow('\n⚠️  No config file found, using defaults'));
-      }
-    }
+    const { loadUserConfig } = await import('../utils/config-loader');
+    const userConfig = await loadUserConfig(options.verbose);
 
     // Register all agents (after LLMService is initialized with config)
     const agentRegistry = registerAgents(spinner);
@@ -537,14 +521,42 @@ async function generateC4Model(projectPath?: string, options: AnalyzeOptions = {
     // Initialize scanner
     const scanner = createScanner();
 
-    // Register all agents
+    // Load config file for C4 orchestrator
+    const { loadUserConfig } = await import('../utils/config-loader');
+    const userConfig = await loadUserConfig(options.verbose);
+
+    // Register all agents (after LLMService is initialized with config)
     const agentRegistry = registerAgents(spinner);
 
     spinner.start('Initializing C4 model orchestrator...');
-    const orchestrator = new C4ModelOrchestrator(agentRegistry, scanner);
+    const orchestrator = new C4ModelOrchestrator(agentRegistry, scanner, userConfig);
+
+    // Extract search mode from config (same as regular analyze command)
+    const configSearchMode = userConfig.searchMode?.mode;
+    const searchMode = options.searchMode || configSearchMode || 'keyword'; // Default to keyword for C4
+    const embeddingsProvider =
+      searchMode === 'vector'
+        ? (userConfig.searchMode?.embeddingsProvider as 'local' | 'openai' | 'google' | undefined)
+        : undefined;
+
+    if (options.verbose) {
+      console.log(chalk.blue(`\n🔍 Search mode: ${searchMode}`));
+      if (embeddingsProvider) {
+        console.log(chalk.blue(`   Embeddings provider: ${embeddingsProvider}`));
+      }
+    }
+
+    // Prepare options with searchMode in agentOptions
+    const orchestratorOptions = {
+      ...options,
+      agentOptions: {
+        searchMode, // Pass search mode to agents
+      },
+      embeddingsProvider, // Pass embeddings provider for vector store initialization
+    };
 
     spinner.text = 'Generating C4 model...\n';
-    const result = await orchestrator.generateC4Model(resolvedPath, options);
+    const result = await orchestrator.generateC4Model(resolvedPath, orchestratorOptions);
 
     spinner.succeed('C4 Model generation completed!');
 

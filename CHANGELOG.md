@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accessible via CLI: `archdoc analyze --c4`
   - Programmatic API: `C4ModelOrchestrator` class
   - Output includes: `c4-model.json`, `context.puml`, `containers.puml`, `components.puml`
+  - **NEW**: Full feature parity with `DocumentationOrchestrator`:
+    - 🔍 **Vector Search**: In-memory vector store with local/OpenAI/Google embeddings
+    - 📊 **Dependency Graph**: Automatic import and module analysis
+    - 💰 **Cost Tracking**: Real-time token and cost monitoring with `maxCostDollars` budget limit
+    - ⚡ **LangSmith Tracing**: Custom run names with variable substitution (`{timestamp}`, `{agent}`, `{project}`)
+    - 🎯 **Agent Skip Logic**: `canExecute()` check to skip agents with no relevant data
+    - 📈 **Orchestrator Token Tracking**: Separate tracking for agent vs orchestrator LLM usage
+    - 🔧 **Iterative Refinement**: Configurable max iterations, clarity threshold, and improvement tracking
+    - 📝 **Enhanced Logging**: Detailed file scanning, dependency analysis, and agent execution logs
 
 - **Base Orchestrator Architecture**: Introduced `BaseOrchestrator` abstract class
   - Provides common functionality for all orchestrator types

@@ -310,55 +310,203 @@ ${plantUML}
   }
 
   private async writeRecommendationsFile(output: C4ModelOutput, outputDir: string): Promise<void> {
+    const recommendations: string[] = [];
+
+    // Analyze Context level
+    if (output.c4Model?.context) {
+      const actors = output.c4Model.context.actors || [];
+      const externalSystems = output.c4Model.context.externalSystems || [];
+
+      if (actors.length === 0) {
+        recommendations.push(
+          '⚠️ **No User Actors Identified**: Consider defining specific user personas/roles who interact with the system for better requirements tracking.',
+        );
+      }
+
+      if (externalSystems.length > 5) {
+        recommendations.push(
+          `⚠️ **High External Dependencies** (${externalSystems.length} systems): Review if all external integrations are necessary. Consider API gateways or adapter patterns to reduce coupling.`,
+        );
+      }
+
+      if (externalSystems.length === 0) {
+        recommendations.push(
+          '⚠️ **No External Systems**: Most production systems depend on databases, caches, or third-party APIs. Verify if all dependencies are captured.',
+        );
+      }
+    }
+
+    // Analyze Containers level
+    if (output.c4Model?.containers) {
+      const containersData = output.c4Model.containers;
+      // Handle both array and object with containers property
+      let containers: any[] = [];
+      if (Array.isArray(containersData)) {
+        containers = containersData;
+      } else if (
+        containersData &&
+        typeof containersData === 'object' &&
+        'containers' in containersData
+      ) {
+        containers = containersData.containers || [];
+      }
+
+      if (containers.length === 0) {
+        recommendations.push(
+          '⚠️ **No Containers Defined**: Unable to identify deployable units. Add Dockerfile/docker-compose or document deployment architecture.',
+        );
+      } else if (containers.length === 1) {
+        recommendations.push(
+          `ℹ️ **Monolithic Architecture**: Single container deployment detected. Consider microservices if: 1) Team size > 10, 2) Different scaling needs per module, 3) Independent deployment required.`,
+        );
+      } else if (containers.length > 10) {
+        recommendations.push(
+          `⚠️ **High Container Count** (${containers.length} containers): May indicate over-fragmentation. Consider consolidating related services or using modular monolith pattern.`,
+        );
+      }
+
+      // Check for missing database containers
+      const hasDatabase = containers.some(
+        (c: any) =>
+          c.name.toLowerCase().includes('database') ||
+          c.name.toLowerCase().includes('db') ||
+          c.technology?.toLowerCase().includes('postgres') ||
+          c.technology?.toLowerCase().includes('mysql') ||
+          c.technology?.toLowerCase().includes('mongo'),
+      );
+
+      if (!hasDatabase && output.c4Model.context?.externalSystems?.length > 0) {
+        recommendations.push(
+          'ℹ️ **Database Container Missing**: If using a database, consider documenting it as a container with specific technology (PostgreSQL, MongoDB, etc.).',
+        );
+      }
+    }
+
+    // Analyze Components level
+    if (output.c4Model?.components) {
+      const componentsData = output.c4Model.components;
+      // Handle both array and object with components property
+      let components: any[] = [];
+      if (Array.isArray(componentsData)) {
+        components = componentsData;
+      } else if (
+        componentsData &&
+        typeof componentsData === 'object' &&
+        'components' in componentsData
+      ) {
+        components = componentsData.components || [];
+      }
+
+      if (components.length === 0) {
+        recommendations.push(
+          '⚠️ **No Internal Components**: Unable to identify internal architecture. Ensure key modules/services are documented.',
+        );
+      } else if (components.length < 3) {
+        recommendations.push(
+          `ℹ️ **Limited Component Detail** (${components.length} components): Consider breaking down into more granular components (Controllers, Services, Repositories) for better understanding.`,
+        );
+      } else if (components.length > 20) {
+        recommendations.push(
+          `⚠️ **High Component Complexity** (${components.length} components): Large number of components may indicate lack of module boundaries. Consider grouping related components into bounded contexts.`,
+        );
+      }
+
+      // Check for layering patterns
+      const hasController = components.some((c: any) =>
+        c.name.toLowerCase().includes('controller'),
+      );
+      const hasService = components.some((c: any) => c.name.toLowerCase().includes('service'));
+      const hasRepository = components.some((c: any) =>
+        c.name.toLowerCase().includes('repository'),
+      );
+
+      if (hasController && hasService && hasRepository) {
+        recommendations.push(
+          '✅ **Layered Architecture Detected**: Controller → Service → Repository pattern provides good separation of concerns.',
+        );
+      } else if (components.length > 5) {
+        recommendations.push(
+          'ℹ️ **Consider Layered Architecture**: Adopt Controller/Service/Repository pattern for clear separation between presentation, business logic, and data access.',
+        );
+      }
+    }
+
+    // Agent-specific recommendations
+    const patternAgent = output.agentResults?.get('pattern-detector');
+    if (patternAgent?.markdown) {
+      const markdown = patternAgent.markdown.toLowerCase();
+      if (markdown.includes('singleton') && markdown.includes('not recommended')) {
+        recommendations.push(
+          '⚠️ **Singleton Pattern Concerns**: Excessive singleton usage detected. Consider dependency injection for better testability.',
+        );
+      }
+      if (!markdown.includes('factory') && !markdown.includes('strategy')) {
+        recommendations.push(
+          'ℹ️ **Design Pattern Opportunities**: Consider Factory or Strategy patterns to improve code flexibility and extensibility.',
+        );
+      }
+    }
+
+    const securityAgent = output.agentResults?.get('security-analyzer');
+    if (securityAgent?.markdown) {
+      const securityIssues = (securityAgent.markdown.match(/vulnerability|security|risk/gi) || [])
+        .length;
+      if (securityIssues > 5) {
+        recommendations.push(
+          `⚠️ **Security Review Needed**: ${securityIssues} security-related items identified. Prioritize addressing authentication, authorization, and data protection.`,
+        );
+      }
+    }
+
+    // Build final content
     const content = `# Architecture Recommendations
 
 ## Overview
 
-Based on the C4 model analysis, here are recommendations for improving your architecture.
+Based on the C4 model analysis of **${output.c4Model?.context?.system?.name || 'this system'}**, here are specific recommendations for improving the architecture.
 
-## Key Recommendations
+## Analysis Summary
 
-### 1. Documentation
+- **Context Level**: ${output.c4Model?.context?.actors?.length || 0} actors, ${output.c4Model?.context?.externalSystems?.length || 0} external systems
+- **Containers Level**: ${output.c4Model?.containers?.length || 0} deployable units
+- **Components Level**: ${output.c4Model?.components?.length || 0} internal components
 
-- ✅ **Complete**: C4 model generated successfully
-- 💡 **Suggestion**: Keep diagrams updated as architecture evolves
-- 💡 **Suggestion**: Consider adding ADRs (Architecture Decision Records)
+## Recommendations
 
-### 2. Architecture Patterns
+${recommendations.length > 0 ? recommendations.map((r, i) => `### ${i + 1}. ${r}\n`).join('\n') : '✅ **No Critical Issues Detected**: Architecture model looks well-structured. Continue monitoring as system evolves.\n'}
 
-${
-  output.agentResults?.has('pattern-detector')
-    ? `Detected patterns: ${output.agentResults.get('pattern-detector')?.summary || 'See pattern analysis'}`
-    : '- Review the architecture for common design patterns'
-}
+## General Best Practices
 
-### 3. Dependencies
+### Documentation Maintenance
+- 📝 Update C4 diagrams whenever architecture changes significantly
+- 📖 Document architectural decisions using ADRs (Architecture Decision Records)
+- 🔄 Review diagrams quarterly to ensure accuracy
 
-${
-  output.agentResults?.has('dependency-analyzer')
-    ? `Dependency analysis: ${output.agentResults.get('dependency-analyzer')?.summary || 'See dependency analysis'}`
-    : '- Analyze external dependencies and their impact'
-}
+### Monitoring & Observability
+- 📊 Add observability for all external system integrations
+- ⏱️ Track latency and error rates per container
+- 📈 Monitor resource usage (CPU, memory, network) per deployment unit
 
-### 4. Security
+### Security & Compliance
+- 🔐 Implement authentication/authorization at system boundaries
+- 🔒 Encrypt sensitive data in transit and at rest
+- 🛡️ Regular security audits of external dependencies
 
-${
-  output.agentResults?.has('security-analyzer')
-    ? `Security findings: ${output.agentResults.get('security-analyzer')?.summary || 'See security analysis'}`
-    : '- Conduct security review of architecture decisions'
-}
+### Scalability Planning
+- 📈 Identify bottlenecks in high-traffic components
+- ⚖️ Plan horizontal scaling strategies for stateless services
+- 💾 Consider caching for frequently accessed data
 
 ## Next Steps
 
-1. Review each C4 diagram level for accuracy
-2. Validate component boundaries and responsibilities
-3. Document key architecture decisions
-4. Plan for scalability and maintainability
-5. Establish architecture governance processes
+1. ✅ Review each recommendation above and assess applicability
+2. 🎯 Prioritize recommendations based on business impact
+3. 📋 Create action items for high-priority improvements
+4. 🔄 Revisit architecture quarterly as system evolves
 
 ---
 
-*Last updated: ${new Date().toLocaleString()}*
+*Generated: ${new Date().toLocaleString()}* | *Based on C4 Model Analysis*
 
 [← Back to Index](./index.md)
 `;
