@@ -1,12 +1,7 @@
 # 🏗️ ArchDoc Generator
 
 [![npm version](https://img.shields.io/npm/v/@techdebtgpt/archdoc-generator.svg)](https://www.npmjs.com/package/@techdebtgpt/archdoc-generator)
-[![MCP Server](https://img.shields.io/badge/MCP-S---
-
-## 🔧 CLI Usage
-
-### Available Commands-blueviolet.svg)](docs/MCP_GUIDE.md)
-
+[![MCP Server](https://img.shields.io/badge/MCP-Server-blueviolet.svg)](docs/MCP_GUIDE.md)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
