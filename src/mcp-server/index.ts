@@ -103,6 +103,21 @@ async function initializeDocumentationVectorStore(docsPath: string) {
 }
 
 /**
+ * Helper function to initialize config and LLM service
+ * Centralizes config loading and LLM initialization across all handlers
+ */
+async function initializeConfigAndLLM(projectPath: string) {
+  // Load config from the target project and apply to environment
+  const config = loadArchDocConfig(projectPath, true) || {};
+
+  // Initialize LLMService with config BEFORE creating agents
+  const { LLMService } = await import('../llm/llm-service');
+  LLMService.getInstance(config);
+
+  return config;
+}
+
+/**
  * MCP Server instance
  */
 const server = new Server(
@@ -747,8 +762,8 @@ async function handleGenerateDocumentation(args: any) {
 
   logger.info(`Generating documentation for ${projectPath}...`);
 
-  // Load config from the target project
-  const config = loadArchDocConfig(projectPath, false); // Don't apply to env
+  // Initialize config and LLM service
+  const config = await initializeConfigAndLLM(projectPath);
 
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
@@ -874,9 +889,12 @@ async function handleUpdateDocumentation(args: any) {
 
   logger.info(`Updating documentation with prompt: "${prompt}"`);
 
+  // Initialize config and LLM service
+  const config = await initializeConfigAndLLM(projectPath);
+
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
-  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
+  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, config);
 
   const output = await orchestrator.generateDocumentation(projectPath, {
     userPrompt: prompt,
@@ -917,9 +935,12 @@ async function handleUpdateDocumentation(args: any) {
 async function handleCheckPatterns(_args: any) {
   const projectPath = process.cwd();
 
+  // Initialize config and LLM service
+  const config = await initializeConfigAndLLM(projectPath);
+
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
-  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
+  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, config);
 
   const output = await orchestrator.generateDocumentation(projectPath, {
     selectiveAgents: ['pattern-detector'],
@@ -957,9 +978,12 @@ async function handleCheckPatterns(_args: any) {
 async function handleAnalyzeDependencies(_args: any) {
   const projectPath = process.cwd();
 
+  // Initialize config and LLM service
+  const config = await initializeConfigAndLLM(projectPath);
+
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
-  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
+  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, config);
 
   const output = await orchestrator.generateDocumentation(projectPath, {
     selectiveAgents: ['dependency-analyzer'],
@@ -998,9 +1022,12 @@ async function handleGetRecommendations(args: any) {
   const { focusArea = 'all' } = args;
   const projectPath = process.cwd();
 
+  // Initialize config and LLM service
+  const config = await initializeConfigAndLLM(projectPath);
+
   const agentRegistry = new AgentRegistry();
   const scanner = new FileSystemScanner();
-  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner);
+  const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, config);
 
   const prompt =
     focusArea === 'all'
@@ -1046,55 +1073,85 @@ async function handleValidateArchitecture(args: any) {
 
   const docsPath = path.join(projectPath, '.arch-docs');
 
-  // Load existing documentation
-  const architectureFile = path.join(docsPath, 'architecture.md');
-  const patternsFile = path.join(docsPath, 'patterns.md');
-
-  let architectureDoc = '';
-  let patternsDoc = '';
-
-  try {
-    architectureDoc = await fs.readFile(architectureFile, 'utf-8');
-  } catch {
-    // File not found
-  }
-
-  try {
-    patternsDoc = await fs.readFile(patternsFile, 'utf-8');
-  } catch {
-    // File not found
-  }
-
-  if (!architectureDoc && !patternsDoc) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: '⚠️ No architecture documentation found. Run "generate_documentation" first.',
-        },
-      ],
-    };
+  // Initialize vector store if not already loaded
+  if (!documentationVectorStore) {
+    await initializeDocumentationVectorStore(docsPath);
   }
 
   // Read the file to validate
   const fileContent = await fs.readFile(filePath, 'utf-8');
 
+  let relevantDocs = '';
+
+  if (documentationVectorStore) {
+    // Use vector search to find relevant architecture documentation
+    // Create a query based on the file content to find relevant patterns
+    const query = `architecture patterns for ${path.basename(filePath)} file validation`;
+    const results = await documentationVectorStore.query(query, 10);
+
+    if (results.length > 0) {
+      relevantDocs = results
+        .map((r) => `### ${r.file}\n\n${r.content}`)
+        .join('\n\n---\n\n');
+    }
+  }
+
+  // Fallback: Load all architecture docs if vector store failed
+  if (!relevantDocs) {
+    logger.info('Vector store not available, loading all architecture docs');
+
+    const architectureFile = path.join(docsPath, 'architecture.md');
+    const patternsFile = path.join(docsPath, 'patterns.md');
+
+    let architectureDoc = '';
+    let patternsDoc = '';
+
+    try {
+      architectureDoc = await fs.readFile(architectureFile, 'utf-8');
+    } catch {
+      // File not found
+    }
+
+    try {
+      patternsDoc = await fs.readFile(patternsFile, 'utf-8');
+    } catch {
+      // File not found
+    }
+
+    if (!architectureDoc && !patternsDoc) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '⚠️ No architecture documentation found. Run "generate_documentation" first.',
+          },
+        ],
+      };
+    }
+
+    // Load FULL documentation (no truncation)
+    relevantDocs = '';
+    if (architectureDoc) {
+      relevantDocs += `### architecture.md\n\n${architectureDoc}\n\n---\n\n`;
+    }
+    if (patternsDoc) {
+      relevantDocs += `### patterns.md\n\n${patternsDoc}`;
+    }
+  }
+
   // Use LLM to validate
   const { LLMService } = await import('../llm/llm-service');
   const llmService = LLMService.getInstance();
-  const model = llmService.getChatModel({ temperature: 0.2, maxTokens: 2048 });
+  const model = llmService.getChatModel({ temperature: 0.2, maxTokens: 4096 });
 
   const prompt = `You are validating if code follows documented architecture patterns.
 
-**Architecture Documentation**:
-${architectureDoc.substring(0, 2000)}
-
-**Patterns Documentation**:
-${patternsDoc.substring(0, 2000)}
+**Relevant Architecture Documentation**:
+${relevantDocs}
 
 **File to Validate**: ${path.basename(filePath)}
 \`\`\`
-${fileContent.substring(0, 3000)}
+${fileContent}
 \`\`\`
 
 **Task**: Validate if this file follows the documented architecture patterns.
