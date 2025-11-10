@@ -101,17 +101,42 @@ For complete CLI options and advanced usage, see [CLI Usage](#-cli-usage) sectio
 
 ---
 
-## 🔄 MCP Integration (Coming Soon)
+## 🔄 MCP Integration
 
-**Model Context Protocol (MCP) support is planned for a future release.**
+**Model Context Protocol (MCP)** allows AI assistants to access ArchDoc tools directly. Use ArchDoc in:
+- **Cursor** - AI code editor
+- **Claude Code** - Claude's code tool
+- **VS Code** + GitHub Copilot
+- **Claude Desktop** - Claude's desktop application
 
-MCP will allow AI assistants like VS Code Claude and Cursor to directly interact with ArchDoc for:
-- Generating architecture documentation
-- Querying docs with RAG-powered semantic search
-- Analyzing dependencies and patterns
-- Validating code against architecture
+### Quick Setup
 
-In the meantime, you can use the powerful **CLI** for all architecture documentation needs.
+```bash
+# Configure ArchDoc
+archdoc config --init
+
+# Set up for your client (choose one)
+archdoc setup-mcp cursor          # For Cursor
+archdoc setup-mcp claude-code     # For Claude Code
+archdoc setup-mcp vscode          # For VS Code + Copilot
+archdoc setup-mcp claude-desktop  # For Claude Desktop
+
+# Restart your AI client and start using ArchDoc!
+```
+
+### Example Uses
+
+```
+"Use archdoc to generate documentation for this project"
+
+"Query the architecture: What authentication system is used?"
+
+"Analyze dependencies and get recommendations"
+
+"Check if this file follows our architecture"
+```
+
+**👉 See [docs/MCP-SETUP.md](./docs/MCP-SETUP.md) for detailed setup instructions and advanced features.**
 
 ---
 
@@ -151,14 +176,15 @@ Also see: [Vector Search Guide](./docs/VECTOR_SEARCH.md) - Complete guide to vec
 
 #### Available Commands
 
-| Command                 | Description                          | Example                                   |
-| ----------------------- | ------------------------------------ | ----------------------------------------- |
-| `archdoc help`          | Show comprehensive help              | `archdoc help`                            |
-| `archdoc analyze`       | Generate comprehensive documentation | `archdoc analyze /path/to/project`        |
-| `archdoc analyze --c4`  | Generate C4 architecture model       | `archdoc analyze --c4`                    |
-| `archdoc config --init` | Interactive configuration setup      | `archdoc config --init`                   |
-| `archdoc config --list` | Show current configuration           | `archdoc config --list`                   |
-| `archdoc export`        | Export docs to different formats     | `archdoc export .arch-docs --format html` |
+| Command                    | Description                          | Example                                   |
+| -------------------------- | ------------------------------------ | ----------------------------------------- |
+| `archdoc help`             | Show comprehensive help              | `archdoc help`                            |
+| `archdoc analyze`          | Generate comprehensive documentation | `archdoc analyze /path/to/project`        |
+| `archdoc analyze --c4`     | Generate C4 architecture model       | `archdoc analyze --c4`                    |
+| `archdoc config --init`    | Interactive configuration setup      | `archdoc config --init`                   |
+| `archdoc config --list`    | Show current configuration           | `archdoc config --list`                   |
+| `archdoc export`           | Export docs to different formats     | `archdoc export .arch-docs --format html` |
+| `archdoc setup-mcp <client>` | Set up MCP for AI client         | `archdoc setup-mcp cursor`                |
 
 > 💡 **Tip**: Run `archdoc help` for a comprehensive guide with examples, configuration options, and common workflows.
 

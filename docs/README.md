@@ -6,10 +6,10 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 
 ### 📖 Getting Started
 
-- [**Installation Guide**](./INSTALLATION.md): Step-by-step guide for installing and setting up ArchDoc in your project.
 - [**User Guide**](./USER_GUIDE.md): Detailed instructions on how to use the CLI, including all commands, options, and configuration.
 - [**Configuration Guide**](./CONFIGURATION_GUIDE.md): A complete reference for all configuration options available in `.archdoc.config.json` and environment variables.
 - [**Quick Config Reference**](./QUICK_CONFIG_REFERENCE.md): A cheat sheet for quick access to the most common configuration settings.
+- [**Installation Legacy**](./INSTALLATION_LEGACY.md): ⚠️ Archived installation guide (for reference only).
 
 ### 🔍 Vector Search & Performance
 
@@ -18,7 +18,7 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 
 ### 🤖 MCP Server (Model Context Protocol)
 
-- [**🔥 MCP Guide**](./MCP_GUIDE.md): ⭐ **Complete guide to using ArchDoc as an MCP server** with Claude Desktop or other MCP clients. Covers setup, configuration, 8 available tools, RAG vector search, troubleshooting, and advanced topics.
+- [**🔥 MCP Setup Guide**](./MCP-SETUP.md): ⭐ **Complete guide to setting up ArchDoc MCP server** with Cursor, Claude Code, VS Code, and Claude Desktop. Covers quick setup, 9 available tools, RAG vector search, troubleshooting, security, and FAQ.
 
 ### 🔧 Integration & Development
 
