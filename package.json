@@ -5,9 +5,7 @@
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
   "bin": {
-    "archdoc": "./dist/cli/index.js",
-    "archdoc-mcp-server": "./dist/src/mcp-server/index.js",
-    "archdoc-generate-mcp": "./dist/cli/generate-mcp-json.js"
+    "archdoc": "./dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

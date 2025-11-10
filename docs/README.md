@@ -6,6 +6,7 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 
 ### 📖 Getting Started
 
+- [**Installation Guide**](./INSTALLATION.md): Step-by-step guide for installing and setting up ArchDoc in your project.
 - [**User Guide**](./USER_GUIDE.md): Detailed instructions on how to use the CLI, including all commands, options, and configuration.
 - [**Configuration Guide**](./CONFIGURATION_GUIDE.md): A complete reference for all configuration options available in `.archdoc.config.json` and environment variables.
 - [**Quick Config Reference**](./QUICK_CONFIG_REFERENCE.md): A cheat sheet for quick access to the most common configuration settings.
@@ -28,6 +29,10 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 - [**Custom Languages**](./CUSTOM_LANGUAGES.md): Add support for any programming language via configuration (no code changes needed).
 - [**Contributing Guide**](./CONTRIBUTING.md): Guidelines for developers who want to contribute to the project, including setup, coding standards, and pull request processes.
 - [**CI/CD**](./CI_CD.md): Information on the continuous integration and deployment setup for this project.
+
+### 🚀 Roadmap & Future Plans
+
+- [**📋 Product Roadmap**](./ROADMAP.md): Comprehensive roadmap with planned features, AI/LLM cost optimization research, and quarterly timeline for 2026.
 
 ## 🚀 Getting Started
 

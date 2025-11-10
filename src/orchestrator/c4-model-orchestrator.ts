@@ -590,7 +590,7 @@ export class C4ModelOrchestrator {
           continue;
         }
 
-        this.logger.info(`🤖 ${agentName}`);
+        this.logger.info(`   🤖 ${agentName}`);
 
         // Create agent context
         const context: AgentContext = {
@@ -817,6 +817,7 @@ ${sampleFiles}
 2. List REAL actors based on API endpoints, authentication, user roles in code
 3. List ACTUAL external systems from imports, API calls, database connections
 4. Define SPECIFIC relationships based on actual code patterns
+5. **CRITICAL**: DEDUPLICATE all findings. If the same actor, external system, or relationship appears multiple times in the analysis above (perhaps with slight variations), consolidate them into a SINGLE entry. Do not list duplicates.
 
 **JSON Output Format:**
 {
@@ -975,6 +976,11 @@ ${compiledInsights.substring(0, 10000)}
 **Sample Files:**
 ${sampleFiles}
 
+**Instructions:**
+1. Extract ACTUAL deployment units and technologies from the code analysis
+2. Identify REAL containers from Dockerfiles, package.json, imports
+3. **CRITICAL**: DEDUPLICATE all findings. If the same container or relationship appears multiple times in the analysis above (perhaps with slight variations), consolidate them into a SINGLE entry. Do not list duplicates.
+
 **JSON Output Format:**
 {
   "containers": [
@@ -1124,6 +1130,11 @@ Also define relationships between components (uses, depends on, calls, etc.)
 
 **C4 Containers (from Level 2):**
 ${c4Containers ? JSON.stringify(c4Containers, null, 2).substring(0, 1000) : 'Not available'}
+
+**Instructions:**
+1. Extract ACTUAL component names from class names, modules, and file structure
+2. Identify REAL design patterns and architectural layers from code
+3. **CRITICAL**: DEDUPLICATE all findings. If the same component or relationship appears multiple times in the analysis above (perhaps with slight variations), consolidate them into a SINGLE entry. Do not list duplicates.
 
 **JSON Output Format (Focus on ONE primary container):**
 {

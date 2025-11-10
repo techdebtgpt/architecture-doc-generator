@@ -1,7 +1,6 @@
 # 🏗️ ArchDoc Generator
 
 [![npm version](https://img.shields.io/npm/v/@techdebtgpt/archdoc-generator.svg)](https://www.npmjs.com/package/@techdebtgpt/archdoc-generator)
-[![MCP Server](https://img.shields.io/badge/MCP-Server-blueviolet.svg)](docs/MCP_GUIDE.md)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
@@ -10,8 +9,8 @@
 [![Website](https://img.shields.io/badge/Website-techdebtgpt.com-blue)](https://techdebtgpt.com)
 [![GitHub stars](https://img.shields.io/github/stars/techdebtgpt/architecture-doc-generator)](https://github.com/techdebtgpt/architecture-doc-generator)
 
-> 🤖 **AI-powered architecture documentation generator with MCP Server support**
-> Use as CLI tool OR integrate with Claude Desktop/GitHub Copilot via Model Context Protocol
+> 🤖 **AI-powered architecture documentation generator**
+> Powerful CLI tool for generating comprehensive architecture documentation automatically
 
 ArchDoc Generator is an intelligent tool that analyzes your codebase and generates comprehensive, accurate architectural documentation automatically. It supports **any programming language** and uses AI-powered agents to understand your project structure, dependencies, patterns, security, and data flows.
 
@@ -19,7 +18,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 - [Features](#-features)
 - [Quick Start](#-quick-start)
-- [🔥 MCP Server - Use with AI Assistants](#-mcp-server---use-with-ai-assistants-new)
+- [MCP Integration](#-mcp-integration-coming-soon)
 - [Search Strategy Performance](#-search-strategy-performance)
 - [CLI Usage](#-cli-usage)
 - [Programmatic Usage](#-programmatic-usage)
@@ -28,6 +27,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - [Available Agents](#-available-agents)
 - [Architecture Highlights](#️-architecture-highlights)
 - [Supported Languages](#-supported-languages)
+- [Future Work & Roadmap](#-future-work--roadmap)
 - [Common Questions](#-common-questions)
 - [Contributing](#-contributing)
 - [License](#-license)
@@ -37,9 +37,8 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 ## ✨ Features
 
 - 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
-- � **MCP Server Integration** (NEW!): Use with GitHub Copilot, Claude Desktop, or any MCP client for real-time architecture guidance. [See MCP Guide →](docs/MCP_SERVER_GUIDE.md)
 - 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings.
-- �📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
+- 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
 - 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
 - ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
@@ -102,87 +101,17 @@ For complete CLI options and advanced usage, see [CLI Usage](#-cli-usage) sectio
 
 ---
 
-## 🔥 MCP Server - Use with AI Assistants (NEW!)
+## 🔄 MCP Integration (Coming Soon)
 
-**ArchDoc now provides an MCP (Model Context Protocol) server** that integrates with AI assistants like Claude Desktop, GitHub Copilot (when supported), and other MCP-compatible clients.
+**Model Context Protocol (MCP) support is planned for a future release.**
 
-### 🚀 Quick MCP Setup
+MCP will allow AI assistants like VS Code Claude and Cursor to directly interact with ArchDoc for:
+- Generating architecture documentation
+- Querying docs with RAG-powered semantic search
+- Analyzing dependencies and patterns
+- Validating code against architecture
 
-```bash
-# 1. Install globally
-npm install -g @techdebtgpt/archdoc-generator
-
-# 2. Create minimal MCP config in your project
-cd /path/to/your/project
-mkdir -p .vscode
-cat > .vscode/mcp.json << 'EOF'
-{
-  "servers": {
-    "archdoc": {
-      "command": "archdoc-server-mcp",
-      "cwd": "${workspaceFolder}"
-    }
-  }
-}
-EOF
-
-# 3. Reload VS Code and configure via UI
-# Use: @archdoc setup config
-```
-
-**⚠️ IMPORTANT**: Do NOT use VS Code's "Add MCP Server" UI - it auto-generates incorrect configuration with args/env/inputs that break the UI-driven setup flow. Always create the config manually as shown above.
-
-The UI setup provides:
-
-- ✅ Provider dropdown (Anthropic/OpenAI/Google/xAI)
-- ✅ Model dropdown (15+ models)
-- ✅ API key input
-- ✅ Search mode selection (keyword/vector)
-- ✅ Embeddings provider (local/openai/google)
-- ✅ Retrieval strategy (smart/vector/graph/hybrid)
-- ✅ Optional LangSmith tracing
-
-### 🤖 What You Can Do with MCP
-
-Once configured, ask your AI assistant:
-
-- **"Generate architecture documentation for this project"** - Full docs generation
-- **"Search for authentication logic"** - RAG-powered semantic search (FREE local embeddings)
-- **"Analyze the dependency graph"** - Dependency analysis
-- **"What design patterns are used?"** - Pattern detection
-- **"Show me the data models"** - Schema extraction
-- **"Visualize control flows"** - Flow diagrams
-- **"Analyze security vulnerabilities"** - Security review
-
-### 📱 Supported MCP Clients
-
-| Client              | Status           | Configuration                                                    |
-| ------------------- | ---------------- | ---------------------------------------------------------------- |
-| **Claude Desktop**  | ✅ Available Now | [See MCP Guide](docs/MCP_GUIDE.md#claude-desktop--available-now) |
-| **VS Code/Copilot** | 🔜 Coming Soon   | Auto-discovers `.vscode/mcp.json`                                |
-| **Custom Clients**  | ✅ MCP SDK       | [See MCP Guide](docs/MCP_GUIDE.md#other-mcp-clients)             |
-
-### 🔍 FREE Local Vector Search
-
-The MCP server includes **built-in semantic search** with **FREE local TF-IDF embeddings**:
-
-- ❌ **No OpenAI API key required** for vector search
-- ⚡ **Fast** - Local processing, no network calls
-- 🎯 **Accurate** - Optimized for code analysis
-- 💰 **Cost-effective** - Zero cost for embeddings
-
-### 📚 Complete MCP Documentation
-
-**➡️ [Read the Full MCP Guide](docs/MCP_GUIDE.md)**
-
-The guide covers:
-
-- Complete installation steps
-- Client-specific configuration (Claude Desktop, VS Code, custom)
-- All 8 available MCP tools
-- RAG vector search details
-- Troubleshooting and FAQ
-- Advanced configuration
+In the meantime, you can use the powerful **CLI** for all architecture documentation needs.
 
 ---
 
@@ -742,6 +671,47 @@ See **[Custom Language Configuration Guide](./docs/CUSTOM_LANGUAGES.md)** for co
 - Extending built-in language configurations
 - Custom import pattern syntax
 - Language-specific frameworks and keywords
+
+---
+
+## 🚀 Future Work & Roadmap
+
+We're building breakthrough features to transform how teams manage architecture documentation. See our **[detailed roadmap →](./docs/ROADMAP.md)** for comprehensive plans.
+
+### 🎯 Upcoming Features
+
+**Q1 2026 - Real-Time Intelligence & Cost Optimization**
+- 🔴 **Architecture Drift Detection** - Monitor compliance in CI/CD
+- 📐 **Mermaid Diagram Export** - GitHub/GitLab native rendering
+- 🔌 **GitHub Actions Integration** - Seamless automation
+- 🔬 **AI/LLM Cost Reduction** - Up to 95% cost savings through intelligent model routing, caching, and local models
+
+**Q2 2026 - Developer Experience**
+- 🎨 **Interactive Web UI** - Clickable graphs, search, timeline
+- 🔌 **VS Code Extension** - Architecture sidebar in your IDE
+- 🤖 **AI Chat Interface** - Ask questions about your codebase
+
+**Q3 2026 - Enterprise Scale**
+- 🌐 **Cross-Repository Analysis** - Multi-service dependency mapping
+- 🔐 **Security Audit Reports** - SOC 2, GDPR, OWASP Top 10
+- 📊 **Organization Dashboard** - System-wide health metrics
+
+**Q4 2026 - Advanced Intelligence**
+- 💡 **AI Refactoring Plans** - Step-by-step improvement guides
+- 🎓 **Onboarding Assistant** - AI-powered developer onboarding
+- 🔄 **Architecture as Code** - Define and enforce architecture rules
+
+### 💬 Community Feedback
+
+Have ideas? We'd love to hear them!
+
+- 💡 **Suggest Features:** [Open an Issue](https://github.com/techdebtgpt/architecture-doc-generator/issues/new?template=feature_request.md)
+- 🗣️ **Join Discussion:** [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
+- ⭐ **Vote on Features:** React with 👍 on issues you care about
+
+**[→ View Full Roadmap & Technical Details](./docs/ROADMAP.md)**
+
+---
 
 ## 🤝 Contributing
 
