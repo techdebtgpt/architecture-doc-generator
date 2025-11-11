@@ -64,6 +64,79 @@ archdoc setup-mcp claude-desktop
 
 Then restart Claude Desktop.
 
+## Configuration Flexibility: Project Config vs Editor Environment
+
+ArchDoc's MCP server intelligently detects which configuration to use. You have two options:
+
+### Option 1: Project-Based Configuration (Recommended)
+
+Store credentials in `.archdoc.config.json` in your project root:
+
+```bash
+archdoc config --init
+```
+
+**Advantages:**
+- ✅ Project-specific settings
+- ✅ Different configs per project
+- ✅ Works offline
+- ✅ Easy to manage
+
+**Security Note:** Add to `.gitignore`:
+```
+.archdoc.config.json
+```
+
+### Option 2: Editor Environment Variables (No Setup Needed!)
+
+Use your editor's configured credentials directly:
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+export DEFAULT_LLM_PROVIDER="anthropic"
+export DEFAULT_LLM_MODEL="claude-sonnet-4-20250514"
+
+archdoc-mcp-server
+```
+
+**Advantages:**
+- ✅ No local config file needed
+- ✅ Use editor's API key directly
+- ✅ Great for CI/CD pipelines
+- ✅ Works with Claude Code, Cursor, Copilot
+
+**Supported Environment Variables:**
+- `ANTHROPIC_API_KEY` - Anthropic API key
+- `OPENAI_API_KEY` - OpenAI API key
+- `GOOGLE_API_KEY` - Google API key
+- `XAI_API_KEY` - xAI API key
+- `DEFAULT_LLM_PROVIDER` - Provider to use (anthropic, openai, google, xai)
+- `DEFAULT_LLM_MODEL` - Model to use (e.g., claude-sonnet-4-20250514, gpt-4o)
+
+### Priority Order
+
+The MCP server uses this priority:
+
+1. **`.archdoc.config.json`** (if present with API keys) → Use project config
+2. **Environment variables** (if ANTHROPIC_API_KEY, OPENAI_API_KEY, etc. are set) → Use editor's credentials
+3. **Error** → No configuration found, setup required
+
+**Example Flow:**
+
+```
+MCP server starts
+    ↓
+Check for .archdoc.config.json with API keys
+    ├─ Found? → Use it ✅
+    └─ Not found?
+        ↓
+        Check environment variables
+        ├─ Found? → Use them ✅
+        └─ Not found?
+            ↓
+            Error: No configuration ❌
+```
+
 ## Setup Details by Client
 
 ### Cursor

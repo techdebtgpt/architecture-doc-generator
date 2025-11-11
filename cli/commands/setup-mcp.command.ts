@@ -33,7 +33,13 @@ function getMcpConfigPath(client: 'cursor' | 'claude-code' | 'vscode' | 'claude-
     case 'claude-desktop':
       // macOS
       if (process.platform === 'darwin') {
-        return path.join(homeDir, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+        return path.join(
+          homeDir,
+          'Library',
+          'Application Support',
+          'Claude',
+          'claude_desktop_config.json',
+        );
       }
       // Windows
       if (process.platform === 'win32') {
@@ -96,7 +102,9 @@ async function writeMcpConfig(configPath: string, config: McpConfig): Promise<vo
     // Write config
     await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8');
   } catch (error) {
-    throw new Error(`Failed to write config file: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to write config file: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
@@ -144,7 +152,9 @@ export async function setupMcp(client: string, _options: any) {
       logger.warn('Continuing without local config (will need to configure in client UI)');
     }
 
-    const configPath = getMcpConfigPath(client as 'cursor' | 'claude-code' | 'vscode' | 'claude-desktop');
+    const configPath = getMcpConfigPath(
+      client as 'cursor' | 'claude-code' | 'vscode' | 'claude-desktop',
+    );
     const mcpCommand = getMcpServerCommand();
 
     logger.info(`Setting up ArchDoc MCP for ${chalk.bold(client)}...`);
@@ -211,9 +221,7 @@ export async function setupMcp(client: string, _options: any) {
     logger.info(chalk.dim('💡 Tip: Make sure your .archdoc.config.json is set up with API keys'));
     logger.info(chalk.dim('   Run: archdoc config --init'));
   } catch (error) {
-    logger.error(
-      `Failed to set up MCP: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    logger.error(`Failed to set up MCP: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }
@@ -224,7 +232,9 @@ export async function setupMcp(client: string, _options: any) {
 export function registerSetupMcpCommand(program: any) {
   program
     .command('setup-mcp <client>')
-    .description('Set up ArchDoc MCP server for an AI client (cursor, claude-code, vscode, claude-desktop)')
+    .description(
+      'Set up ArchDoc MCP server for an AI client (cursor, claude-code, vscode, claude-desktop)',
+    )
     .option('--global', 'Use globally installed archdoc-generator (default: local npm package)')
     .action(setupMcp);
 
