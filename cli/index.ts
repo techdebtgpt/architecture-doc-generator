@@ -7,6 +7,7 @@ import { analyzeProject } from './commands/analyze.command';
 import { registerConfigCommand } from './commands/config.command';
 import { exportDocumentation } from './commands/export.command';
 import { registerHelpCommand } from './commands/help.command';
+import { registerSetupMcpCommand } from './commands/setup-mcp.command';
 
 // Read version from package.json
 const packageJson = JSON.parse(
@@ -85,6 +86,9 @@ program
 
 // Config command
 registerConfigCommand(program);
+
+// Setup MCP command
+registerSetupMcpCommand(program);
 
 // Help command
 registerHelpCommand(program);

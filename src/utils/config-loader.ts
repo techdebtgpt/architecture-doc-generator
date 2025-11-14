@@ -39,6 +39,11 @@ export interface ArchDocConfig {
     depth?: string;
     maxCostDollars?: number;
   };
+  searchMode?: {
+    mode?: 'vector' | 'keyword';
+    strategy?: 'vector' | 'graph' | 'hybrid' | 'smart';
+    embeddingsProvider?: 'local' | 'openai' | 'google';
+  };
 }
 
 /**

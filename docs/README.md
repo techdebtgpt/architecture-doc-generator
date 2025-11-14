@@ -9,6 +9,7 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 - [**User Guide**](./USER_GUIDE.md): Detailed instructions on how to use the CLI, including all commands, options, and configuration.
 - [**Configuration Guide**](./CONFIGURATION_GUIDE.md): A complete reference for all configuration options available in `.archdoc.config.json` and environment variables.
 - [**Quick Config Reference**](./QUICK_CONFIG_REFERENCE.md): A cheat sheet for quick access to the most common configuration settings.
+- [**Installation Legacy**](./INSTALLATION_LEGACY.md): ⚠️ Archived installation guide (for reference only).
 
 ### 🔍 Vector Search & Performance
 
@@ -17,7 +18,7 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 
 ### 🤖 MCP Server (Model Context Protocol)
 
-- [**🔥 MCP Guide**](./MCP_GUIDE.md): ⭐ **Complete guide to using ArchDoc as an MCP server** with Claude Desktop or other MCP clients. Covers setup, configuration, 8 available tools, RAG vector search, troubleshooting, and advanced topics.
+- [**🔥 MCP Setup Guide**](./MCP-SETUP.md): ⭐ **Complete guide to setting up ArchDoc MCP server** with Cursor, Claude Code, VS Code, and Claude Desktop. Covers quick setup, 9 available tools, RAG vector search, troubleshooting, security, and FAQ.
 
 ### 🔧 Integration & Development
 
@@ -28,6 +29,10 @@ Welcome to the official documentation for the ArchDoc Generator. This documentat
 - [**Custom Languages**](./CUSTOM_LANGUAGES.md): Add support for any programming language via configuration (no code changes needed).
 - [**Contributing Guide**](./CONTRIBUTING.md): Guidelines for developers who want to contribute to the project, including setup, coding standards, and pull request processes.
 - [**CI/CD**](./CI_CD.md): Information on the continuous integration and deployment setup for this project.
+
+### 🚀 Roadmap & Future Plans
+
+- [**📋 Product Roadmap**](./ROADMAP.md): Comprehensive roadmap with planned features, AI/LLM cost optimization research, and quarterly timeline for 2026.
 
 ## 🚀 Getting Started
 

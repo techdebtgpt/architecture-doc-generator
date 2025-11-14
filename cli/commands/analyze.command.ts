@@ -14,6 +14,8 @@ import {
   registerAgents,
   createScanner,
 } from '../utils/orchestrator-setup';
+import { loadArchDocConfig } from '../../src/utils/config-loader';
+import { LLMService } from '../../src/llm/llm-service';
 
 /**
  * Check if existing documentation exists in output directory
@@ -205,8 +207,18 @@ export async function analyzeProject(
     }
 
     // Load config file BEFORE registering agents (agents need LLMService with config)
-    const { loadUserConfig } = await import('../utils/config-loader');
-    const userConfig = await loadUserConfig(options.verbose);
+    const userConfig = loadArchDocConfig(resolvedPath, true) || {};
+
+    // Initialize LLMService with config BEFORE agents are constructed
+    LLMService.getInstance(userConfig);
+
+    if (options.verbose) {
+      if (Object.keys(userConfig).length > 0) {
+        console.log(chalk.blue('\n📄 Config loaded successfully'));
+      } else {
+        console.log(chalk.yellow('\n⚠️  No config file found, using defaults'));
+      }
+    }
 
     // Register all agents (after LLMService is initialized with config)
     const agentRegistry = registerAgents(spinner);
