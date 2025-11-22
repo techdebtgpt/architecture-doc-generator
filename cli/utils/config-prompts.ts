@@ -118,14 +118,23 @@ export function loadExistingConfig(projectPath: string): ExistingConfig | null {
 export async function promptLLMConfig(
   existingConfig: ExistingConfig | null,
   isUpdate: boolean,
+  detectedKey?: { provider: string; key: string; source: string },
 ): Promise<Pick<ConfigAnswers, 'provider' | 'selectedModel' | 'apiKey'>> {
   const hasExisting = !!existingConfig;
 
   // Provider selection
-  const { provider } = await inquirer.prompt<{ provider: ConfigAnswers['provider'] }>([
+  let provider: ConfigAnswers['provider'];
+
+  // Determine default provider
+  const defaultProvider =
+    detectedKey && !isUpdate
+      ? detectedKey.provider
+      : existingConfig?.llm?.provider || 'anthropic';
+
+  const { selectedProvider } = await inquirer.prompt<{ selectedProvider: ConfigAnswers['provider'] }>([
     {
       type: 'list',
-      name: 'provider',
+      name: 'selectedProvider',
       message: isUpdate ? 'Update LLM provider:' : 'Choose your LLM provider:',
       choices: [
         {
@@ -149,9 +158,10 @@ export async function promptLLMConfig(
           short: 'xAI',
         },
       ],
-      default: existingConfig?.llm?.provider || 'anthropic',
+      default: defaultProvider,
     },
   ]);
+  provider = selectedProvider;
 
   const info = PROVIDER_INFO[provider];
 
@@ -169,35 +179,44 @@ export async function promptLLMConfig(
     },
   ]);
 
-  // API key prompt with URL guidance
+  // API key prompt
+  let apiKey = '';
   const existingKey = existingConfig?.apiKeys?.[provider];
-  if (!existingKey || !hasExisting) {
-    console.log(`\nGet your API key at: ${info.url}`);
+
+  // Check if we have a detected key for this provider
+  if (detectedKey && detectedKey.provider === provider) {
+    console.log(`\n✨ Using detected API key from ${detectedKey.source}`);
+    apiKey = detectedKey.key;
+  } else {
+    if (!existingKey || !hasExisting) {
+      console.log(`\nGet your API key at: ${info.url}`);
+    }
+
+    const { inputKey } = await inquirer.prompt<{ inputKey: string }>([
+      {
+        type: 'password',
+        name: 'inputKey',
+        message:
+          hasExisting && existingKey
+            ? `Update ${provider.toUpperCase()} API key (press Enter to keep existing):`
+            : `Enter ${provider} API key (${info.keyFormat}):`,
+        validate: (input: string) => {
+          // Allow empty if we have existing config
+          if (hasExisting && existingKey && !input) {
+            return true;
+          }
+          if (!input || input.trim().length === 0) {
+            return 'API key is required';
+          }
+          return true;
+        },
+        mask: '*',
+      },
+    ]);
+    apiKey = inputKey.trim() || existingKey || '';
   }
 
-  const { apiKey } = await inquirer.prompt<{ apiKey: string }>([
-    {
-      type: 'password',
-      name: 'apiKey',
-      message:
-        hasExisting && existingKey
-          ? `Update ${provider.toUpperCase()} API key (press Enter to keep existing):`
-          : `Enter ${provider} API key (${info.keyFormat}):`,
-      validate: (input: string) => {
-        // Allow empty if we have existing config
-        if (hasExisting && existingKey && !input) {
-          return true;
-        }
-        if (!input || input.trim().length === 0) {
-          return 'API key is required';
-        }
-        return true;
-      },
-      mask: '*',
-    },
-  ]);
-
-  return { provider, selectedModel, apiKey: apiKey.trim() || existingKey || '' };
+  return { provider, selectedModel, apiKey };
 }
 
 /**
@@ -376,15 +395,21 @@ export async function promptFullConfig(
     includeVectorSearch?: boolean;
     includeTracing?: boolean;
     verbose?: boolean;
+    detectedKey?: { provider: string; key: string; source: string };
   } = {},
 ): Promise<{ answers: ConfigAnswers; existingConfig: ExistingConfig | null }> {
-  const { includeVectorSearch = true, includeTracing = true, verbose = true } = options;
+  const {
+    includeVectorSearch = true,
+    includeTracing = true,
+    verbose = true,
+    detectedKey,
+  } = options;
 
   const existingConfig = loadExistingConfig(projectPath);
   const isUpdate = !!existingConfig;
 
   // LLM configuration
-  const llmConfig = await promptLLMConfig(existingConfig, isUpdate);
+  const llmConfig = await promptLLMConfig(existingConfig, isUpdate, detectedKey as any);
 
   // Vector search configuration (optional)
   let vectorConfig: Pick<

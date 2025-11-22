@@ -4,6 +4,7 @@ import * as path from 'path';
 import inquirer from 'inquirer';
 import { Logger } from '../../src/utils/logger';
 import { promptFullConfig } from '../utils/config-prompts';
+import { detectKeys } from '../../src/utils/key-detector';
 
 const logger = new Logger('ConfigCommand');
 
@@ -139,13 +140,23 @@ async function initializeConfig(): Promise<void> {
   } else {
     logger.info(`Creating configuration in: ${CONFIG_FILE}`);
   }
-
   // Use shared prompt utility for all configuration
   logger.info('\n📋 LLM Provider Selection (REQUIRED)\n');
+
+  // Detect keys if not updating existing config
+  let detectedKey;
+  if (!existingConfig) {
+    detectedKey = await detectKeys();
+    if (detectedKey) {
+        logger.info(`✨ Detected ${detectedKey.provider} API key from ${detectedKey.source}`);
+    }
+  }
+
   const { answers, existingConfig: loadedConfig } = await promptFullConfig(projectPath, {
     includeVectorSearch: true,
     includeTracing: true,
     verbose: true,
+    detectedKey: detectedKey || undefined,
   });
 
   // Start with default config or existing config

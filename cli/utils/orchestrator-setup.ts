@@ -13,6 +13,10 @@ import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
 import { KPIAnalyzerAgent } from '../../src/agents/kpi-analyzer-agent';
 
+import { detectKeys } from '../../src/utils/key-detector';
+import inquirer from 'inquirer';
+import { promptFullConfig } from './config-prompts';
+
 /**
  * Check if API keys are configured
  * Reads from .archdoc.config.json in current directory
@@ -49,6 +53,121 @@ export async function checkConfiguration(): Promise<boolean> {
   } catch (_error) {
     // Config file doesn't exist or can't be read
     console.log(chalk.red('\n❌ No configuration file found!\n'));
+
+    // Attempt to detect keys from other tools
+    const detectedKey = await detectKeys();
+
+    if (detectedKey) {
+      console.log(
+        chalk.green(
+          `✨ Detected ${detectedKey.provider} API key from ${detectedKey.source}`,
+        ),
+      );
+
+      const { useDetected } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'useDetected',
+          message: 'Would you like to use this key to configure ArchDoc?',
+          default: true,
+        },
+      ]);
+
+      if (useDetected) {
+        // Launch interactive setup with detected key pre-filled
+        console.log(chalk.cyan('\n🚀 Launching setup with detected key...\n'));
+
+        // We need to import promptFullConfig from config.command logic, but it's in utils
+        // Re-using the logic from config.command.ts is tricky because of circular deps or duplication.
+        // Best approach: We are in orchestrator-setup, which is used by analyze command.
+        // We should probably just guide them to run config --init or run it inline here?
+        // Running inline is better for UX.
+
+        // NOTE: We need to replicate some logic from config.command.ts here or refactor.
+        // Given the constraints, I'll import the prompt logic and save the file here.
+
+        const projectPath = process.cwd();
+        const { answers } = await promptFullConfig(projectPath, {
+            includeVectorSearch: true,
+            includeTracing: true,
+            verbose: true,
+            detectedKey
+        });
+
+        // Construct config object (simplified version of config.command.ts logic)
+        const config = {
+            apiKeys: {
+                anthropic: '',
+                openai: '',
+                google: '',
+                xai: '',
+            },
+            llm: {
+                provider: answers.provider,
+                model: answers.selectedModel,
+                temperature: 0.2,
+                maxTokens: 4096,
+            },
+            // ... minimal defaults ...
+            scan: {
+                maxFiles: 10000,
+                maxFileSize: 1048576,
+                respectGitignore: true,
+                excludePatterns: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
+                includeHidden: false,
+                followSymlinks: false,
+            },
+            agents: {
+                enabled: ['file-structure', 'dependency-analyzer', 'pattern-detector', 'flow-visualization', 'schema-generator', 'architecture-analyzer'],
+                parallel: true,
+                timeout: 300000,
+            },
+            searchMode: {
+                mode: 'keyword',
+                embeddingsProvider: 'local',
+                strategy: 'smart',
+            },
+            output: {
+                directory: '.arch-docs',
+                format: 'markdown',
+                clean: true,
+                splitFiles: true,
+                includeTOC: true,
+                includeMetadata: true,
+            },
+            tracing: {
+                enabled: false,
+                apiKey: '',
+                project: 'archdoc-analysis',
+            }
+        };
+
+        if (answers.apiKey) {
+            (config.apiKeys as any)[answers.provider] = answers.apiKey;
+        }
+
+        if (answers.enableVectorSearch && answers.embeddingsProvider) {
+            (config.searchMode as any).mode = 'vector';
+            (config.searchMode as any).embeddingsProvider = answers.embeddingsProvider;
+            if (answers.strategy) (config.searchMode as any).strategy = answers.strategy;
+            if (answers.embeddingsApiKey) (config.apiKeys as any).embeddings = answers.embeddingsApiKey;
+        }
+
+        if (answers.enableTracing) {
+            config.tracing.enabled = true;
+            if (answers.langsmithKey) config.tracing.apiKey = answers.langsmithKey;
+            if (answers.langsmithProject) config.tracing.project = answers.langsmithProject || 'archdoc-analysis';
+        }
+
+        // Save config
+        await fs.writeFile(configPath, JSON.stringify(config, null, 2));
+        console.log(chalk.green(`\n✅ Configuration saved to ${path.relative(process.cwd(), configPath)}`));
+        console.log(chalk.green('✅ You can now run analysis!'));
+
+        return true;
+      }
+    }
+
     console.log(chalk.yellow('You need to create .archdoc.config.json'));
 
     console.log(chalk.cyan('\nQuick setup:'));
