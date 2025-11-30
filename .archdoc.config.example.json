@@ -4,6 +4,10 @@
     "openai": "",
     "google": ""
   },
+  "embeddings": {
+    "openai": "",
+    "google": ""
+  },
   "llm": {
     "provider": "anthropic",
     "model": "claude-3-5-sonnet-20241022",

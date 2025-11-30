@@ -334,8 +334,8 @@ export class C4ModelOrchestrator {
       ).toLowerCase();
 
       // Check for provider-specific API keys in config
-      const hasOpenAIKey = this.config.apiKeys?.openai;
-      const hasGoogleKey = this.config.apiKeys?.google;
+      const hasOpenAIKey = this.config.apiKeys?.openai || this.config.embeddings?.openai;
+      const hasGoogleKey = this.config.apiKeys?.google || this.config.embeddings?.google;
 
       const providerHasKey =
         embeddingsProvider === 'local' || // Local embeddings are always available (FREE)
@@ -345,8 +345,8 @@ export class C4ModelOrchestrator {
 
       if (!providerHasKey) {
         const providerKeyMap: Record<string, string> = {
-          openai: 'apiKeys.openai',
-          google: 'apiKeys.google',
+          openai: 'apiKeys.openai or embeddings.openai',
+          google: 'apiKeys.google or embeddings.google',
           cohere: 'apiKeys.cohere',
           voyage: 'apiKeys.voyage',
         };

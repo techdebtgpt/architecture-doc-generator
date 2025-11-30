@@ -259,9 +259,10 @@ export function createSetupConfigHandler(): ContextualToolHandler {
       [provider]: apiKey,
     };
 
-    // Add embeddings API key if provided
+    // Build embeddings object if API key provided
+    const embeddings: any = existingConfig.embeddings ? { ...existingConfig.embeddings } : {};
     if (embeddingsApiKey && finalEmbeddingsProvider && finalEmbeddingsProvider !== 'local') {
-      apiKeys.embeddings = embeddingsApiKey;
+      embeddings[finalEmbeddingsProvider] = embeddingsApiKey;
     }
 
     // Build config - single definition (not duplicated!)
@@ -274,6 +275,7 @@ export function createSetupConfigHandler(): ContextualToolHandler {
         embeddingsProvider: finalEmbeddingsProvider,
       },
       apiKeys,
+      embeddings,
       searchMode: {
         mode: searchMode,
         strategy: retrievalStrategy,

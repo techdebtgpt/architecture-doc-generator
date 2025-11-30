@@ -75,9 +75,19 @@ async function setupTargetProject() {
   const providerChoice = await question('Choice (1-4): ');
 
   const providerMap = {
-    '1': { name: 'anthropic', models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'] },
+    '1': {
+      name: 'anthropic',
+      models: [
+        'claude-sonnet-4-20250514',
+        'claude-3-5-sonnet-20241022',
+        'claude-3-5-haiku-20241022',
+      ],
+    },
     '2': { name: 'openai', models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1-preview'] },
-    '3': { name: 'google', models: ['gemini-2.0-flash-exp', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-latest'] },
+    '3': {
+      name: 'google',
+      models: ['gemini-2.0-flash-exp', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-latest'],
+    },
     '4': { name: 'xai', models: ['grok-beta', 'grok-2-latest'] },
   };
 
@@ -114,6 +124,7 @@ async function setupTargetProject() {
   const searchMode = searchModeChoice === '2' ? 'vector' : 'keyword';
 
   let embeddingsProvider = 'local';
+  let embeddingsApiKey = null;
   if (searchMode === 'vector') {
     console.log('\nEmbeddings provider:');
     console.log('  1. local (FREE, TF-IDF, works offline)');
@@ -123,6 +134,16 @@ async function setupTargetProject() {
 
     const embeddingsMap = { '1': 'local', '2': 'openai', '3': 'google' };
     embeddingsProvider = embeddingsMap[embeddingsChoice] || 'local';
+
+    // Ask for API key if not using local
+    if (embeddingsProvider !== 'local') {
+      embeddingsApiKey = await question(`\n${embeddingsProvider} embeddings API key: `);
+      if (!embeddingsApiKey || embeddingsApiKey.length < 10) {
+        console.warn('⚠️  Invalid embeddings API key, falling back to local');
+        embeddingsProvider = 'local';
+        embeddingsApiKey = null;
+      }
+    }
   }
 
   // Create config
@@ -136,6 +157,11 @@ async function setupTargetProject() {
     apiKeys: {
       [provider.name]: apiKey
     },
+    embeddings: embeddingsApiKey
+      ? {
+          [embeddingsProvider]: embeddingsApiKey,
+        }
+      : {},
     searchMode: {
       mode: searchMode,
       strategy: 'smart',
