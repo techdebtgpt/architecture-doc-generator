@@ -276,6 +276,22 @@ export function buildApiKeysFromEnv(): Record<string, string> {
 }
 
 /**
+ * Build embeddings config from environment variables (only include defined keys)
+ */
+export function buildEmbeddingsFromEnv(): Record<string, string> {
+  const embeddings: Record<string, string> = {};
+
+  if (process.env.OPENAI_EMBEDDINGS_KEY) {
+    embeddings.openai = process.env.OPENAI_EMBEDDINGS_KEY;
+  }
+  if (process.env.GOOGLE_EMBEDDINGS_KEY) {
+    embeddings.google = process.env.GOOGLE_EMBEDDINGS_KEY;
+  }
+
+  return embeddings;
+}
+
+/**
  * Get default model for a provider
  */
 export function getDefaultModelForProvider(provider?: string): string {
@@ -313,6 +329,7 @@ export function buildConfigFromEnv(): ArchDocConfig {
       model,
     },
     apiKeys: buildApiKeysFromEnv(),
+    embeddings: buildEmbeddingsFromEnv(),
     // Search mode can be overridden via env variables
     searchMode: {
       mode: (process.env.DEFAULT_SEARCH_MODE as 'vector' | 'keyword') || 'keyword',

@@ -25,6 +25,10 @@ const DEFAULT_CONFIG = {
     google: '',
     xai: '',
   },
+  embeddings: {
+    openai: '',
+    google: '',
+  },
   llm: {
     provider: 'anthropic',
     model: 'claude-sonnet-4-5-20250929',
@@ -171,10 +175,10 @@ async function initializeConfig(): Promise<void> {
     }
     // Only add embeddings key if an API key was provided (not needed for local)
     if (answers.embeddingsApiKey) {
-      if (!config.apiKeys.embeddings) {
-        config.apiKeys.embeddings = '';
+      if (!config.embeddings) {
+        config.embeddings = {};
       }
-      config.apiKeys.embeddings = answers.embeddingsApiKey;
+      config.embeddings[answers.embeddingsProvider] = answers.embeddingsApiKey;
     }
     logger.info(`✅ Vector search enabled with ${answers.embeddingsProvider} embeddings`);
     logger.info(`✅ Search strategy: ${answers.strategy || 'smart'}`);

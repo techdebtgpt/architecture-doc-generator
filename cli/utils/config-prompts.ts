@@ -30,6 +30,7 @@ export interface ExistingConfig {
     embeddingsProvider?: string;
   };
   apiKeys?: Record<string, string>;
+  embeddings?: Record<string, string>;
   tracing?: {
     enabled?: boolean;
     apiKey?: string;
@@ -283,7 +284,7 @@ export async function promptVectorSearchConfig(
   // Only prompt for API key if not using local embeddings
   let embeddingsApiKey: string | undefined;
   if (embeddingsProvider !== 'local') {
-    const existingKey = existingConfig?.apiKeys?.embeddings;
+    const existingKey = existingConfig?.embeddings?.[embeddingsProvider];
     const { key } = await inquirer.prompt<{ key: string }>([
       {
         type: 'password',
