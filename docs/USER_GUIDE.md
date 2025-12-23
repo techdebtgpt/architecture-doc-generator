@@ -289,11 +289,7 @@ You can add custom exclude patterns in `.archdoc.config.json`:
 ```json
 {
   "scan": {
-    "excludePatterns": [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/my-custom-folder/**"
-    ],
+    "excludePatterns": ["**/node_modules/**", "**/dist/**", "**/my-custom-folder/**"],
     "respectGitignore": true // Default: true - loads all .gitignore files
   }
 }

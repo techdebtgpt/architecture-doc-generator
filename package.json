@@ -18,6 +18,7 @@
     "lint": "eslint \"{src,cli,tests}/**/*.ts\"",
     "lint:fix": "eslint \"{src,cli,tests}/**/*.ts\" --fix",
     "format": "prettier --write \"**/*.{ts,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,json,md}\"",
     "prepublishOnly": "npm run build && npm run lint && npm test",
     "prepack": "npm run build",
     "postpack": "echo 'Package created successfully'",
