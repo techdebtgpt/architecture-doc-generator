@@ -278,6 +278,12 @@ export interface TokenUsage {
   /** Total tokens */
   totalTokens: number;
 
+  /** Cached input tokens (Anthropic prompt caching) */
+  cachedInputTokens?: number;
+
+  /** Cache creation tokens (Anthropic prompt caching) */
+  cacheCreationTokens?: number;
+
   /** Estimated cost in USD */
   estimatedCost?: number;
 }
@@ -363,4 +369,89 @@ export interface LLMConfig {
   topP?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
+}
+
+/**
+ * File Structure Agent Agent Result Data
+ */
+export interface FileStructureAnalysis {
+  summary: string;
+  structure: {
+    organizationStrategy: string;
+    keyDirectories: string[];
+    directoryPurposes: Record<string, string>;
+    [key: string]: unknown;
+  };
+  patterns: {
+    architectural: string[];
+    organizational: string[];
+    [key: string]: unknown;
+  };
+  conventions: {
+    naming: string[];
+    grouping: string[];
+    [key: string]: unknown;
+  };
+  recommendations: string[];
+  warnings: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * Dependency Analyzer Agent Result Data
+ */
+export interface DependencyAnalysis {
+  summary: string;
+  metrics: Record<string, number>;
+  insights: string[];
+  vulnerabilities: Array<{
+    package: string;
+    severity: string;
+    description: string;
+    [key: string]: unknown;
+  }>;
+  recommendations: string[];
+  warnings: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * Architectural styles
+ */
+export enum ArchitecturalStyle {
+  MONOLITHIC = 'monolithic',
+  MICROSERVICES = 'microservices',
+  LAYERED = 'layered',
+  EVENT_DRIVEN = 'event-driven',
+  HEXAGONAL = 'hexagonal',
+  SERVERLESS = 'serverless',
+  MODULAR_MONOLITH = 'modular-monolith',
+}
+
+/**
+ * Component information
+ */
+export interface ComponentInfo {
+  name: string;
+  type: string;
+  description: string;
+  responsibilities: string[];
+  dependencies: string[];
+  technologies: string[];
+  [key: string]: unknown;
+}
+
+/**
+ * Architecture analysis result
+ */
+export interface ArchitectureAnalysis {
+  style: ArchitecturalStyle;
+  components: ComponentInfo[];
+  layers: string[];
+  integrations: string[];
+  diagram: string; // Mermaid C4 or component diagram
+  insights: string[];
+  summary: string;
+  warnings: string[];
+  [key: string]: unknown;
 }

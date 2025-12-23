@@ -43,15 +43,82 @@ export class MultiFileMarkdownFormatter {
 
     const generatedFiles: string[] = [];
 
-    // STEP 1: Write agent-generated files (agents own their file generation)
+    // STEP 1: Write JSON cache for agent results
+    await this.writeJsonCache(output, opts);
+
+    // STEP 2: Write agent-generated files (agents own their file generation)
     const agentFiles = await this.writeAgentFiles(output, opts);
     generatedFiles.push(...agentFiles);
 
-    // STEP 2: Write orchestrator-owned files (generic/cross-cutting)
+    // STEP 3: Write orchestrator-owned files (generic/cross-cutting)
     const orchestratorFiles = await this.writeOrchestratorFiles(output, opts);
     generatedFiles.push(...orchestratorFiles);
 
     return generatedFiles;
+  }
+
+  /**
+   * Write JSON cache for agent results
+   * Saves structured data to .arch-docs/cache/{agent-name}.json
+   */
+  private async writeJsonCache(
+    output: DocumentationOutput,
+    options: MultiFileFormatterOptions,
+  ): Promise<void> {
+    const cacheDir = path.join(options.outputDir, 'cache');
+    await fs.mkdir(cacheDir, { recursive: true });
+
+    const sectionsIterator =
+      output.customSections instanceof Map
+        ? output.customSections.entries()
+        : Object.entries(output.customSections as Record<string, any>);
+
+    for (const [agentName, section] of sectionsIterator) {
+      const customSection = section as {
+        data?: Record<string, unknown>;
+        metadata?: Record<string, unknown>;
+        confidence?: number;
+        executionTime?: number;
+        status?: string;
+        summary?: string;
+        tokenUsage?: {
+          inputTokens: number;
+          outputTokens: number;
+          totalTokens: number;
+        };
+      };
+
+      // Skip if agent was skipped or has no data
+      if (customSection.metadata?.skipped === true || !customSection.data) {
+        continue;
+      }
+
+      // Create cache object with data + metadata
+      const cacheData = {
+        // Analysis data (primary content)
+        ...customSection.data,
+
+        // Metadata about the analysis
+        _metadata: {
+          agentName,
+          status: customSection.status || 'success',
+          confidence: customSection.confidence || 1.0,
+          executionTime: customSection.executionTime || 0,
+          tokenUsage: customSection.tokenUsage || {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+          },
+          summary: customSection.summary,
+          generatedAt: output.timestamp.toISOString(),
+          ...customSection.metadata,
+        },
+      };
+
+      // Write JSON cache file
+      const jsonPath = path.join(cacheDir, `${agentName}.json`);
+      await fs.writeFile(jsonPath, JSON.stringify(cacheData, null, 2), 'utf-8');
+    }
   }
 
   /**

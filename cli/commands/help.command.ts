@@ -51,7 +51,11 @@ export function displayHelp(): void {
     '      -f, --format <format>           Format: markdown|json|html (with --single-file)',
   );
   console.log('      --verbose                       Enable verbose output');
-  console.log('      --no-clean                      Keep existing output directory\n');
+  console.log('      --no-clean                      Keep existing output directory');
+  console.log('      --force                         Force full analysis (ignore delta analysis)');
+  console.log(
+    '      --since <commit>                Git commit/branch/tag for delta analysis (Git projects)\n',
+  );
 
   // Config command
   console.log(chalk.bold('  config'));

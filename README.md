@@ -50,6 +50,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 - 📊 **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
 - 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
 - ➕ **Extensible**: Add support for any language via configuration—no code changes required.
+- 💰 **Delta Analysis** (v0.3.37+): Automatic change detection reduces costs by 60-90% on incremental runs. Uses Git or file hashing to only analyze changed files.
 
 ## 🚀 Quick Start
 
@@ -104,6 +105,7 @@ For complete CLI options and advanced usage, see [CLI Usage](#-cli-usage) sectio
 ## 🔄 MCP Integration
 
 **Model Context Protocol (MCP)** allows AI assistants to access ArchDoc tools directly. Use ArchDoc in:
+
 - **Cursor** - AI code editor
 - **Claude Code** - Claude's code tool
 - **VS Code** + GitHub Copilot
@@ -176,15 +178,15 @@ Also see: [Vector Search Guide](./docs/VECTOR_SEARCH.md) - Complete guide to vec
 
 #### Available Commands
 
-| Command                    | Description                          | Example                                   |
-| -------------------------- | ------------------------------------ | ----------------------------------------- |
-| `archdoc help`             | Show comprehensive help              | `archdoc help`                            |
-| `archdoc analyze`          | Generate comprehensive documentation | `archdoc analyze /path/to/project`        |
-| `archdoc analyze --c4`     | Generate C4 architecture model       | `archdoc analyze --c4`                    |
-| `archdoc config --init`    | Interactive configuration setup      | `archdoc config --init`                   |
-| `archdoc config --list`    | Show current configuration           | `archdoc config --list`                   |
-| `archdoc export`           | Export docs to different formats     | `archdoc export .arch-docs --format html` |
-| `archdoc setup-mcp <client>` | Set up MCP for AI client         | `archdoc setup-mcp cursor`                |
+| Command                      | Description                          | Example                                   |
+| ---------------------------- | ------------------------------------ | ----------------------------------------- |
+| `archdoc help`               | Show comprehensive help              | `archdoc help`                            |
+| `archdoc analyze`            | Generate comprehensive documentation | `archdoc analyze /path/to/project`        |
+| `archdoc analyze --c4`       | Generate C4 architecture model       | `archdoc analyze --c4`                    |
+| `archdoc config --init`      | Interactive configuration setup      | `archdoc config --init`                   |
+| `archdoc config --list`      | Show current configuration           | `archdoc config --list`                   |
+| `archdoc export`             | Export docs to different formats     | `archdoc export .arch-docs --format html` |
+| `archdoc setup-mcp <client>` | Set up MCP for AI client             | `archdoc setup-mcp cursor`                |
 
 > 💡 **Tip**: Run `archdoc help` for a comprehensive guide with examples, configuration options, and common workflows.
 
@@ -214,7 +216,47 @@ archdoc analyze --no-refinement
 
 # Verbose output for debugging
 archdoc analyze --verbose
+
+# Delta Analysis (Cost Optimization) - Automatically enabled
+# Only analyzes changed/new files, saving 60-90% on token costs
+archdoc analyze                    # Automatic delta analysis (default)
+archdoc analyze --since main       # Compare against main branch
+archdoc analyze --since abc123def  # Compare against specific commit
+archdoc analyze --force            # Force full analysis (ignore delta)
 ```
+
+### Delta Analysis (Cost Optimization)
+
+ArchDoc automatically performs delta analysis to reduce costs on incremental runs. Only changed and new files are analyzed, typically saving **60-90% on token costs**.
+
+**How it works:**
+
+- **Git projects**: Uses Git to detect files changed since the last commit or a specific commit/branch/tag
+- **Non-Git projects**: Uses file hashing to detect changes since the last analysis
+- **Automatic**: Delta analysis is enabled by default - no configuration needed
+- **Cache integration**: Cached results from previous runs are automatically loaded and merged
+
+```bash
+# Automatic delta analysis (default behavior)
+archdoc analyze
+
+# Compare against a specific Git commit/branch/tag
+archdoc analyze --since main
+archdoc analyze --since abc123def
+archdoc analyze --since v1.0.0
+
+# Force full analysis (analyze all files, ignore delta analysis)
+archdoc analyze --force
+
+# Delta analysis with focused prompt
+archdoc analyze --prompt "security vulnerabilities" --since HEAD~1
+```
+
+**When to use `--force`:**
+
+- First-time analysis of a project
+- When you want to ensure all files are analyzed regardless of changes
+- After major refactoring where change detection might miss dependencies
 
 ### C4 Architecture Model Generation
 
@@ -324,20 +366,41 @@ archdoc analyze --search-mode vector --retrieval-strategy hybrid
 
 ### What Files Are Excluded?
 
-Both **File Scanner** and **Vector Search** automatically exclude common build/dependency folders (language-agnostic):
+Both **File Scanner** and **Vector Search** automatically exclude common build/dependency folders with **language-specific patterns**:
 
-**Default Exclusions** (applies to all languages):
+**Language-Specific Exclusions** (automatically detected from project languages):
 
-- **Dependencies**: `node_modules/`, `vendor/`, `target/`, `packages/`, `bower_components/`
-- **Build outputs**: `dist/`, `build/`, `out/`, `bin/`, `obj/`, `target/`
-- **Test files**: `.test.`, `.spec.`, `__tests__/`, `test_`, `*_test.*`
+- **TypeScript/JavaScript**: `node_modules/`, `dist/`, `build/`, `.next/`, `out/`
+- **Python**: `venv/`, `__pycache__/`, `.pytest_cache/`, `dist/`, `build/`
+- **Java**: `target/`, `build/`, `.gradle/`, `.m2/`
+- **Go**: `vendor/`, `bin/`
+- **Rust**: `target/`
+- **PHP**: `vendor/`
+- **Ruby**: `vendor/`, `tmp/`
+- **C#**: `bin/`, `obj/`, `packages/`
+- **C/C++**: `build/`, `bin/`, `obj/`
+- **Kotlin**: `build/`
+- **Scala**: `target/`, `out/`
+- **Swift**: `build/`
+- **Dart**: `build/`, `.dart_tool/`, `.packages/`
+- And more...
+
+**Common System Exclusions** (applies to all projects):
+
 - **Version control**: `.git/`, `.svn/`, `.hg/`
+- **Test files**: `.test.`, `.spec.`, `__tests__/`, `test_`, `*_test.*`
+- **IDE directories**: `.idea/`, `.vscode/`, `.vs/`
+- **Build caches**: `.cache/`, `.parcel-cache/`, `.nyc_output/`
+- **Framework-specific**: `.next/`, `.nuxt/`, `.svelte-kit/`, `.docusaurus/`
 - **Generated code**: Coverage reports, logs, OS files (`.DS_Store`, `Thumbs.db`)
 
 **Gitignore Support**:
 
-- Automatically honors `.gitignore` patterns (default: `respectGitignore: true`)
-- Works with all languages (not just JavaScript/Node.js)
+- **Recursively loads all `.gitignore` files** at any directory level (root and subdirectories)
+- Patterns from `.gitignore` files are used **as-is** (no automatic modification)
+- Static patterns (when no `.gitignore` exists) use `**/` prefix for recursive matching
+- Works with all languages and monorepo structures
+- Default: `respectGitignore: true`
 
 **Customize Exclusions** in `.archdoc.config.json`:
 
@@ -399,6 +462,8 @@ archdoc analyze [path] [options]
 | `--refinement`                | Enable iterative refinement                                    | `true`       |
 | `--refinement-iterations <n>` | Max refinement iterations                                      | `5`          |
 | `--refinement-threshold <n>`  | Clarity threshold %                                            | `80`         |
+| `--force`                     | Force full analysis (ignore delta analysis)                    | `false`      |
+| `--since <commit>`            | Git commit/branch/tag for delta analysis (Git projects only)   |              |
 | `--no-clean`                  | Don't clear output directory                                   |              |
 | `--verbose`                   | Show detailed progress                                         |              |
 
@@ -706,34 +771,13 @@ We're building breakthrough features to transform how teams manage architecture 
 
 ### 🎯 Upcoming Features
 
-**Q1 2026 - Real-Time Intelligence & Cost Optimization**
-- 🔴 **Architecture Drift Detection** - Monitor compliance in CI/CD
-- 📐 **Mermaid Diagram Export** - GitHub/GitLab native rendering
-- 🔌 **GitHub Actions Integration** - Seamless automation
-- 🔬 **AI/LLM Cost Reduction** - Up to 95% cost savings through intelligent model routing, caching, and local models
+We've organized our future work into five foundational EPICS:
 
-**Q2 2026 - Developer Experience**
-- 🎨 **Interactive Web UI** - Clickable graphs, search, timeline
-- 🔌 **VS Code Extension** - Architecture sidebar in your IDE
-- 🤖 **AI Chat Interface** - Ask questions about your codebase
-
-**Q3 2026 - Enterprise Scale**
-- 🌐 **Cross-Repository Analysis** - Multi-service dependency mapping
-- 🔐 **Security Audit Reports** - SOC 2, GDPR, OWASP Top 10
-- 📊 **Organization Dashboard** - System-wide health metrics
-
-**Q4 2026 - Advanced Intelligence**
-- 💡 **AI Refactoring Plans** - Step-by-step improvement guides
-- 🎓 **Onboarding Assistant** - AI-powered developer onboarding
-- 🔄 **Architecture as Code** - Define and enforce architecture rules
-
-### 💬 Community Feedback
-
-Have ideas? We'd love to hear them!
-
-- 💡 **Suggest Features:** [Open an Issue](https://github.com/techdebtgpt/architecture-doc-generator/issues/new?template=feature_request.md)
-- 🗣️ **Join Discussion:** [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
-- ⭐ **Vote on Features:** React with 👍 on issues you care about
+1. 🗂️ **Core MCP Integration**: Native support for Cursor, Claude Code, and VS Code.
+2. 🗂️ **Token & Cost Optimization**: JSON-first internal format and delta analysis.
+3. 🗂️ **Developer-Centric Query Interface**: Natural language queries and impact analysis.
+4. 🗂️ **Observability & CI Guardrails**: Drift detection and architecture scorecards.
+5. 🗂️ **Extensibility & Ecosystem**: Custom agent API and Architecture-as-Code.
 
 **[→ View Full Roadmap & Technical Details](./docs/ROADMAP.md)**
 

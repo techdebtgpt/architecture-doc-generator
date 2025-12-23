@@ -52,6 +52,7 @@ Create the following files:
 ```
 
 **⚠️ Important:** Add to `.gitignore`:
+
 ```gitignore
 .archdoc.config.json
 .arch-docs/
@@ -209,6 +210,7 @@ Once set up, you can use these commands in your IDE:
 ```
 
 **Output:**
+
 ```
 ✅ Configuration Found and Valid
 
@@ -224,6 +226,7 @@ API Key: sk-ant-...xxxx
 ```
 
 **Output:**
+
 ```
 ✅ Documentation generated successfully!
 
@@ -240,6 +243,7 @@ Files Generated: 8
 ```
 
 **Output:**
+
 ```
 ✅ Validation Result
 
@@ -277,6 +281,7 @@ workspace/
 ```
 
 Each project gets its own:
+
 - ✅ Separate `.archdoc.config.json` (API keys, preferences)
 - ✅ Separate `.arch-docs/` folder (generated documentation)
 - ✅ Same MCP server binary (installed globally)
@@ -290,6 +295,7 @@ Each project gets its own:
 **Problem:** MCP server can't find `.archdoc.config.json`
 
 **Solution:**
+
 1. Check the file exists in your project root
 2. Verify you're running from the correct directory
 3. Check file permissions (should be readable)
@@ -299,6 +305,7 @@ Each project gets its own:
 **Problem:** Global install not found
 
 **Solution:**
+
 ```bash
 # Re-install globally
 npm install -g @techdebtgpt/archdoc-generator
@@ -316,6 +323,7 @@ npm config get prefix
 **Problem:** Invalid or missing API key
 
 **Solution:**
+
 1. Check `.archdoc.config.json` syntax (valid JSON)
 2. Verify API key format:
    - Anthropic: starts with `sk-ant-`
@@ -328,6 +336,7 @@ npm config get prefix
 **Problem:** MCP server doesn't pick up config changes
 
 **Solution:**
+
 1. Restart your IDE completely
 2. Check MCP server logs
 3. Verify `process.cwd()` is your project root
@@ -390,7 +399,7 @@ You can customize config for different projects:
   },
   "searchMode": {
     "mode": "vector",
-    "embeddingsProvider": "local",  // ← FREE, offline
+    "embeddingsProvider": "local", // ← FREE, offline
     "strategy": "smart"
   }
 }
@@ -410,6 +419,7 @@ You can customize config for different projects:
 6. ✅ Run: `@archdoc check config`
 
 **The MCP server will:**
+
 - ✅ Load config from YOUR project's `.archdoc.config.json`
 - ✅ Generate docs in YOUR project's `.arch-docs/`
 - ✅ Analyze YOUR project's source code

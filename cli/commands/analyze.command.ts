@@ -68,6 +68,9 @@ interface AnalyzeOptions {
   format?: 'markdown' | 'json' | 'html';
   singleFile?: boolean;
   c4?: boolean;
+  // Delta analysis options (v0.3.37+)
+  force?: boolean;
+  since?: string;
 }
 
 /**
@@ -190,6 +193,8 @@ export async function analyzeProject(
       respectGitignore: true,
       includeHidden: false,
       followSymlinks: false,
+      force: options.force,
+      since: options.since,
     });
 
     spinner.succeed(
@@ -371,6 +376,8 @@ export async function analyzeProject(
         },
         retrievalStrategy, // Retrieval strategy for hybrid search (vector + graph)
         embeddingsProvider, // Embeddings provider for vector search (local, openai, google)
+        force: options.force, // Force full analysis, ignoring delta analysis
+        since: options.since, // Git commit/branch/tag to compare against
         onAgentProgress: (current: number, total: number, agentName: string) => {
           const now = Date.now();
           // Throttle progress updates to every 2 seconds to avoid log spam
@@ -565,6 +572,8 @@ async function generateC4Model(projectPath?: string, options: AnalyzeOptions = {
         searchMode, // Pass search mode to agents
       },
       embeddingsProvider, // Pass embeddings provider for vector store initialization
+      force: options.force, // Force full analysis, ignoring delta analysis
+      since: options.since, // Git commit/branch/tag to compare against
     };
 
     spinner.text = 'Generating C4 model...\n';

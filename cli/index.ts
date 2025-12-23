@@ -70,6 +70,12 @@ program
     'Output format for single-file: markdown, json, or html (default: markdown)',
     'markdown',
   )
+  // Delta analysis options (v0.3.37+)
+  .option('--force', 'Force full analysis, ignoring delta analysis (analyze all files)', false)
+  .option(
+    '--since <commit>',
+    'Git commit/branch/tag to compare against for delta analysis (Git projects only)',
+  )
   // Other options
   .option('--verbose', 'Verbose output', false)
   .action(analyzeProject);

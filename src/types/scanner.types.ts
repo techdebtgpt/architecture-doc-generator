@@ -8,6 +8,11 @@ export enum FileEntryType {
 }
 
 /**
+ * File change status for delta analysis
+ */
+export type ChangeStatus = 'new' | 'modified' | 'unchanged' | 'deleted';
+
+/**
  * File system entry information
  */
 export interface FileEntry {
@@ -34,6 +39,12 @@ export interface FileEntry {
 
   /** Detected language/mime type */
   detectedType?: string;
+
+  /** Change status for delta analysis (v0.3.37+) */
+  changeStatus?: ChangeStatus;
+
+  /** Content hash for change detection (v0.3.37+) */
+  contentHash?: string;
 }
 
 /**
@@ -75,6 +86,12 @@ export interface ScanOptions {
 
   /** File extensions to exclude */
   excludedExtensions?: string[];
+
+  /** Force full analysis, ignoring delta analysis (v0.3.37+) */
+  force?: boolean;
+
+  /** Git commit/branch/tag to compare against for delta analysis (v0.3.37+) */
+  since?: string;
 }
 
 /**
@@ -119,6 +136,38 @@ export interface ScanResult {
 
   /** Scan metadata */
   metadata: Record<string, unknown>;
+
+  /** Delta analysis metadata (v0.3.37+) */
+  deltaAnalysis?: DeltaAnalysisMetadata;
+}
+
+/**
+ * Delta analysis metadata
+ */
+export interface DeltaAnalysisMetadata {
+  /** Is delta analysis enabled? */
+  enabled: boolean;
+
+  /** Base commit hash (Git) */
+  baseCommit?: string;
+
+  /** Number of changed files */
+  changedFiles: number;
+
+  /** Number of new files */
+  newFiles: number;
+
+  /** Number of deleted files */
+  deletedFiles: number;
+
+  /** Number of unchanged files */
+  unchangedFiles: number;
+
+  /** Estimated tokens saved by skipping unchanged files */
+  estimatedTokensSaved?: number;
+
+  /** Change detection method */
+  detectionMethod: 'git' | 'hash' | 'none';
 }
 
 /**

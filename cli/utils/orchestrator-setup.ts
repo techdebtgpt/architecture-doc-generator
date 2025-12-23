@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import { Ora } from 'ora';
 import { AgentRegistry } from '../../src/agents/agent-registry';
 import { FileSystemScanner } from '../../src/scanners/file-system-scanner';
+import { GitIgnoreHandler } from '../../src/scanners/gitignore-handler';
 import { ArchitectureAnalyzerAgent } from '../../src/agents/architecture-analyzer-agent';
 import { FileStructureAgent } from '../../src/agents/file-structure-agent';
 import { DependencyAnalyzerAgent } from '../../src/agents/dependency-analyzer-agent';
@@ -127,8 +128,9 @@ export function registerAgents(spinner: Ora): AgentRegistry {
 }
 
 /**
- * Initialize scanner
+ * Initialize scanner with gitignore support
  */
 export function createScanner(): FileSystemScanner {
-  return new FileSystemScanner();
+  const ignoreHandler = new GitIgnoreHandler();
+  return new FileSystemScanner(ignoreHandler);
 }

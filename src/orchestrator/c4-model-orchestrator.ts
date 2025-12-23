@@ -290,6 +290,8 @@ export class C4ModelOrchestrator {
       respectGitignore: true,
       includeHidden: false,
       followSymlinks: false,
+      force: options.force,
+      since: options.since,
     });
 
     this.logger.info(

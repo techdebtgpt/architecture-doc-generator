@@ -29,13 +29,13 @@
 
 ### MCP vs Other Integration Methods
 
-| Aspect | MCP | API | Plugin |
-|--------|-----|-----|--------|
-| Client Support | Multi-client | Single/Multi | Single |
-| Setup Complexity | Easy | Complex | Complex |
-| Performance | Excellent (stdio) | Good (HTTP) | Varies |
-| Security | Built-in | Custom | Custom |
-| Standard | Open Standard | Custom | Custom |
+| Aspect           | MCP               | API          | Plugin  |
+| ---------------- | ----------------- | ------------ | ------- |
+| Client Support   | Multi-client      | Single/Multi | Single  |
+| Setup Complexity | Easy              | Complex      | Complex |
+| Performance      | Excellent (stdio) | Good (HTTP)  | Varies  |
+| Security         | Built-in          | Custom       | Custom  |
+| Standard         | Open Standard     | Custom       | Custom  |
 
 ---
 
@@ -135,6 +135,7 @@ AI Assistant (Claude/Cursor)
 ### 1. MCP Server (`src/mcp-server/index.ts`)
 
 **Responsibilities:**
+
 - Initialize and manage MCP protocol
 - Handle stdio transport
 - Route tool calls to handlers
@@ -142,11 +143,12 @@ AI Assistant (Claude/Cursor)
 - Error handling and logging
 
 **Key Methods:**
+
 ```typescript
-setRequestHandler(ListToolsRequestSchema)      // List available tools
-setRequestHandler(CallToolRequestSchema)       // Execute tool calls
-setRequestHandler(ListResourcesRequestSchema)  // List available resources
-setRequestHandler(ReadResourceRequestSchema)   // Read resource content
+setRequestHandler(ListToolsRequestSchema); // List available tools
+setRequestHandler(CallToolRequestSchema); // Execute tool calls
+setRequestHandler(ListResourcesRequestSchema); // List available resources
+setRequestHandler(ReadResourceRequestSchema); // Read resource content
 ```
 
 ### 2. Tool Registry (`src/mcp-server/tools/tool-registry.ts`)
@@ -154,12 +156,14 @@ setRequestHandler(ReadResourceRequestSchema)   // Read resource content
 **Purpose:** Central definition of all available tools
 
 **Contains:**
+
 - Tool definitions with JSON schemas
 - Versioning information
 - Changelog and deprecation info
 - Parameter validation
 
 **Example Tool Definition:**
+
 ```typescript
 check_config: {
   name: 'check_config',
@@ -173,6 +177,7 @@ check_config: {
 ```
 
 **Functions Provided:**
+
 - `getAllTools()` - Get all available tools
 - `getTool(name)` - Get specific tool definition
 - `getToolVersion(name)` - Get tool version
@@ -184,6 +189,7 @@ check_config: {
 **Purpose:** Implement actual tool functionality
 
 **Handler Signature:**
+
 ```typescript
 type ContextualToolHandler = (
   args: Record<string, any>,
@@ -192,15 +198,17 @@ type ContextualToolHandler = (
 ```
 
 **Available Context:**
+
 ```typescript
 interface ToolContext {
-  projectPath: string;      // Current project directory
-  config: ArchDocConfig;    // Configuration object
-  logger: Logger;           // Logger instance
+  projectPath: string; // Current project directory
+  config: ArchDocConfig; // Configuration object
+  logger: Logger; // Logger instance
 }
 ```
 
 **Handler Factory:**
+
 - `createSelectiveAgentHandler()` - Run specific documentation agents
 - `createCheckConfigHandler()` - Validate configuration
 - `createSetupConfigHandler()` - Initialize configuration
@@ -208,17 +216,20 @@ interface ToolContext {
 ### 4. Configuration Service (`src/mcp-server/services/config.service.ts`)
 
 **Responsibilities:**
+
 - Centralized configuration management
 - Singleton pattern
 - Configuration caching
 - Intelligent detection of config sources
 
 **Detection Logic:**
+
 1. Check for `.archdoc.config.json` with API keys
 2. Fall back to environment variables (ANTHROPIC_API_KEY, etc.)
 3. Throw error if neither found
 
 **Methods:**
+
 ```typescript
 static getInstance(): ConfigService
 async initializeConfig(projectPath): Promise<ArchDocConfig>
@@ -229,12 +240,14 @@ getConfig(projectPath): ArchDocConfig | undefined
 ### 5. Documentation Service (`src/mcp-server/services/documentation.service.ts`)
 
 **Responsibilities:**
+
 - Orchestrate documentation generation
 - Run selective agents
 - Manage output formatting
 - Track progress and costs
 
 **Key Methods:**
+
 ```typescript
 async generateDocumentation(options): Promise<GeneratedDocs>
 async runSelectiveAgents(options): Promise<CustomSections>
@@ -244,11 +257,13 @@ async queryDocumentation(question): Promise<string>
 ### 6. Vector Store Service (`src/mcp-server/services/vector-store.service.ts`)
 
 **Responsibilities:**
+
 - Semantic search over generated documentation
 - RAG (Retrieval-Augmented Generation) indexing
 - Vector embeddings management
 
 **Methods:**
+
 ```typescript
 async initialize(docsPath): Promise<void>
 async searchFiles(query, topK): Promise<SearchResult[]>
@@ -259,12 +274,14 @@ async reset(): Promise<void>
 ### 7. Telemetry Service (`src/mcp-server/services/telemetry.service.ts`)
 
 **Responsibilities:**
+
 - Track tool execution metrics
 - Measure performance
 - Redact sensitive data
 - Generate reports
 
 **Metrics Tracked:**
+
 - Execution count per tool
 - Success/failure rates
 - Duration statistics (min, max, average)
@@ -276,6 +293,7 @@ async reset(): Promise<void>
 **Purpose:** Detect and resolve configuration sources
 
 **Functions:**
+
 - `detectConfigSources()` - Detect file and environment configs
 - `bothConfigsAvailable()` - Check if both sources exist
 - `buildConfigFromEnv()` - Build config from environment variables
@@ -297,6 +315,7 @@ async function start() {
 ```
 
 **Process:**
+
 1. Create MCP Server with capabilities (tools, resources)
 2. Register request handlers
 3. Connect to stdio transport
@@ -399,6 +418,7 @@ Format and return results
 **Parameters:** None
 
 **Response:**
+
 ```typescript
 {
   content: [{
@@ -410,6 +430,7 @@ Format and return results
 ```
 
 **Use Cases:**
+
 - Verify setup before using other tools
 - Debug configuration issues
 - Get setup instructions if missing
@@ -419,6 +440,7 @@ Format and return results
 **Purpose:** Create or update configuration
 
 **Parameters:**
+
 - `provider` (required): 'anthropic' | 'openai' | 'google' | 'xai'
 - `model` (required): Model name for selected provider
 - `apiKey` (required): API key
@@ -436,6 +458,7 @@ Format and return results
 **Purpose:** Generate architecture documentation
 
 **Parameters:**
+
 - `outputDir` (optional): Default '.arch-docs'
 - `depth` (optional): 'quick' | 'normal' | 'deep'
 - `focusArea` (optional): e.g., "security", "performance"
@@ -449,6 +472,7 @@ Format and return results
 **Purpose:** Semantic search over documentation
 
 **Parameters:**
+
 - `question` (required): Your question
 - `topK` (optional): Number of results, default 5
 
@@ -459,6 +483,7 @@ Format and return results
 **Purpose:** Add new focus areas incrementally
 
 **Parameters:**
+
 - `prompt` (required): What to analyze
 - `existingDocsPath` (optional): Path to existing docs
 
@@ -469,6 +494,7 @@ Format and return results
 **Purpose:** Detect design patterns and anti-patterns
 
 **Parameters:**
+
 - `filePaths` (optional): Specific files to analyze
 
 **Response:** Patterns found
@@ -478,6 +504,7 @@ Format and return results
 **Purpose:** Analyze project dependencies
 
 **Parameters:**
+
 - `includeDevDeps` (optional): Include dev deps, default true
 
 **Response:** Dependency analysis
@@ -487,6 +514,7 @@ Format and return results
 **Purpose:** Get improvement suggestions
 
 **Parameters:**
+
 - `focusArea` (optional): 'security' | 'performance' | 'maintainability' | 'all'
 
 **Response:** Prioritized recommendations
@@ -496,6 +524,7 @@ Format and return results
 **Purpose:** Validate code against architecture
 
 **Parameters:**
+
 - `filePath` (required): File to validate
 
 **Response:** Validation results
@@ -522,6 +551,7 @@ ArchDoc supports multiple LLM providers through configuration:
 ```
 
 **Providers:**
+
 - **Anthropic (Claude):** Latest models, recommended
 - **OpenAI (GPT):** GPT-4o, o1 series
 - **Google (Gemini):** Latest Gemini models
@@ -592,6 +622,7 @@ Store in project root:
 ```
 
 **Add to .gitignore:**
+
 ```
 .archdoc.config.json
 ```
@@ -637,7 +668,7 @@ export const TOOLS = {
       required: ['param1'],
     },
   },
-}
+};
 ```
 
 **Step 2: Implement Handler**
@@ -659,17 +690,21 @@ function createMyNewToolHandler(): ContextualToolHandler {
       const result = await myLogic(args, context);
 
       return {
-        content: [{
-          type: 'text',
-          text: result,
-        }],
+        content: [
+          {
+            type: 'text',
+            text: result,
+          },
+        ],
       };
     } catch (error) {
       return {
-        content: [{
-          type: 'text',
-          text: `Error: ${error.message}`,
-        }],
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error.message}`,
+          },
+        ],
         isError: true,
       };
     }
@@ -748,6 +783,7 @@ npm test -- tests/mcp-server/integration
 ### Test Patterns Used
 
 **Mock Setup:**
+
 ```typescript
 jest.mock('../../../src/mcp-server/services/documentation.service');
 const mockDocumentationService = DocumentationService as jest.MockedClass<
@@ -756,6 +792,7 @@ const mockDocumentationService = DocumentationService as jest.MockedClass<
 ```
 
 **Handler Testing:**
+
 ```typescript
 it('should execute tool with context', async () => {
   const handler = createCheckConfigHandler();
@@ -787,6 +824,7 @@ beforeEach(() => {
 **Cause:** Neither `.archdoc.config.json` nor environment variables found
 
 **Solution:**
+
 ```bash
 # Create config
 archdoc config --init
@@ -807,6 +845,7 @@ export DEFAULT_LLM_PROVIDER="anthropic"
 **Cause:** Build not updated
 
 **Solution:**
+
 ```bash
 npm run build
 npm run mcp:build
@@ -817,6 +856,7 @@ npm run mcp:build
 **Common Problem:** fs/promises getter properties can't be reassigned
 
 **Solution:** Use jest.mock() factory function:
+
 ```typescript
 jest.mock('fs/promises', () => ({
   readFile: jest.fn(),
@@ -829,6 +869,7 @@ jest.mock('fs/promises', () => ({
 **Cause:** Deep analysis selected
 
 **Solution:**
+
 - Use `depth: "quick"` for testing
 - Use `searchMode: "keyword"` (faster than vector)
 - Limit with `selectiveAgents`
@@ -837,16 +878,19 @@ jest.mock('fs/promises', () => ({
 ### Debugging Tips
 
 **Enable Verbose Logging:**
+
 ```typescript
 logger.debug('message', details);
 ```
 
 **Check Configuration:**
+
 ```bash
 archdoc check-config
 ```
 
 **Verify Tool Registration:**
+
 ```typescript
 import { getAllTools, getTool } from './tools/tool-registry';
 console.log(getAllTools());
@@ -854,6 +898,7 @@ console.log(getTool('my_tool'));
 ```
 
 **Test Handler Directly:**
+
 ```typescript
 const handler = createCheckConfigHandler();
 const result = await handler({}, context);

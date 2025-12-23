@@ -180,6 +180,9 @@ export interface OrchestratorOptions {
       }
     >;
   };
+  // Delta analysis options (v0.3.37+)
+  force?: boolean; // Force full analysis, ignoring delta analysis
+  since?: string; // Git commit/branch/tag to compare against
 }
 
 /**
@@ -251,14 +254,23 @@ export class DocumentationOrchestrator {
       respectGitignore: true,
       includeHidden: false,
       followSymlinks: false,
+      force: options.force,
+      since: options.since,
     });
 
-    // Scan imports and build dependency graph
+    // Load cached results and filter files based on delta analysis
+    const { filteredScanResult, cachedResults, savings } = await this.loadCacheAndFilterFiles(
+      projectPath,
+      scanResult,
+      options,
+    );
+
+    // Scan imports and build dependency graph (only for changed files)
     this.logger.info('Analyzing dependencies and imports...');
     const importScanner = new ImportScanner();
     const { imports, modules, graph } = await importScanner.scanProject(
       projectPath,
-      scanResult.files.map((f) => f.relativePath),
+      filteredScanResult.files.map((f) => f.relativePath),
     );
 
     this.logger.info(
@@ -398,11 +410,14 @@ export class DocumentationOrchestrator {
       }
     }
 
-    // Initial state
+    // Initial state (use filtered scan result)
     const initialState = {
-      scanResult,
+      scanResult: filteredScanResult,
       projectPath,
-      options,
+      options: {
+        ...options,
+        cachedResults, // Pass cached results to agents for merging
+      },
       currentAgentIndex: 0,
       agentNames,
       agentResults: new Map(),
@@ -440,12 +455,20 @@ export class DocumentationOrchestrator {
     const executionTime = Date.now() - startTime;
     this.logger.info(`Documentation generation completed in ${(executionTime / 1000).toFixed(2)}s`);
 
+    // Log delta analysis savings
+    if (savings.filesSkipped > 0) {
+      this.logger.info(
+        `💰 Delta analysis savings: ${savings.filesSkipped} files skipped, ~${savings.estimatedTokensSaved.toLocaleString()} tokens saved`,
+      );
+    }
+
     const output = finalState.output as DocumentationOutput;
     return {
       ...output,
       metadata: {
         ...output.metadata,
         generationDuration: executionTime,
+        deltaAnalysisSavings: savings,
       },
     };
   }
@@ -1186,20 +1209,30 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       (sum, r) => sum + r.tokenUsage.outputTokens,
       0,
     );
+    const agentCachedInputTokens = Array.from(agentResults.values()).reduce(
+      (sum, r) => sum + (r.tokenUsage.cachedInputTokens || 0),
+      0,
+    );
+    const agentCacheCreationTokens = Array.from(agentResults.values()).reduce(
+      (sum, r) => sum + (r.tokenUsage.cacheCreationTokens || 0),
+      0,
+    );
 
     // Include orchestrator tokens (synthesis, recommendations, etc.)
     const totalInputTokens = agentInputTokens + state.orchestratorTokens.inputTokens;
     const totalOutputTokens = agentOutputTokens + state.orchestratorTokens.outputTokens;
     const totalTokens = totalInputTokens + totalOutputTokens;
 
-    // Calculate total cost using actual provider/model pricing
+    // Calculate total cost using actual provider/model pricing with caching support
     const modelConfig = this.llmService.getModelConfig(
       this.llmService['defaultProvider'],
       this.llmService['getDefaultModel'](this.llmService['defaultProvider']),
     );
-    const totalCost = this.llmService['tokenManager'].calculateCost(
+    const totalCost = this.llmService['tokenManager'].calculateCostWithCache(
       totalInputTokens,
       totalOutputTokens,
+      agentCachedInputTokens,
+      agentCacheCreationTokens,
       modelConfig.costPerMillionInputTokens,
       modelConfig.costPerMillionOutputTokens,
     );
@@ -1224,6 +1257,24 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       );
     }
     this.logger.info(`💵 Total cost: $${totalCost.toFixed(4)}`);
+    if (agentCachedInputTokens > 0 || agentCacheCreationTokens > 0) {
+      const cacheSavings =
+        this.llmService['tokenManager'].calculateCost(
+          agentCachedInputTokens,
+          0,
+          modelConfig.costPerMillionInputTokens,
+          0,
+        ) -
+        this.llmService['tokenManager'].calculateCost(
+          agentCachedInputTokens,
+          0,
+          modelConfig.costPerMillionInputTokens / 10,
+          0,
+        );
+      this.logger.info(
+        `💰 Cache savings: $${cacheSavings.toFixed(4)} (${agentCachedInputTokens.toLocaleString()} cached tokens)`,
+      );
+    }
     this.logger.info(`📈 Avg tokens per agent: ${avgTokensPerAgent.toLocaleString()}`);
     this.logger.info('='.repeat(80));
 
@@ -1481,6 +1532,7 @@ ${allImprovements.slice(0, 30).join('\n')}
           files: result.files || [], // NEW: Agent-generated files
           confidence: result.confidence,
           executionTime: result.executionTime,
+          tokenUsage: result.tokenUsage, // NEW: Token usage for caching
           warnings: result.warnings,
           metadata: result.metadata || {},
         };
@@ -1828,5 +1880,109 @@ Needs Update: ${evaluation.needsUpdate}
     }
 
     return gaps;
+  }
+
+  /**
+   * Load cached results and filter files based on delta analysis
+   * Returns filtered scan result, cached agent results, and savings metrics
+   */
+  private async loadCacheAndFilterFiles(
+    projectPath: string,
+    scanResult: ScanResult,
+    options: OrchestratorOptions,
+  ): Promise<{
+    filteredScanResult: ScanResult;
+    cachedResults: Map<string, any>;
+    savings: {
+      filesSkipped: number;
+      estimatedTokensSaved: number;
+    };
+  }> {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const cacheDir = path.join(projectPath, '.arch-docs', 'cache');
+
+    const cachedResults = new Map<string, any>();
+    let filesSkipped = 0;
+    let estimatedTokensSaved = 0;
+
+    // If force is enabled, skip cache loading and filtering
+    if (options.force) {
+      this.logger.info('Force mode enabled: skipping delta analysis and cache loading');
+      return {
+        filteredScanResult: scanResult,
+        cachedResults,
+        savings: { filesSkipped: 0, estimatedTokensSaved: 0 },
+      };
+    }
+
+    // Check if delta analysis is available
+    if (!scanResult.deltaAnalysis?.enabled) {
+      this.logger.info('Delta analysis not available: performing full analysis');
+      return {
+        filteredScanResult: scanResult,
+        cachedResults,
+        savings: { filesSkipped: 0, estimatedTokensSaved: 0 },
+      };
+    }
+
+    // Load cached agent results
+    try {
+      const cacheFiles = await fs.readdir(cacheDir).catch(() => []);
+      for (const file of cacheFiles) {
+        if (file.endsWith('.json') && file !== 'file-hashes.json') {
+          const agentName = file.replace('.json', '');
+          try {
+            const cachePath = path.join(cacheDir, file);
+            const content = await fs.readFile(cachePath, 'utf-8');
+            const cachedData = JSON.parse(content);
+            cachedResults.set(agentName, cachedData);
+            this.logger.debug(`Loaded cache for agent: ${agentName}`);
+          } catch (error) {
+            this.logger.debug(`Failed to load cache for ${agentName}: ${error}`);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.debug(`Cache directory not found or inaccessible: ${error}`);
+    }
+
+    // Filter files: only analyze changed/new files
+    const filteredFiles = scanResult.files.filter((file) => {
+      const status = file.changeStatus;
+      if (status === 'unchanged') {
+        filesSkipped++;
+        // Estimate tokens saved (rough: ~100 tokens per file)
+        estimatedTokensSaved += 100;
+        return false;
+      }
+      return true; // Include new, modified, or deleted files
+    });
+
+    this.logger.info(
+      `Delta analysis: ${filteredFiles.length} files to analyze, ${filesSkipped} files skipped (unchanged)`,
+    );
+
+    if (scanResult.deltaAnalysis) {
+      this.logger.info(
+        `Change summary: ${scanResult.deltaAnalysis.changedFiles} changed, ${scanResult.deltaAnalysis.newFiles} new, ${scanResult.deltaAnalysis.unchangedFiles} unchanged`,
+      );
+    }
+
+    // Create filtered scan result
+    const filteredScanResult: ScanResult = {
+      ...scanResult,
+      files: filteredFiles,
+      totalFiles: filteredFiles.length,
+    };
+
+    return {
+      filteredScanResult,
+      cachedResults,
+      savings: {
+        filesSkipped,
+        estimatedTokensSaved,
+      },
+    };
   }
 }
