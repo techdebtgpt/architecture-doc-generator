@@ -277,6 +277,8 @@ export abstract class BaseAgentWorkflow {
     let finalState = initialState;
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    let totalCachedInputTokens = 0;
+    let totalCacheCreationTokens = 0;
 
     // Note: LangSmith trace name comes from individual node LLM calls (e.g., "{agent}-InitialAnalysis")
     // The LangGraph wrapper itself will show as "LangGraph" in traces
@@ -296,6 +298,12 @@ export abstract class BaseAgentWorkflow {
         }
         if (stateAny.totalOutputTokens !== undefined) {
           totalOutputTokens = stateAny.totalOutputTokens;
+        }
+        if (stateAny.totalCachedInputTokens !== undefined) {
+          totalCachedInputTokens = stateAny.totalCachedInputTokens;
+        }
+        if (stateAny.totalCacheCreationTokens !== undefined) {
+          totalCacheCreationTokens = stateAny.totalCacheCreationTokens;
         }
       }
     }
@@ -321,6 +329,8 @@ export abstract class BaseAgentWorkflow {
         inputTokens: totalInputTokens,
         outputTokens: totalOutputTokens,
         totalTokens: totalInputTokens + totalOutputTokens,
+        cachedInputTokens: totalCachedInputTokens,
+        cacheCreationTokens: totalCacheCreationTokens,
       },
       executionTime,
       errors: [],
@@ -387,12 +397,18 @@ export abstract class BaseAgentWorkflow {
         const usage = result?.response_metadata?.usage || result?.usage_metadata || {};
         const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
         const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
+        const cachedInputTokens = usage.cache_read_input_tokens || 0;
+        const cacheCreationTokens = usage.cache_creation_input_tokens || 0;
         const totalTokens = inputTokens + outputTokens;
 
-        // Log token usage
+        // Log token usage with cache info
         if (totalTokens > 0) {
+          const cacheInfo =
+            cachedInputTokens > 0 || cacheCreationTokens > 0
+              ? ` (${cachedInputTokens} cached, ${cacheCreationTokens} cache creation)`
+              : '';
           this.logger.debug(
-            `Token usage: ${inputTokens} input + ${outputTokens} output = ${totalTokens} total`,
+            `Token usage: ${inputTokens} input + ${outputTokens} output = ${totalTokens} total${cacheInfo}`,
             '💰',
           );
         } else {
@@ -406,7 +422,14 @@ export abstract class BaseAgentWorkflow {
         // Try to parse analysis - will throw if invalid JSON
         const analysisData = await this.parseAnalysis(analysisText);
 
-        return { result, analysisData, inputTokens, outputTokens };
+        return {
+          result,
+          analysisData,
+          inputTokens,
+          outputTokens,
+          cachedInputTokens,
+          cacheCreationTokens,
+        };
       },
       ({ analysisData }) => {
         // Validate JSON structure (check if it has expected properties)

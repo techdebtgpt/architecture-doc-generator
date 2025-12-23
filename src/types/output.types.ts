@@ -303,6 +303,12 @@ export interface DocumentationMetadata {
     clarityScore: number;
     missingInformation: string[];
   }>;
+
+  /** Delta analysis savings (v0.3.37+) */
+  deltaAnalysisSavings?: {
+    filesSkipped: number;
+    estimatedTokensSaved: number;
+  };
 }
 
 // Supporting types

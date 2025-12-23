@@ -9,6 +9,7 @@ import {
 } from '../config/language-config';
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { MarkdownRenderer } from '../services/markdown-renderer.service';
 
 interface DependencyInfo {
   name: string;
@@ -124,15 +125,6 @@ Please analyze dependency health, security, and provide recommendations.`;
 
   protected async parseAnalysis(analysis: string): Promise<Record<string, unknown>> {
     return this.parseAnalysisResult(analysis);
-  }
-
-  protected async formatMarkdown(
-    data: Record<string, unknown>,
-    state: Record<string, unknown>,
-  ): Promise<string> {
-    const context = state.context as AgentContext;
-    const dependencyData = await this.extractDependencies(context);
-    return this.formatMarkdownReport(data, dependencyData);
   }
 
   protected generateSummary(data: Record<string, unknown>): string {
@@ -282,62 +274,22 @@ Please analyze dependency health, security, and provide recommendations.`;
     });
   }
 
-  private formatMarkdownReport(
-    analysis: Record<string, unknown>,
-    dependencyData: DependencyData,
-  ): string {
-    // Type-safe accessors
-    const summary = (analysis.summary as string) || 'Dependency analysis completed';
-    const metrics = (analysis.metrics as Record<string, number>) || {};
-    const insights = (analysis.insights as string[]) || [];
-    const vulnerabilities = (analysis.vulnerabilities as Array<Record<string, string>>) || [];
-    const recommendations = (analysis.recommendations as string[]) || [];
-    const warnings = (analysis.warnings as string[]) || [];
-    const packageManagers = (dependencyData.packageManagers as string[]) || [];
+  protected async formatMarkdown(
+    data: Record<string, unknown>,
+    state: typeof AgentWorkflowState.State,
+  ): Promise<string> {
+    // Helper to extract strict state type
+    const context = state.context as AgentContext;
 
-    return `# 📦 Dependency Analysis
+    // Enrich with raw dependency data
+    const dependencyData = await this.extractDependencies(context);
+    const combinedData = {
+      ...data,
+      ...dependencyData,
+      totalDependencies: dependencyData.total,
+    };
 
-## Overview
-${summary}
-
-**Total Dependencies**: ${dependencyData.total || 0}
-**Package Managers**: ${packageManagers.join(', ') || 'None detected'}
-
-## Metrics
-${
-  Object.entries(metrics)
-    .map(([key, value]) => `- **${key}**: ${value}/10`)
-    .join('\n') || 'No metrics available'
-}
-
-## Key Insights
-${insights.map((insight: string, index: number) => `${index + 1}. ${insight}`).join('\n') || 'No insights available'}
-
-${
-  vulnerabilities.length > 0
-    ? `
-## 🔒 Security Concerns
-${vulnerabilities
-  .map(
-    (vuln) =>
-      `- **${vuln.package}** (${vuln.severity?.toUpperCase() || 'UNKNOWN'}): ${vuln.description}`,
-  )
-  .join('\n')}
-`
-    : ''
-}
-
-## 💡 Recommendations
-${recommendations.map((rec: string, index: number) => `${index + 1}. ${rec}`).join('\n') || 'No recommendations available'}
-
-${
-  warnings.length > 0
-    ? `
-## ⚠️ Warnings
-${warnings.map((warning: string) => `- ${warning}`).join('\n')}
-`
-    : ''
-}`;
+    return MarkdownRenderer.getInstance().render(this.getAgentName(), combinedData);
   }
 
   protected async generateFiles(

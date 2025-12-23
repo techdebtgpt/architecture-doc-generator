@@ -1,5 +1,13 @@
 import { Agent } from './agent.interface';
-import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/agent.types';
+import {
+  AgentContext,
+  AgentMetadata,
+  AgentPriority,
+  AgentFile,
+  ArchitectureAnalysis,
+  ArchitecturalStyle,
+} from '../types/agent.types';
+import { MarkdownRenderer } from '../services/markdown-renderer.service';
 import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
 import { LLMJsonParser } from '../utils/json-parser';
 import {
@@ -8,45 +16,6 @@ import {
   getComponentFiles,
   getSchemaFiles,
 } from '../config/language-config';
-
-/**
- * Architectural styles
- */
-export enum ArchitecturalStyle {
-  MONOLITHIC = 'monolithic',
-  MICROSERVICES = 'microservices',
-  LAYERED = 'layered',
-  EVENT_DRIVEN = 'event-driven',
-  HEXAGONAL = 'hexagonal',
-  SERVERLESS = 'serverless',
-  MODULAR_MONOLITH = 'modular-monolith',
-}
-
-/**
- * Component information
- */
-export interface ComponentInfo {
-  name: string;
-  type: string;
-  description: string;
-  responsibilities: string[];
-  dependencies: string[];
-  technologies: string[];
-}
-
-/**
- * Architecture analysis result
- */
-export interface ArchitectureAnalysis {
-  style: ArchitecturalStyle;
-  components: ComponentInfo[];
-  layers: string[];
-  integrations: string[];
-  diagram: string; // Mermaid C4 or component diagram
-  insights: string[];
-  summary: string;
-  warnings: string[];
-}
 
 /**
  * Agent that analyzes high-level system architecture, components, and architectural patterns
@@ -83,7 +52,7 @@ export class ArchitectureAnalyzerAgent extends BaseAgentWorkflow implements Agen
   public async canExecute(context: AgentContext): Promise<boolean> {
     // Can execute on any project with source files (uses centralized language config)
     const sourceFiles = getCodeFiles(context.files);
-    return sourceFiles.length > 10; // Need minimum project size for meaningful analysis
+    return sourceFiles.length > 0; // Can analyze any project with source files
   }
 
   public async estimateTokens(context: AgentContext): Promise<number> {
@@ -197,9 +166,9 @@ Based on this structure, identify the architectural style, major components, lay
 
   protected async formatMarkdown(
     data: Record<string, unknown>,
-    _state: { context: unknown },
+    _state: typeof AgentWorkflowState.State,
   ): Promise<string> {
-    return this.formatMarkdownReport(data as unknown as ArchitectureAnalysis);
+    return MarkdownRenderer.getInstance().render(this.getAgentName(), data);
   }
 
   protected generateSummary(data: Record<string, unknown>): string {
@@ -364,115 +333,6 @@ Respond with ONE WORD only: monolithic, microservices, layered, event-driven, he
       summary: parsed.summary || 'Unable to parse architecture analysis - LLM output format error',
       warnings: parsed.warnings || ['Failed to parse architecture analysis JSON'],
     };
-  }
-
-  private formatMarkdownReport(analysis: ArchitectureAnalysis): string {
-    let report = `# 🏗️ System Architecture\n\n`;
-    report += `[← Back to Index](./index.md)\n\n`;
-    report += `---\n\n`;
-
-    report += `## Overview\n\n`;
-    report += `${analysis.summary}\n\n`;
-
-    report += `## Architectural Style\n\n`;
-    report += `**Style**: ${analysis.style}\n\n`;
-
-    if (analysis.layers.length > 0) {
-      report += `## System Layers\n\n`;
-      analysis.layers.forEach((layer, index) => {
-        report += `${index + 1}. ${layer}\n`;
-      });
-      report += `\n`;
-    }
-
-    if (analysis.components.length > 0) {
-      report += `## Main Components\n\n`;
-      analysis.components.forEach((comp) => {
-        report += `### ${comp.name}\n\n`;
-        report += `**Type**: ${comp.type}\n\n`;
-        report += `${comp.description}\n\n`;
-
-        if (comp.responsibilities.length > 0) {
-          report += `**Responsibilities**:\n`;
-          comp.responsibilities.forEach((resp) => {
-            report += `- ${resp}\n`;
-          });
-          report += `\n`;
-        }
-
-        if (comp.dependencies.length > 0) {
-          report += `**Dependencies**: ${comp.dependencies.join(', ')}\n\n`;
-        }
-
-        if (comp.technologies.length > 0) {
-          report += `**Technologies**: ${comp.technologies.join(', ')}\n\n`;
-        }
-      });
-    }
-
-    if (analysis.integrations.length > 0) {
-      report += `## External Integrations\n\n`;
-      analysis.integrations.forEach((integration) => {
-        report += `- ${integration}\n`;
-      });
-      report += `\n`;
-    }
-
-    if (analysis.diagram) {
-      report += `## Architecture Diagram\n\n`;
-      report += `> 💡 **Tip**: View this diagram with a Mermaid renderer:\n`;
-      report += `> - VS Code: Install "Markdown Preview Mermaid Support" extension\n`;
-      report += `> - GitHub/GitLab: Automatic rendering in markdown preview\n`;
-      report += `> - Online: Copy to [mermaid.live](https://mermaid.live)\n\n`;
-      report += `<details>\n<summary>📊 Click to view component diagram</summary>\n\n`;
-      report += `\`\`\`mermaid\n${analysis.diagram}\n\`\`\`\n\n`;
-      report += `</details>\n\n`;
-    }
-
-    if (analysis.insights.length > 0) {
-      report += `## 💡 Key Insights\n\n`;
-      analysis.insights.forEach((insight, index) => {
-        report += `${index + 1}. ${insight}\n`;
-      });
-      report += `\n`;
-    }
-
-    // Recommendations section (before metadata)
-    if (analysis.warnings.length > 0) {
-      report += `## 💡 Recommendations\n\n`;
-      report += `Based on the architectural analysis, consider the following improvements:\n\n`;
-      analysis.warnings.forEach((warning) => {
-        // Convert warnings to actionable recommendations
-        report += `- **Address**: ${warning}\n`;
-      });
-      report += `\n`;
-    }
-
-    // Add Architecture Metadata section (project-specific, not agent metadata)
-    report += `## Architecture Metadata\n\n`;
-    report += `| Property | Value |\n`;
-    report += `|----------|-------|\n`;
-    report += `| **Architecture Style** | ${analysis.style} |\n`;
-
-    if (analysis.layers && analysis.layers.length > 0) {
-      report += `| **Layers** | ${analysis.layers.join(', ')} |\n`;
-    }
-
-    if (analysis.components && analysis.components.length > 0) {
-      report += `| **Total Components** | ${analysis.components.length} |\n`;
-    }
-
-    if (analysis.integrations && analysis.integrations.length > 0) {
-      report += `| **External Integrations** | ${analysis.integrations.join(', ')} |\n`;
-    }
-
-    report += `| **Analysis Date** | ${new Date().toISOString().split('T')[0]} |\n`;
-    report += `\n`;
-
-    report += `---\n\n`;
-    report += `_Architecture analysis completed on ${new Date().toISOString()}_\n`;
-
-    return report;
   }
 
   protected async generateFiles(

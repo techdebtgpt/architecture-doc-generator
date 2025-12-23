@@ -148,3 +148,4 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .claude/
 .vscode/
+/.arch-docs

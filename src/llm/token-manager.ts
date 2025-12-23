@@ -111,6 +111,33 @@ export class TokenManager {
   }
 
   /**
+   * Calculate cost with prompt caching support (Anthropic)
+   * Cached tokens are 10x cheaper than regular input tokens
+   */
+  public calculateCostWithCache(
+    inputTokens: number,
+    outputTokens: number,
+    cachedInputTokens: number,
+    cacheCreationTokens: number,
+    costPerMillionInput: number,
+    costPerMillionOutput: number,
+  ): number {
+    // Regular input tokens (not cached)
+    const regularInputCost = (inputTokens / 1_000_000) * costPerMillionInput;
+
+    // Cached input tokens (10x cheaper - $0.30/M vs $3.00/M for Sonnet)
+    const cachedInputCost = (cachedInputTokens / 1_000_000) * (costPerMillionInput / 10);
+
+    // Cache creation tokens (same price as regular input, but creates cache)
+    const cacheCreationCost = (cacheCreationTokens / 1_000_000) * (costPerMillionInput * 1.25);
+
+    // Output tokens (same price regardless of caching)
+    const outputCost = (outputTokens / 1_000_000) * costPerMillionOutput;
+
+    return regularInputCost + cachedInputCost + cacheCreationCost + outputCost;
+  }
+
+  /**
    * Get or create encoder for a model
    */
   private getEncoder(model: string): Tiktoken {

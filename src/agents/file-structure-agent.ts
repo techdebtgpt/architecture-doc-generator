@@ -3,6 +3,7 @@ import { AgentContext, AgentMetadata, AgentPriority, AgentFile } from '../types/
 import { BaseAgentWorkflow, AgentWorkflowState } from './base-agent-workflow';
 import { LLMJsonParser } from '../utils/json-parser';
 import { getTestPatterns } from '../config/language-config';
+import { MarkdownRenderer } from '../services/markdown-renderer.service';
 
 /**
  * Agent that analyzes project file structure and organization
@@ -135,10 +136,9 @@ Respond with ONLY valid JSON - no markdown, no code blocks, no explanations. Sta
 
   protected async formatMarkdown(
     data: Record<string, unknown>,
-    state: Record<string, unknown>,
+    _state: Record<string, unknown>,
   ): Promise<string> {
-    const context = state.context as AgentContext;
-    return this.formatMarkdownReport(data, context);
+    return MarkdownRenderer.getInstance().render(this.getAgentName(), data);
   }
 
   protected generateSummary(data: Record<string, unknown>): string {
@@ -327,72 +327,6 @@ Respond with ONLY valid JSON - no markdown, no code blocks, no explanations. Sta
         warnings: ['Failed to parse LLM response as JSON'],
       },
     });
-  }
-
-  private formatMarkdownReport(analysis: Record<string, unknown>, context: AgentContext): string {
-    // Type-safe accessors
-    const summary = (analysis.summary as string) || 'File structure analysis completed';
-    const structure = (analysis.structure as Record<string, unknown>) || {};
-    const patterns = (analysis.patterns as Record<string, unknown>) || {};
-    const conventions = (analysis.conventions as Record<string, unknown>) || {};
-    const recommendations = (analysis.recommendations as string[]) || [];
-    const warnings = (analysis.warnings as string[]) || [];
-
-    const orgStrategy = (structure.organizationStrategy as string) || 'Not specified';
-    const keyDirs = (structure.keyDirectories as string[]) || [];
-    const dirPurposes = (structure.directoryPurposes as Record<string, string>) || {};
-    const archPatterns = (patterns.architectural as string[]) || [];
-    const orgPatterns = (patterns.organizational as string[]) || [];
-    const namingConventions = (conventions.naming as string[]) || [];
-    const groupingConventions = (conventions.grouping as string[]) || [];
-
-    return `# 📁 File Structure Analysis
-
-## Overview
-${summary}
-
-## Structure Organization
-**Strategy**: ${orgStrategy}
-
-### Key Directories
-${
-  keyDirs.length > 0
-    ? keyDirs
-        .map((dir: string) => `- **${dir}**: ${dirPurposes[dir] || 'Purpose not specified'}`)
-        .join('\n')
-    : 'No key directories identified'
-}
-
-## Patterns Detected
-
-### Architectural Patterns
-${archPatterns.length > 0 ? archPatterns.map((pattern: string) => `- ${pattern}`).join('\n') : 'No architectural patterns detected'}
-
-### Organizational Patterns
-${orgPatterns.length > 0 ? orgPatterns.map((pattern: string) => `- ${pattern}`).join('\n') : 'No organizational patterns detected'}
-
-## Conventions
-
-### Naming Conventions
-${namingConventions.length > 0 ? namingConventions.map((conv: string) => `- ${conv}`).join('\n') : 'No naming conventions detected'}
-
-### Grouping Conventions
-${groupingConventions.length > 0 ? groupingConventions.map((conv: string) => `- ${conv}`).join('\n') : 'No grouping conventions detected'}
-
-## Recommendations
-${recommendations.length > 0 ? recommendations.map((rec: string, index: number) => `${index + 1}. ${rec}`).join('\n') : 'No recommendations available'}
-
-${
-  warnings.length > 0
-    ? `
-## ⚠️ Warnings
-${warnings.map((warning: string) => `- ${warning}`).join('\n')}
-`
-    : ''
-}
-
----
-*Analysis completed in ${Date.now() - Date.parse(context.executionId)}ms*`;
   }
 
   protected async generateFiles(

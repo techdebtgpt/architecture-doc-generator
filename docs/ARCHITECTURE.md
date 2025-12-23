@@ -46,6 +46,33 @@ The `BaseOrchestrator` is an abstract base class that provides common functional
 
 This design allows for easy extension with new orchestrator types (e.g., C4 model generation, Mermaid diagrams) while maintaining consistency.
 
+### File System Scanner
+
+The `FileSystemScanner` is responsible for discovering and cataloging files in the project. It includes:
+
+- **File discovery**: Recursive directory scanning with pattern matching
+- **Delta Analysis** (v0.3.37+): Automatic change detection using Git or file hashing
+- **Language detection**: Automatic programming language identification
+- **Language-specific exclusions**: Automatically excludes patterns based on detected languages (e.g., `node_modules/` for JS/TS, `vendor/` for PHP/Go, `target/` for Rust/Java)
+- **Multi-level `.gitignore` support**: Recursively loads and respects `.gitignore` files from root and all subdirectories
+- **Ignore pattern support**: Respects `.gitignore` patterns (as-is) and custom exclude patterns
+- **Change status tracking**: Marks files as `new`, `modified`, `unchanged`, or `deleted`
+
+**Delta Analysis Features:**
+
+- **Git-based detection**: For Git repositories, uses Git commands to detect changed files
+- **Hash-based detection**: For non-Git projects, uses file content hashing to detect changes
+- **Automatic filtering**: Only changed/new files are passed to agents for analysis
+- **Cost optimization**: Reduces token usage by 60-90% on incremental runs
+
+**Ignore Pattern Handling:**
+
+- **Language-specific patterns**: Automatically collected from language configuration (e.g., `node_modules`, `vendor`, `target`, `venv`)
+- **Static patterns**: Use `**/` prefix for recursive matching at any depth
+- **`.gitignore` patterns**: Used exactly as written (no automatic modification)
+- **Subdirectory `.gitignore`**: Patterns from subdirectories are transformed to be root-relative while preserving their original format
+- **Pattern priority**: `.gitignore` patterns take precedence, then language-specific, then static defaults
+
 ### Documentation Orchestrator
 
 The `DocumentationOrchestrator` extends `BaseOrchestrator` and is the central coordinator for generating comprehensive documentation. It manages the entire workflow, from scanning the file system to executing agents and aggregating their results.
@@ -60,7 +87,21 @@ The `AgentRegistry` is responsible for managing the lifecycle and discovery of a
 
 ### File System Scanner
 
-The `FileSystemScanner` efficiently scans the project directory, respects `.gitignore` rules, and gathers metadata about the codebase, such as language distribution and file structure.
+The `FileSystemScanner` efficiently scans the project directory, respects `.gitignore` rules from all directory levels, and gathers metadata about the codebase, such as language distribution and file structure.
+
+**Ignore Pattern System:**
+
+- **Language-specific exclusions**: Automatically includes exclude patterns from all detected languages (e.g., `node_modules/` for TypeScript/JavaScript, `vendor/` for PHP/Go, `target/` for Rust/Java/Scala, `venv/` for Python)
+- **Multi-level `.gitignore` support**: Recursively finds and loads `.gitignore` files from root and all subdirectories
+- **Pattern handling**: `.gitignore` patterns are used as-is; static patterns use `**/` prefix for recursive matching
+- **Monorepo support**: Properly handles nested projects with their own `.gitignore` files
+
+**Delta Analysis** (v0.3.37+):
+
+- **Git-based detection**: For Git repositories, uses Git commands to detect changed files since the last commit or a specific commit/branch/tag
+- **Hash-based detection**: For non-Git projects, uses file content hashing stored in `.arch-docs/cache/file-hashes.json` to detect changes
+- **Change status tracking**: Marks files as `new`, `modified`, `unchanged`, or `deleted`
+- **Automatic filtering**: Only changed/new files are passed to agents for analysis, reducing costs by 60-90% on incremental runs
 
 ### LLM Service
 
@@ -82,12 +123,59 @@ The core of the generator is its multi-agent system, where specialized agents an
 
 ## 🌊 Data Flow
 
+### JSON-First Architecture (v0.3.36+)
+
+ArchDoc uses a **JSON-first internal format** where agents produce structured data as their primary output. Markdown is generated from this JSON by the `MarkdownRenderer` service.
+
+```
+┌──────────────┐
+│    Agent     │
+└──────┬───────┘
+       │
+       ├─► JSON Data (primary)
+       │   └─► Saved to .arch-docs/cache/{agent}.json
+       │
+       └─► MarkdownRenderer (local, no LLM)
+           └─► Markdown files in .arch-docs/
+```
+
+**Benefits**:
+
+- **Separation of Concerns**: Data generation decoupled from presentation
+- **Caching**: Structured data enables intelligent caching and delta analysis
+- **Multi-Client Support**: JSON can be consumed by CLI, MCP, web UI, etc.
+- **Cost Optimization**: Reuse cached JSON instead of re-running expensive LLM calls
+
+### Execution Flow
+
 1. **Scan**: The `FileSystemScanner` scans the project and creates an execution context.
-2. **Execute**: The `DocumentationOrchestrator` selects and runs the appropriate agents in parallel.
-3. **Analyze**: Each agent performs its analysis using the LLM service.
-4. **Refine**: If enabled, the results are iteratively refined to improve clarity and accuracy.
-5. **Aggregate**: The orchestrator aggregates the results from all agents into a final documentation output.
-6. **Format**: The output is formatted into Markdown files.
+2. **Delta Analysis** (v0.3.37+): Detects changed files using Git (or file hashing for non-Git projects).
+3. **Cache Loading**: Loads cached JSON results from previous runs (`.arch-docs/cache/`).
+4. **File Filtering**: Filters files to only analyze changed/new files (skips unchanged files).
+5. **Execute**: The `DocumentationOrchestrator` selects and runs the appropriate agents in parallel.
+6. **Analyze**: Each agent performs its analysis using the LLM service (only on changed files).
+7. **Generate JSON**: Agent produces structured JSON data (primary output).
+8. **Merge**: Cached results are merged with new analysis results.
+9. **Cache**: JSON is saved to `.arch-docs/cache/{agent-name}.json` with metadata.
+10. **Render**: `MarkdownRenderer` converts JSON to Markdown (local, no tokens).
+11. **Aggregate**: The orchestrator aggregates results from all agents.
+12. **Format**: The output is formatted into multiple Markdown files.
+
+### Token Tracking & Cost Calculation
+
+ArchDoc accurately tracks token usage including **Anthropic's prompt caching**:
+
+- **Regular Input Tokens**: $3.00/M (Claude Sonnet 4.5)
+- **Cached Input Tokens**: $0.30/M (10x cheaper!)
+- **Cache Creation Tokens**: $3.75/M (1.25x regular)
+- **Output Tokens**: $15.00/M
+
+The orchestrator displays:
+
+```
+💵 Total cost: $0.4545
+💰 Cache savings: $0.1234 (45,678 cached tokens)
+```
 
 ## 🎨 Design Patterns
 

@@ -23,6 +23,7 @@ archdoc config --init
 ```
 
 This will prompt you to configure:
+
 - LLM provider (anthropic, openai, google, xai)
 - Model to use
 - API key
@@ -77,12 +78,14 @@ archdoc config --init
 ```
 
 **Advantages:**
+
 - ✅ Project-specific settings
 - ✅ Different configs per project
 - ✅ Works offline
 - ✅ Easy to manage
 
 **Security Note:** Add to `.gitignore`:
+
 ```
 .archdoc.config.json
 ```
@@ -100,12 +103,14 @@ archdoc-mcp-server
 ```
 
 **Advantages:**
+
 - ✅ No local config file needed
 - ✅ Use editor's API key directly
 - ✅ Great for CI/CD pipelines
 - ✅ Works with Claude Code, Cursor, Copilot
 
 **Supported Environment Variables:**
+
 - `ANTHROPIC_API_KEY` - Anthropic API key
 - `OPENAI_API_KEY` - OpenAI API key
 - `GOOGLE_API_KEY` - Google API key
@@ -151,6 +156,7 @@ The setup command adds ArchDoc to your Cursor MCP configuration at `~/.cursor/mc
 4. You're ready to use it!
 
 **In Cursor:**
+
 - Type `@archdoc` to access ArchDoc tools
 - Use tools like `@archdoc generate_documentation` or `@archdoc query_documentation`
 
@@ -165,6 +171,7 @@ The setup command configures ArchDoc at `~/.claude/mcp.json`.
 3. Ask Claude Code to use ArchDoc tools
 
 **Example prompts:**
+
 - "Use the archdoc tool to generate documentation for this project"
 - "Query the architecture documentation to understand the data flow"
 
@@ -179,12 +186,14 @@ The setup command creates a configuration at `~/.vscode/mcp.json`.
 3. Use Copilot Chat with ArchDoc commands
 
 **Example prompts:**
+
 - "@archdoc generate_documentation"
 - "Use archdoc to analyze the project structure"
 
 ### Claude Desktop
 
 The setup command configures ArchDoc in the Claude Desktop config:
+
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `~/AppData/Roaming/Claude/claude_desktop_config.json`
 - **Linux:** `~/.config/Claude/claude_desktop_config.json`
@@ -212,6 +221,7 @@ Verify your ArchDoc configuration is valid.
 Create or update your `.archdoc.config.json` file.
 
 **Parameters:**
+
 - `provider` - LLM provider (required)
 - `model` - Model to use (required)
 - `apiKey` - API key for provider (required)
@@ -225,6 +235,7 @@ Create or update your `.archdoc.config.json` file.
 Generate comprehensive architecture documentation.
 
 **Parameters:**
+
 - `outputDir` - Output directory (default: .arch-docs)
 - `depth` - Analysis depth: "quick", "normal", or "deep"
 - `focusArea` - Focus area (e.g., "security", "performance")
@@ -238,6 +249,7 @@ Generate comprehensive architecture documentation.
 Search documentation using semantic search (RAG).
 
 **Parameters:**
+
 - `question` - Your question (required)
 - `topK` - Number of results (default: 5)
 
@@ -248,6 +260,7 @@ Search documentation using semantic search (RAG).
 Add new focus areas to existing documentation.
 
 **Parameters:**
+
 - `prompt` - What to add/analyze
 - `existingDocsPath` - Path to existing docs
 
@@ -264,6 +277,7 @@ Detect design patterns and anti-patterns.
 Analyze project dependencies.
 
 **Parameters:**
+
 - `includeDevDeps` - Include dev dependencies (default: true)
 
 **Usage:** "Analyze the project dependencies"
@@ -273,6 +287,7 @@ Analyze project dependencies.
 Get improvement recommendations.
 
 **Parameters:**
+
 - `focusArea` - "security", "performance", "maintainability", or "all"
 
 **Usage:** "What improvements would you recommend?"
@@ -282,6 +297,7 @@ Get improvement recommendations.
 Validate code against documented architecture.
 
 **Parameters:**
+
 - `filePath` - File to validate (required)
 
 **Usage:** "Validate this file against our architecture"
@@ -309,6 +325,7 @@ The server runs on stdio and accepts MCP protocol requests.
 **Error:** "Command not found: archdoc-mcp-server"
 
 **Solution:**
+
 1. Make sure you've built the project: `npm run build`
 2. Install locally first: `npm install @techdebtgpt/archdoc-generator`
 3. For development, use: `npm run mcp:dev`
@@ -318,6 +335,7 @@ The server runs on stdio and accepts MCP protocol requests.
 **Error:** "No Configuration Found"
 
 **Solution:**
+
 1. Run: `archdoc config --init`
 2. Follow the prompts to set up your provider and API key
 3. Make sure `.archdoc.config.json` is in your project root
@@ -325,6 +343,7 @@ The server runs on stdio and accepts MCP protocol requests.
 ### MCP Server Not Available After Setup
 
 **Solution:**
+
 1. Check that the setup command completed successfully
 2. Verify the config file was created (check paths above for your OS)
 3. Restart your AI client completely (not just reload)
@@ -333,6 +352,7 @@ The server runs on stdio and accepts MCP protocol requests.
 ### Slow Documentation Generation
 
 **Tips:**
+
 1. Use `--depth quick` for faster analysis
 2. Use `--search-mode keyword` (faster than vector search)
 3. Limit with `--selective-agents` to run only needed agents
@@ -343,6 +363,7 @@ The server runs on stdio and accepts MCP protocol requests.
 **Error:** "No API key configured"
 
 **Solution:**
+
 1. Run: `archdoc config --init`
 2. Enter your API key when prompted
 3. Verify it's in `.archdoc.config.json`
@@ -471,6 +492,14 @@ Combine semantic and structural search:
 2. Review findings
 3. Ask: "What are your recommendations based on the dependencies?"
 
+### Workflow 4: IDE-Specific Prompts
+
+Try these prompts in your AI chat (Cursor, Claude Code, etc.):
+
+- “Use archdoc to explain this file’s role”
+- “Check if this follows our layered architecture”
+- “Analyze the impact of changing this interface”
+
 ## FAQ
 
 **Q: Can I use the MCP server without configuring an API key locally?**
@@ -480,6 +509,7 @@ A: Yes, for Claude Desktop and some other clients, you can prompt for the API ke
 **Q: Can I use different LLM providers for documentation generation vs. embeddings?**
 
 A: Yes! You can use Claude for analysis and local embeddings for search:
+
 ```json
 {
   "llm": { "provider": "anthropic" },
@@ -498,6 +528,7 @@ A: Yes, just don't run the setup command. The MCP server is optional and only ac
 **Q: How do I remove the MCP server from a client?**
 
 A: Delete the archdoc entry from the client's config file:
+
 - Cursor: `~/.cursor/mcp.json`
 - Claude Code: `~/.claude/mcp.json`
 - VS Code: `~/.vscode/mcp.json`
