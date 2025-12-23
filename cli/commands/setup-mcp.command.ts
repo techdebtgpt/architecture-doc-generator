@@ -60,19 +60,16 @@ function getMcpConfigPath(client: 'cursor' | 'claude-code' | 'vscode' | 'claude-
  */
 function getMcpServerCommand(): { command: string; args?: string[]; cwd?: string } {
   const isGlobal = process.argv.includes('--global');
-  const isLocal = !isGlobal;
 
-  if (isLocal) {
-    // For local development: use npx with local package
-    return {
-      command: 'npx',
-      args: ['@techdebtgpt/archdoc-generator', 'mcp-server'],
-      cwd: undefined,
-    };
-  } else {
-    // For global installation: use direct command
+  if (isGlobal) {
     return {
       command: 'archdoc-mcp-server',
+    };
+  } else {
+    // For local: use npx to find the binary in node_modules/.bin
+    return {
+      command: 'npx',
+      args: ['--yes', 'archdoc-mcp-server'],
     };
   }
 }
@@ -235,7 +232,6 @@ export function registerSetupMcpCommand(program: any) {
     .description(
       'Set up ArchDoc MCP server for an AI client (cursor, claude-code, vscode, claude-desktop)',
     )
-    .option('--global', 'Use globally installed archdoc-generator (default: local npm package)')
     .action(setupMcp);
 
   // Also add a convenience command
