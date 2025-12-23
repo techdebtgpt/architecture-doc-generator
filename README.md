@@ -37,20 +37,24 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 ## ✨ Features
 
 - 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
-- 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings.
+- 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings (TF-IDF + Graph-based retrieval).
 - 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
 - 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
+- 💾 **JSON-First Architecture** (v0.3.37+): All agent outputs stored as JSON in `.archdoc/cache/` with Markdown as rendered views—enable fast local queries, multi-format exports, and zero-LLM-cost lookups.
 - ⚡ **Generation Performance Metrics**: Track agent execution times, token usage, costs, and confidence scores in metadata.
 - 🌍 **17 Languages Out-of-the-Box**: TypeScript, Python, Java, Go, C#, C/C++, Kotlin, PHP, Ruby, Rust, Scala, Swift, CSS, HTML, JSON, XML, Flex/ActionScript.
 - 🧠 **AI-Powered**: Uses LangChain with Claude 4.5, OpenAI o1/GPT-4o, Gemini 2.5, or Grok 3.
 - 📚 **Comprehensive Analysis**: Structure, dependencies, patterns, flows, schemas, security, and executive-level KPIs.
-- 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation.
-- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection.
-- 🎨 **Customizable**: Prompt-based agent selection and configuration.
-- 📊 **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking.
+- 📝 **Markdown Output**: Clean, version-controllable documentation with smart navigation and dynamic table of contents.
+- 🔄 **Iterative Refinement**: Self-improving analysis with quality checks and gap detection (LangGraph-based workflow).
+- 🎨 **Customizable**: Prompt-based agent selection and configuration without code changes.
+- 📊 **LangSmith Tracing**: Full observability of AI workflows with detailed token tracking and multi-step traces.
 - 🔒 **Security Analysis**: Vulnerability detection, authentication review, and crypto analysis.
 - ➕ **Extensible**: Add support for any language via configuration—no code changes required.
 - 💰 **Delta Analysis** (v0.3.37+): Automatic change detection reduces costs by 60-90% on incremental runs. Uses Git or file hashing to only analyze changed files.
+- 🔄 **MCP Integration** (v0.3.30+): Native Model Context Protocol support for Cursor, Claude Code, VS Code + Copilot, and Claude Desktop—access ArchDoc as a native tool in your AI assistant.
+- 📂 **Recursive .gitignore Support**: Automatically loads `.gitignore` patterns from any directory level (root and subdirectories), ensuring consistent file filtering across monorepo structures and nested projects.
+- 🌿 **Branch-Based Augmented Generation** (v0.3.37+): Delta analysis supports Git branches, tags, and commits—compare against `main`, `develop`, or any specific reference to generate augmented documentation focusing only on changes.
 
 ## 🚀 Quick Start
 
@@ -96,9 +100,66 @@ archdoc analyze --output ./docs
 
 # Verbose output for debugging
 archdoc analyze --verbose
+
+# Branch-based augmented generation (delta analysis)
+archdoc analyze --since main       # Compare against main branch
+archdoc analyze --since develop    # Compare against develop branch
+archdoc analyze --since v1.0.0     # Compare against specific tag
+
+# Force full analysis (skip delta analysis)
+archdoc analyze --force
+
+# Quick analysis (faster, fewer tokens)
+archdoc analyze --depth quick
 ```
 
 For complete CLI options and advanced usage, see [CLI Usage](#-cli-usage) section below.
+
+### 🔍 Query Generated Documentation (RAG)
+
+Once documentation is generated, query it with natural language using **Retrieval-Augmented Generation (RAG)**:
+
+```bash
+# Interactive query mode
+archdoc query
+
+# Ask a specific question
+archdoc query "Which services handle user authentication?"
+
+# Query with file context (find related files)
+archdoc query "Show all files related to payment processing"
+
+# Explain a specific file (find its role and dependencies)
+archdoc explain src/services/auth.service.ts
+
+# Analyze architecture impact
+archdoc impact src/utils/ --show-dependents
+```
+
+**Key Features:**
+
+- ✅ **Zero-Cost Local Search**: Uses FREE local TF-IDF embeddings (no API calls)
+- ✅ **Hybrid Retrieval**: Combines semantic search with dependency graph analysis
+- ✅ **Smart Caching**: Queries reuse `.archdoc/cache/` JSON files instead of re-running LLM
+- ✅ **Multi-Format**: Search by function name, file path, architecture role, or natural language
+
+**Example Outputs:**
+
+```
+Q: "Where is the payment logic?"
+A:
+  - src/services/payment/stripe.service.ts (role: Payment Processor)
+  - src/handlers/checkout.handler.ts (role: API Endpoint)
+  - src/models/transaction.model.ts (role: Data Model)
+
+Q: "What breaks if we refactor authentication?"
+A:
+  - Affected: src/middleware/auth.ts
+  - Depends on: 12 endpoints, 3 services, 2 guards
+  - Risk level: HIGH (critical path)
+```
+
+See [docs/VECTOR_SEARCH.md](./docs/VECTOR_SEARCH.md) for advanced RAG configuration and [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) for complete command reference.
 
 ---
 

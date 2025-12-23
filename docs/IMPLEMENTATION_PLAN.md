@@ -1,103 +1,213 @@
 # 🏗️ ArchDoc Implementation Plan
 
-This document breaks down our Roadmap into actionable User Stories and small TODO items.
+This document breaks down our Roadmap into **actionable User Stories and TODO items for the current quarter**. For long-term vision and completed features, see [ROADMAP.md](./ROADMAP.md).
 
 ---
 
-## 🗂️ EPIC 1: Implement Core MCP Integration
+## 📋 Overview
 
-**Goal:** Native, high-performance integration with Cursor, Claude Code, and VS Code.
+**Current Status**: v0.3.37+ (December 2025)
 
-### Story 1: Standardize Tool Output for AI Clients
-
-> "As an AI client (like Claude), I want tool outputs to be pure JSON so that I can parse results reliably without being distracted by Markdown formatting."
-
-- [ ] Refactor `src/mcp-server/tools/handlers.ts` to return structured JSON.
-- [ ] Ensure `generate_documentation` returns a JSON summary of what was created.
-- [ ] Handle client-specific capabilities to decide between JSON and Markdown output.
-
-### Story 2: Automated Multi-Client Setup
-
-> "As a developer, I want to register ArchDoc as a tool in my IDE with one simple command."
-
-- [ ] Implement `archdoc setup-mcp cursor` (writes to `~/.cursor/mcp.json`).
-- [ ] Implement `archdoc setup-mcp claude-code` (writes to `~/.claude/mcp.json`).
-- [ ] Implement `archdoc setup-mcp vscode` (writes to `~/.vscode/mcp.json`).
-- [ ] Implement `archdoc setup-mcp claude-desktop` (writes to OS-specific config path).
-
-### Story 3: Smart MCP-Aware Execution Mode
-
-> "As a user, I want ArchDoc to respond instantly in the IDE by reusing cached analysis instead of re-running LLM agents."
-
-- [ ] Implement detection of MCP client environment via headers/env vars.
-- [ ] Update `DocumentationService` to check `.archdoc/cache` before running agents.
-- [ ] Implement "Zero-Config" fallback: trigger a `quick` analysis if no cache exists.
+- ✅ Core agents (8 total): File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, KPI
+- ✅ MCP integration for IDE use
+- ✅ JSON-first cache architecture
+- ✅ Delta analysis (Git + file hashing)
+- ✅ RAG with hybrid retrieval (semantic + graph-based)
+- 📋 Next: TOON format optimization, query API, drift detection
 
 ---
 
-## 🗂️ EPIC 2: Token & Cost Optimization
+## 🗂️ EPIC 1: Token Optimization with TOON Format
 
-**Goal:** Reduce LLM costs by 90% for iterative development.
+**Goal**: Reduce LLM token usage by 40%+ through structured output formats.
 
-### Story 4: JSON-First Internal Structure ✅ COMPLETED
-
-> "As a developer, I want technical details stored in JSON so that they can be easily queried by tools."
-
-- [x] Refactor agents to output raw JSON to `.archdoc/cache/*.json`.
-- [x] Create a `MarkdownRenderer` service to generate `.md` files from JSON.
-- [x] Include token usage and execution metadata in JSON cache.
-- [x] Update all core agents (FileStructure, Dependency, Architecture) to use renderer.
-
-**Status**: ✅ Complete (2025-12-21)
-**Details**: See [Story 4 Walkthrough](file:///../.gemini/antigravity/brain/28fc2c8a-23ed-40a3-a35c-e2debe470d91/walkthrough.md)
-
-### Story 5: Delta Analysis via Git ✅ COMPLETED
-
-> "As a developer, I only want to pay for analyzing files I actually changed."
-
-- [x] Implement `GitService` for Git-based change detection
-- [x] Implement `FileHashService` for non-Git fallback
-- [x] Update `FileSystemScanner` to mark files with change status
-- [x] Update `DocumentationOrchestrator` to skip unchanged files
-- [x] Add `--force`, `--since` CLI flags
-
-**Status**: ✅ Complete (2025-01-XX)
-**Details**: Delta analysis automatically detects changed files using Git (or file hashing for non-Git projects) and only analyzes modified/new files, reducing costs by 60-90% on incremental runs.
-**Expected Savings**: 60-90% token reduction on incremental runs
+**Status**: ✅ Ready for implementation
 
 ### Story 6: TOON Format Integration for LLM Prompts
 
 > "As a developer, I want to reduce token costs by using TOON format in LLM prompts instead of JSON."
 
+**What is TOON?**
+
+- Compact, human-readable encoding of JSON data
+- Combines YAML indentation with CSV-style tabular arrays
+- 40% smaller than JSON for uniform arrays
+- Better LLM accuracy (73.9% vs 70%)
+
+**Implementation**:
+
 - [ ] Install `@toon-format/toon` package
-- [ ] Replace `JSON.stringify()` in agent prompts with TOON encoding
-- [ ] Update `file-structure-agent`, `pattern-detector-agent`, and other agents that send structured data to LLMs
-- [ ] Keep JSON for cache files (universal compatibility)
-- [ ] Measure token savings (expected 60-90% reduction in prompt tokens)
+- [ ] Create `ToonMarkdownRenderer` service (converts TOON to markdown tables)
+- [ ] Update agents with tabular data to use TOON:
+  - [ ] `file-structure-agent`: Files, directories, patterns
+  - [ ] `dependency-analyzer-agent`: Vulnerabilities, dependencies
+  - [ ] `schema-generator-agent`: Entities, relationships
+  - [ ] `pattern-detector-agent`: Detected patterns
+- [ ] Keep JSON for deeply nested/non-uniform data (architecture components)
+- [ ] Add `--toon-format` flag to CLI for opt-in
+- [ ] Measure token savings in real analysis runs
 
-**Status**: 📋 Planned
-**Expected Savings**: 60-90% token reduction in LLM prompts
+**Expected Results**:
 
-### Story 7: Real-time Cost Dashboard
+- 35-40% token reduction per agent
+- 390+ tokens saved per full analysis (~10% cost reduction)
+- Improved LLM accuracy on tabular data
 
-> "As a project lead, I want to see exactly how much each analysis costs."
+**Acceptance Criteria**:
 
-- [ ] Inject token counting into the `LLMService` base class.
-- [ ] Record per-agent costs in the result object.
-- [ ] Update `kpi.md` or `metadata.md` with a "Savings vs Full Run" metric.
+- [ ] All agents support TOON output (with JSON fallback)
+- [ ] No breaking changes to existing output
+- [ ] Documentation updated
+- [ ] Token savings verified in benchmarks
 
 ---
 
-## 🗂️ EPIC 3: Developer-Centric Query Interface
+## 🗂️ EPIC 2: Query & RAG Improvements
 
-**Goal:** Turn documentation into an interactive expert.
+**Goal**: Make architecture documentation fully queryable without LLM calls.
+
+**Status**: 📋 In planning
 
 ### Story 8: Instant CLI Query
 
-> "As a developer, I want to ask questions about the codebase without opening a browser."
+> "As a developer, I want to ask questions about the codebase without opening a browser or waiting for LLM responses."
 
-- [ ] Implement `archdoc query <question>`.
-- [ ] Connect the query command to the existing `VectorStoreService`.
+**Implementation**:
+
+- [ ] Implement `archdoc query <question>` command
+- [ ] Connect to existing `VectorStoreService` for semantic search
+- [ ] Query `.archdoc/cache/*.json` instead of re-running LLM
+- [ ] Support multiple query types:
+  - [ ] Natural language: "Which services handle authentication?"
+  - [ ] File-based: `archdoc explain src/auth/` → role, dependencies, risks
+  - [ ] Impact analysis: `archdoc impact src/utils/` → shows dependents
+- [ ] Fallback to local regex search if vector embeddings disabled
+
+**Acceptance Criteria**:
+
+- [ ] Query returns results in <100ms
+- [ ] No API costs (use cached JSON only)
+- [ ] Results ranked by relevance
+
+### Story 9: File-to-Architecture Mapping
+
+> "As a developer looking at a specific file, I want to know its role and dependencies instantly."
+
+**Implementation**:
+
+- [ ] Implement `archdoc explain <file_path>` command
+- [ ] Extract architecture role from cached analysis
+- [ ] Show journey mapping: which user flows touch this file
+- [ ] Display critical dependencies and dependents
+
+---
+
+## 🗂️ EPIC 3: Observability & CI Guardrails
+
+**Goal**: Enforce architectural integrity in every PR.
+
+**Status**: 📋 Planned
+
+### Story 10: Architecture Drift Detection
+
+> "As a tech lead, I want the build to fail if a developer introduces a major architectural violation."
+
+**Implementation**:
+
+- [ ] Implement `archdoc diff <baseline> <current>` command
+- [ ] Compare current analysis against committed baseline (`.arch-docs/baseline.json`)
+- [ ] Detect "Critical Changes":
+  - [ ] New public APIs
+  - [ ] Circular dependencies introduced
+  - [ ] Security vulnerabilities added
+  - [ ] Test coverage decreased
+- [ ] Implement exit codes for CI/CD:
+  - Exit 0: No critical changes
+  - Exit 1: Critical changes detected
+  - Exit 2: Analysis failed
+
+**Acceptance Criteria**:
+
+- [ ] Can run in GitHub Actions
+- [ ] Clear diff report in console
+- [ ] Configurable thresholds
+
+### Story 11: Automated PR Comments
+
+> "As a reviewer, I want to see the architectural impact of a PR directly in the GitHub UI."
+
+**Implementation**:
+
+- [ ] Create GitHub Action template (`.github/workflows/arch-check.yml`)
+- [ ] Generate "Impact Summary" for PR descriptions
+- [ ] Auto-comment on PRs with:
+  - Files changed in architecture
+  - New dependencies introduced
+  - Risk assessment
+
+---
+
+## 🗂️ EPIC 4: Extensibility
+
+**Goal**: Empower teams to customize their analysis.
+
+**Status**: 📋 Planned
+
+### Story 12: Custom Agent API
+
+> "As a user, I want to add my own domain-specific analysis agents."
+
+**Implementation**:
+
+- [ ] Define standard `BaseAgent` interface for third-party extensions
+- [ ] Implement dynamic loading mechanism for `custom-agents/*.ts`
+- [ ] Allow configuration-based agent selection
+- [ ] Support for custom output formats
+
+---
+
+## 📊 Current Work (v0.3.37+)
+
+### Completed
+
+- ✅ **Core Agents**: 8 agents covering structure, dependencies, patterns, security
+- ✅ **MCP Integration**: Cursor, Claude Code, VS Code, Claude Desktop
+- ✅ **JSON Cache**: `.archdoc/cache/` with structured outputs
+- ✅ **Delta Analysis**: Git-based + file hash fallback (60-90% savings)
+- ✅ **RAG Search**: Semantic + graph-based hybrid retrieval
+- ✅ **LangSmith Tracing**: Full observability with token tracking
+- ✅ **Dynamic TOC**: Auto-generated table of contents
+
+### In Progress
+
+- 📋 **TOON Format**: Token optimization (35-40% reduction)
+- 📋 **Query API**: Natural language search over cached docs
+- 📋 **Prettier Check**: CI/CD lint improvements
+
+### Next Quarter
+
+- 📋 **Drift Detection**: Architecture compliance checking
+- 📋 **GitHub Actions**: Automated PR impact comments
+- 📋 **Custom Agents**: Extensibility API
+
+---
+
+## 🔗 Related Documents
+
+- **[ROADMAP.md](./ROADMAP.md)** - Long-term vision and completed features
+- **[docs/ARCHITECTURE.md](./ARCHITECTURE.md)** - Technical architecture
+- **[docs/CONTRIBUTING.md](./CONTRIBUTING.md)** - Developer guide
+- **[docs/MCP-SETUP.md](./MCP-SETUP.md)** - MCP configuration
+
+---
+
+## 💬 Feedback & Contributions
+
+Have ideas or want to contribute? We'd love to hear from you!
+
+- 💡 **Suggest Features**: [Open an Issue](https://github.com/techdebtgpt/architecture-doc-generator/issues/new?template=feature_request.md)
+- 🗣️ **Join Discussion**: [GitHub Discussions](https://github.com/techdebtgpt/architecture-doc-generator/discussions)
+- 🤝 **Contribute**: See [CONTRIBUTING.md](./CONTRIBUTING.md)
 - [ ] Fallback to local regex search if vector embeddings are disabled.
 
 ### Story 9: File-to-Architecture Mapper
