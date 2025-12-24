@@ -20,6 +20,10 @@ export interface ToolResponse {
     mimeType?: string;
   }>;
   isError?: boolean;
+  _meta?: {
+    structuredData?: Record<string, any>; // JSON data for programmatic access
+    format?: 'json' | 'markdown' | 'hybrid'; // Output format used
+  };
 }
 
 /**
@@ -63,12 +67,22 @@ export interface ToolDefinition {
 }
 
 /**
+ * Client capabilities for output formatting
+ */
+export interface ClientCapabilities {
+  supportsJson?: boolean; // Client can parse JSON directly
+  supportsMarkdown?: boolean; // Client prefers Markdown
+  interactive?: boolean; // Client supports interactive prompts
+}
+
+/**
  * Tool context passed to handlers
  */
 export interface ToolContext {
   projectPath: string;
   config: ArchDocConfig;
   logger: any; // Logger instance
+  clientCapabilities?: ClientCapabilities;
 }
 
 /**

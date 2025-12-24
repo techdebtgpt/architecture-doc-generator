@@ -10,6 +10,7 @@ import { DocumentationOrchestrator } from '../../orchestrator/documentation-orch
 import { AgentRegistry } from '../../agents/agent-registry';
 import { FileSystemScanner } from '../../scanners/file-system-scanner';
 import { MultiFileMarkdownFormatter } from '../../formatters/multi-file-markdown-formatter';
+import { CacheService } from './cache.service';
 import * as fs from 'fs/promises';
 
 const logger = new Logger('DocumentationService');
@@ -41,15 +42,48 @@ export class DocumentationService {
     focusArea?: string;
     selectiveAgents?: string[];
     maxCostDollars?: number;
+    useCacheIfAvailable?: boolean; // NEW: Enable cache usage
   }): Promise<{
     output: any;
     docsPath: string;
+    fromCache?: boolean; // NEW: Indicates if result came from cache
   }> {
     const depth = options.depth || 'normal';
     const docsPath = options.outputDir || path.join(this.projectPath, '.arch-docs');
     const focusArea = options.focusArea;
     const selectiveAgents = options.selectiveAgents;
     const maxCostDollars = options.maxCostDollars || 5.0;
+    const useCacheIfAvailable = options.useCacheIfAvailable ?? true; // Default to true
+
+    // NEW: Check cache if enabled
+    if (useCacheIfAvailable) {
+      const cacheService = CacheService.getInstance();
+      const isCacheValid = await cacheService.isCacheValid(this.projectPath, 24 * 60 * 60 * 1000); // 24 hours
+
+      if (isCacheValid) {
+        logger.info('Using cached documentation (MCP-aware mode)');
+        const metadata = await cacheService.getCacheMetadata(this.projectPath);
+
+        if (metadata) {
+          // Return cached result
+          const mockOutput = {
+            customSections: new Map(),
+            metadata: {
+              agentsExecuted: metadata.agentsExecuted,
+              totalTokensUsed: metadata.totalTokens,
+            },
+          };
+
+          return {
+            output: mockOutput,
+            docsPath,
+            fromCache: true,
+          };
+        }
+      } else {
+        logger.info('Cache not available or expired, generating fresh documentation...');
+      }
+    }
 
     logger.info(`Generating documentation for ${this.projectPath}...`);
 
@@ -79,7 +113,23 @@ export class DocumentationService {
       includeNavigation: true,
     });
 
-    return { output, docsPath };
+    // NEW: Save cache metadata
+    const cacheService = CacheService.getInstance();
+    const filesGenerated = Array.from(output.customSections.values()).reduce(
+      (sum: number, section: any) => sum + (section.files?.length || 0),
+      0,
+    );
+
+    await cacheService.saveCacheMetadata(this.projectPath, {
+      version: '1.0.0',
+      projectPath: this.projectPath,
+      generatedAt: new Date().toISOString(),
+      agentsExecuted: output.metadata.agentsExecuted || [],
+      totalTokens: output.metadata.totalTokensUsed || 0,
+      filesCount: filesGenerated,
+    });
+
+    return { output, docsPath, fromCache: false };
   }
 
   /**

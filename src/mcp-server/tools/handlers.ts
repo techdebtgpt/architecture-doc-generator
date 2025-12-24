@@ -8,11 +8,13 @@ import * as path from 'path';
 import { ContextualToolHandler } from '../types';
 import { DocumentationService } from '../services/documentation.service';
 import { VectorStoreService } from '../services/vector-store.service';
+import { OutputFormatter } from '../utils/output-formatter';
 import {
   createSelectiveAgentHandler,
   createCheckConfigHandler,
   createSetupConfigHandler,
 } from './handler-factory';
+import { handleCheckCache, handleInvalidateCache } from './cache-handlers';
 
 /**
  * Handler: check_config
@@ -32,38 +34,48 @@ export const handleGenerateDocumentation: ContextualToolHandler = async (args, c
 
   try {
     const docService = new DocumentationService(context.config, context.projectPath);
-    const { output, docsPath } = await docService.generateDocumentation({
+
+    // Enable cache usage in MCP mode (default: true)
+    const useCacheIfAvailable = args.useCache !== false;
+
+    const { output, docsPath, fromCache } = await docService.generateDocumentation({
       outputDir,
       depth,
       focusArea,
       selectiveAgents,
       maxCostDollars,
+      useCacheIfAvailable,
     });
 
     // Initialize vector store for RAG
     const vectorService = VectorStoreService.getInstance();
     await vectorService.initialize(docsPath);
 
-    const summary = docService.formatOutput(output, { docsPath });
+    // Count generated files
+    const filesGenerated = Array.from(output.customSections.values()).reduce(
+      (sum: number, section: any) => sum + (section.files?.length || 0),
+      0,
+    );
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: summary,
-        },
-      ],
+    // Calculate estimated cost (rough estimate: $0.01 per 1000 tokens)
+    const estimatedCost = (output.metadata.totalTokensUsed || 0) * 0.00001;
+
+    // Create structured response
+    const structuredData = {
+      success: true,
+      type: 'documentation_generated',
+      docsPath,
+      agentsExecuted: output.metadata.agentsExecuted || [],
+      totalTokens: output.metadata.totalTokensUsed || 0,
+      filesGenerated,
+      estimatedCost,
+      fromCache, // NEW: Indicate if from cache
+      timestamp: new Date().toISOString(),
     };
+
+    return OutputFormatter.createResponse(structuredData, context.clientCapabilities);
   } catch (error) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
-      isError: true,
-    };
+    return OutputFormatter.createErrorResponse(error as Error, { tool: 'generate_documentation' });
   }
 };
 
@@ -86,46 +98,42 @@ export const handleQueryDocumentation: ContextualToolHandler = async (args, cont
     if (vectorService.isReady()) {
       const results = await vectorService.query(question, topK);
 
-      let answer = `🔍 **Question**: ${question}\n\n`;
-      answer += `📚 **Relevant Documentation** (${results.length} sections):\n\n`;
-
-      for (const result of results) {
-        answer += `### ${result.file} (score: ${(result.score * 100).toFixed(1)}%)\n\n`;
-        answer += `${result.content.substring(0, 1000)}${result.content.length > 1000 ? '...' : ''}\n\n`;
-      }
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: answer,
-          },
-        ],
+      const structuredData = {
+        success: true,
+        type: 'query_result',
+        question,
+        totalResults: results.length,
+        results: results.map((r) => ({
+          file: r.file,
+          score: r.score,
+          content: r.content,
+        })),
+        timestamp: new Date().toISOString(),
       };
+
+      return OutputFormatter.createResponse(structuredData, context.clientCapabilities);
     }
 
     // Fallback: Read all docs
     const docService = new DocumentationService(context.config, context.projectPath);
     const allContent = await docService.readDocumentationFallback(docsPath);
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `📄 Documentation Content:\n\n${allContent.substring(0, 5000)}...\n\n⚠️ Note: Vector search not available, showing full docs instead.`,
-        },
-      ],
+    const structuredData = {
+      success: true,
+      type: 'query_result',
+      question,
+      fallback: true,
+      content: allContent.substring(0, 5000),
+      note: 'Vector search not available, showing full docs instead',
+      timestamp: new Date().toISOString(),
     };
+
+    return OutputFormatter.createResponse(structuredData, context.clientCapabilities);
   } catch (error) {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
-      isError: true,
-    };
+    return OutputFormatter.createErrorResponse(error as Error, {
+      tool: 'query_documentation',
+      question,
+    });
   }
 };
 
@@ -254,6 +262,8 @@ export const TOOL_HANDLERS: Record<string, ContextualToolHandler> = {
   analyze_dependencies: handleAnalyzeDependencies,
   get_recommendations: handleGetRecommendations,
   validate_architecture: handleValidateArchitecture,
+  check_cache: handleCheckCache,
+  invalidate_cache: handleInvalidateCache,
 };
 
 /**

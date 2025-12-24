@@ -8,6 +8,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { ContextualToolHandler } from '../types';
 import { DocumentationService } from '../services/documentation.service';
+import { OutputFormatter } from '../utils/output-formatter';
 
 /**
  * Create a selective agent handler
@@ -38,34 +39,32 @@ export function createSelectiveAgentHandler(
       const section = output.customSections.get(sectionKey) as any;
 
       if (!section) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `⚠️ No results for ${sectionKey}`,
-            },
-          ],
+        const structuredData = {
+          success: false,
+          type: 'agent_analysis',
+          agentName: sectionKey,
+          message: `No results for ${sectionKey}`,
         };
+        return OutputFormatter.createResponse(structuredData, context.clientCapabilities);
       }
 
-      return {
-        content: [
-          {
-            type: 'text',
-            text: section.content || section.markdown || 'No data available',
-          },
-        ],
+      const structuredData = {
+        success: true,
+        type: 'agent_analysis',
+        agentName: sectionKey,
+        summary: section.summary || 'Analysis complete',
+        tokensUsed: output.metadata.totalTokensUsed,
+        findings: section.data || {},
+        content: section.content || section.markdown,
+        timestamp: new Date().toISOString(),
       };
+
+      return OutputFormatter.createResponse(structuredData, context.clientCapabilities);
     } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-        isError: true,
-      };
+      return OutputFormatter.createErrorResponse(error as Error, {
+        tool: 'selective_agent',
+        agents: selectiveAgents,
+      });
     }
   };
 }

@@ -29,6 +29,7 @@ import { Logger } from '../utils/logger';
 import { getAllTools } from './tools/tool-registry';
 import { getToolHandler } from './tools/handlers';
 import { ConfigService } from './services/config.service';
+import { OutputFormatter } from './utils/output-formatter';
 
 const logger = new Logger('MCP-Server');
 
@@ -133,11 +134,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const configService = ConfigService.getInstance();
     const config = await configService.initializeConfig(projectPath);
 
+    // Detect client capabilities (from headers if available)
+    // Note: MCP doesn't expose headers directly, so we use a heuristic
+    const clientCapabilities = OutputFormatter.detectClientCapabilities();
+
     // Create context for handler
     const context = {
       projectPath,
       config,
       logger,
+      clientCapabilities,
     };
 
     // Call handler with context

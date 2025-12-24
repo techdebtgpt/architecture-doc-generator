@@ -361,6 +361,48 @@ export const TOOLS: Record<string, ToolDefinition> = {
       required: ['filePath'],
     },
   },
+
+  check_cache: {
+    name: 'check_cache',
+    description:
+      'Check documentation cache status. Returns whether cached documentation exists, its age, size, and validity.',
+    version: '1.0.0',
+    versionInfo: {
+      current: { major: 1, minor: 0, patch: 0 },
+      changelog: [
+        {
+          version: '1.0.0',
+          date: '2025-01-24',
+          changes: ['Initial release', 'MCP-aware execution support', 'Cache metadata tracking'],
+        },
+      ],
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+
+  invalidate_cache: {
+    name: 'invalidate_cache',
+    description:
+      'Invalidate the documentation cache to force fresh generation on next request. Useful when code has changed significantly.',
+    version: '1.0.0',
+    versionInfo: {
+      current: { major: 1, minor: 0, patch: 0 },
+      changelog: [
+        {
+          version: '1.0.0',
+          date: '2025-01-24',
+          changes: ['Initial release', 'Force cache invalidation', 'Fresh generation trigger'],
+        },
+      ],
+    },
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
 };
 
 /**
