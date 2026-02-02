@@ -19,7 +19,7 @@ export function createSelectiveAgentHandler(
 ): ContextualToolHandler {
   return async (args: any, context) => {
     try {
-      // Use project_path from args if provided, otherwise use context.projectPath (CodeWave pattern)
+      // Use project_path from args if provided, otherwise use context.projectPath
       const project_path = args.project_path;
       const projectPath = project_path || context.projectPath;
 
@@ -207,7 +207,7 @@ export function createCheckConfigHandler(): ContextualToolHandler {
  */
 export function createSetupConfigHandler(): ContextualToolHandler {
   return async (args: any, context) => {
-    // Use project_path from args if provided, otherwise use context.projectPath (CodeWave pattern)
+    // Use project_path from args if provided, otherwise use context.projectPath
     const project_path = args.project_path;
     const projectPath = project_path || context.projectPath;
     const configPath = path.join(projectPath, '.archdoc.config.json');

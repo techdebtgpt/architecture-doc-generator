@@ -18,7 +18,7 @@ import {
 
 /**
  * Handler: check_config
- * Accepts project_path parameter (like CodeWave's repo_path)
+ * Accepts project_path parameter
  */
 export const handleCheckConfig: ContextualToolHandler = async (args, context) => {
   const { project_path } = args as { project_path?: string };
@@ -36,7 +36,7 @@ export const handleCheckConfig: ContextualToolHandler = async (args, context) =>
 
 /**
  * Handler: setup_config
- * Accepts project_path parameter (like CodeWave's repo_path)
+ * Accepts project_path parameter
  */
 export const handleSetupConfig: ContextualToolHandler = async (args, context) => {
   const { project_path, ...restArgs } = args as { project_path?: string; [key: string]: any };
@@ -51,7 +51,7 @@ export const handleSetupConfig: ContextualToolHandler = async (args, context) =>
 
 /**
  * Handler: generate_documentation
- * Accepts project_path parameter (like CodeWave's repo_path)
+ * Accepts project_path parameter
  */
 export const handleGenerateDocumentation: ContextualToolHandler = async (args, context) => {
   const {
@@ -66,7 +66,7 @@ export const handleGenerateDocumentation: ContextualToolHandler = async (args, c
   } = args;
 
   try {
-    // CodeWave approach: use project_path from args if provided, otherwise context.projectPath
+    //  use project_path from args if provided, otherwise context.projectPath
     const projectPath = project_path || context.projectPath;
     try {
       await fs.access(projectPath);
@@ -82,13 +82,13 @@ export const handleGenerateDocumentation: ContextualToolHandler = async (args, c
       };
     }
 
-    // CodeWave approach: load config in handler if needed
+    //load config in handler if needed
     let config = context.config;
     if (!config) {
       try {
         const configService = ConfigService.getInstance();
         config = await configService.initializeConfig(projectPath);
-      } catch (error) {
+      } catch (_error) {
         // Config loading failed
       }
     }
@@ -205,7 +205,7 @@ export const handleGenerateDocumentation: ContextualToolHandler = async (args, c
 
 /**
  * Handler: query_documentation
- * Accepts project_path parameter (like CodeWave's repo_path)
+ * Accepts project_path parameter
  */
 export const handleQueryDocumentation: ContextualToolHandler = async (args, context) => {
   const {
@@ -285,7 +285,7 @@ export const handleQueryDocumentation: ContextualToolHandler = async (args, cont
 
 /**
  * Handler: update_documentation
- * Accepts project_path parameter (like CodeWave's repo_path)
+ * Accepts project_path parameter
  */
 export const handleUpdateDocumentation: ContextualToolHandler = async (args, context) => {
   const { project_path, prompt, existingDocsPath } = args as {
@@ -380,7 +380,7 @@ export const handleGetRecommendations = createSelectiveAgentHandler(
 
 /**
  * Handler: validate_architecture
- * Accepts project_path parameter (like CodeWave's repo_path)
+ * Accepts project_path parameter
  */
 export const handleValidateArchitecture: ContextualToolHandler = async (args, context) => {
   // Keep schema validation responsibility with registry/types; currently not implemented.
