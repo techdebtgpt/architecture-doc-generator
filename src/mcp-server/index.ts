@@ -2,17 +2,6 @@
 
 /**
  * MCP Server for Architecture Documentation Generator
- * Refactored for maintainability and testability
- *
- * Architecture:
- * - Types & Interfaces (types.ts)
- * - Tool Registry (tools/tool-registry.ts) - Tool definitions
- * - Tool Handlers (tools/handlers.ts) - Tool implementations
- * - Services (services/) - Business logic
- *   ├── ConfigService - Configuration management
- *   ├── DocumentationService - Documentation generation
- *   └── VectorStoreService - RAG vector store
- * - This file: MCP Protocol implementation & orchestration
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -25,12 +14,19 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { Logger } from '../utils/logger';
 import { getAllTools } from './tools/tool-registry';
 import { getToolHandler } from './tools/handlers';
 import { ConfigService } from './services/config.service';
 
-const logger = new Logger('MCP-Server');
+/**
+ * Simple logger for MCP server 
+ */
+const logger = {
+  info: (message: string) => console.error(`[INFO] ${message}`),
+  error: (message: string, error?: unknown) =>
+    console.error(`[ERROR] ${message}`, error || ''),
+  warn: (message: string) => console.error(`[WARN] ${message}`),
+};
 
 /**
  * MCP Server instance
@@ -116,24 +112,48 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
 /**
  * Handle tool calls
- * Routes to appropriate handler with proper context
+ * Routes to appropriate handler with context
  */
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
-  const projectPath = process.cwd();
+  const explicitProjectPath = (args as any).project_path;
+  const projectPath = explicitProjectPath || process.cwd();
+
+  logger.info(
+    `CallTool request received: ${name}${
+      explicitProjectPath ? ` (explicit path: ${explicitProjectPath})` : ` (cwd: ${projectPath})`
+    }`,
+  );
 
   try {
     // Get the handler for this tool
     const handler = getToolHandler(name);
     if (!handler) {
-      throw new Error(`Unknown tool: ${name}`);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Unknown tool: ${name}`,
+          },
+        ],
+        isError: true,
+      };
     }
 
-    // Initialize configuration
-    const configService = ConfigService.getInstance();
-    const config = await configService.initializeConfig(projectPath);
+    // Create context for handler (CLI-style: load config once per call, pass it in)
+    // Tools that don't need config can ignore it; tools that do should rely on context.config.
+    let config = null;
+    try {
+      // Avoid forcing config for setup/check tools (they intentionally work without it)
+      if (name !== 'check_config' && name !== 'setup_config') {
+        const configService = ConfigService.getInstance();
+        config = await configService.initializeConfig(projectPath);
+      }
+    } catch {
+      // Config missing/invalid is handled by individual tools as needed
+      config = null;
+    }
 
-    // Create context for handler
     const context = {
       projectPath,
       config,
@@ -143,7 +163,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Call handler with context
     const result = await handler(args, context);
 
-    // Convert ToolResponse to MCP ServerResult format
     return {
       content: result.content,
       isError: result.isError,
@@ -164,16 +183,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 /**
- * Start the MCP server on stdio
+ * Start the MCP server on stdio transport
  */
-async function start() {
+export async function startServer(): Promise<void> {
   const transport = new StdioServerTransport();
+  logger.info('ArchDoc MCP Server starting...');
   await server.connect(transport);
-  logger.info('ArchDoc MCP Server started on stdio transport');
+  // Note: connect() never returns - server runs indefinitely
 }
 
 // Start server
-start().catch((error) => {
+startServer().catch((error) => {
   logger.error('Failed to start MCP server', error);
   process.exit(1);
 });

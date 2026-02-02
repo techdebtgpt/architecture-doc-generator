@@ -279,6 +279,10 @@ export class DocumentationOrchestrator {
 
     // Get all agents and sort by dependencies (topological sort)
     let agents = this.agentRegistry.getAllAgents();
+    if (agents.length === 0) {
+      this.logger.error('AgentRegistry is empty! This should not happen.');
+      throw new Error('No agents registered in AgentRegistry. Agents must be registered before creating the orchestrator.');
+    }
 
     // Filter agents if selective list provided (from refinement check)
     if (options.selectiveAgents && options.selectiveAgents.length > 0) {
@@ -293,6 +297,10 @@ export class DocumentationOrchestrator {
     const agentNames = sortedAgents.map((a) => a.getMetadata().name);
 
     this.logger.info(`Found ${agentNames.length} agents: ${agentNames.join(', ')}`);
+    if (agentNames.length === 0) {
+      this.logger.error(`[ERROR] No agent names after sorting! This should not happen.`);
+      throw new Error('No agents available after filtering and sorting. Check agent registration.');
+    }
 
     // Validate embeddings API key if vector search mode is enabled
     if (options.agentOptions?.searchMode === 'vector') {
@@ -444,9 +452,13 @@ export class DocumentationOrchestrator {
       if (nodeNames.length > 0) {
         const lastNodeName = nodeNames[nodeNames.length - 1];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        finalState = (state as any)[lastNodeName] || finalState;
+        const nodeState = (state as any)[lastNodeName];
+        if (nodeState) {
+          finalState = nodeState;
+        }
       }
     }
+
 
     if (!finalState.output) {
       throw new Error('Documentation generation failed: no output produced');
@@ -671,11 +683,14 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     this.logger.info('🔄 Running only agents that need updates...');
 
     // Run selective regeneration with only the agents that need updates
+    // Force full analysis since refinement check already determined updates are needed
+    // Delta analysis might filter out files, but we need to analyze them for the selected agents
     const output = await this.generateDocumentation(projectPath, {
       ...options,
       incrementalMode: false,
       existingDocsPath: undefined,
-      selectiveAgents: agentsToRun, // NEW: Pass list of agents to run
+      selectiveAgents: agentsToRun, // Pass list of agents to run
+      force: true, // Force full analysis - refinement check already determined updates are needed
     });
 
     // Mark as refinement mode for changelog formatting
@@ -1917,8 +1932,13 @@ Needs Update: ${evaluation.needsUpdate}
     }
 
     // Check if delta analysis is available
-    if (!scanResult.deltaAnalysis?.enabled) {
-      this.logger.info('Delta analysis not available: performing full analysis');
+    // Also skip if scanResult has no files (shouldn't happen, but safety check)
+    if (!scanResult.deltaAnalysis?.enabled || scanResult.files.length === 0) {
+      if (scanResult.files.length === 0) {
+        this.logger.warn('⚠️ Scan result has 0 files - this should not happen. Check project path and scanner configuration.');
+      } else {
+        this.logger.info('Delta analysis not available: performing full analysis');
+      }
       return {
         filteredScanResult: scanResult,
         cachedResults,
@@ -1967,6 +1987,23 @@ Needs Update: ${evaluation.needsUpdate}
       this.logger.info(
         `Change summary: ${scanResult.deltaAnalysis.changedFiles} changed, ${scanResult.deltaAnalysis.newFiles} new, ${scanResult.deltaAnalysis.unchangedFiles} unchanged`,
       );
+    }
+
+    // If delta analysis filtered out ALL files, fall back to full analysis
+    // This can happen when all files are unchanged but user wants to regenerate/update docs
+    if (filteredFiles.length === 0 && scanResult.files.length > 0) {
+      this.logger.warn(
+        `⚠️ Delta analysis filtered out all files (all unchanged). Falling back to full analysis of all ${scanResult.files.length} files.`,
+      );
+      this.logger.info(
+        '💡 Tip: Use --force flag to always perform full analysis, or modify files to trigger delta analysis.',
+      );
+      // Return full scan result instead of filtered
+      return {
+        filteredScanResult: scanResult,
+        cachedResults,
+        savings: { filesSkipped: 0, estimatedTokensSaved: 0 },
+      };
     }
 
     // Create filtered scan result

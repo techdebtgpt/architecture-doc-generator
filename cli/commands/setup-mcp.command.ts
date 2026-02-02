@@ -16,10 +16,12 @@ interface McpServer {
 
 interface McpConfig {
   mcpServers?: Record<string, McpServer>;
+  servers?: Record<string, McpServer>;
 }
 
 /**
  * Get the appropriate MCP config file path based on client type
+ * VS Code reads from the user profile (Application Support/Code/User), not ~/.vscode/
  */
 function getMcpConfigPath(client: 'cursor' | 'claude-code' | 'vscode' | 'claude-desktop'): string {
   const homeDir = os.homedir();
@@ -28,10 +30,8 @@ function getMcpConfigPath(client: 'cursor' | 'claude-code' | 'vscode' | 'claude-
     case 'cursor':
       return path.join(homeDir, '.cursor', 'mcp.json');
     case 'claude-code':
-      // Claude Code uses the same config as Claude Desktop for now
       return path.join(homeDir, '.claude', 'mcp.json');
     case 'claude-desktop':
-      // macOS
       if (process.platform === 'darwin') {
         return path.join(
           homeDir,
@@ -41,15 +41,21 @@ function getMcpConfigPath(client: 'cursor' | 'claude-code' | 'vscode' | 'claude-
           'claude_desktop_config.json',
         );
       }
-      // Windows
       if (process.platform === 'win32') {
         return path.join(homeDir, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json');
       }
-      // Linux
       return path.join(homeDir, '.config', 'Claude', 'claude_desktop_config.json');
-    case 'vscode':
-      // VS Code settings are in settings.json, we'll provide CLI command instead
-      return path.join(homeDir, '.vscode', 'mcp.json');
+    case 'vscode': {
+      // VS Code (with Copilot) reads MCP config from user profile, not ~/.vscode/
+      if (process.platform === 'darwin') {
+        return path.join(homeDir, 'Library', 'Application Support', 'Code', 'User', 'mcp.json');
+      }
+      if (process.platform === 'win32') {
+        const appData = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
+        return path.join(appData, 'Code', 'User', 'mcp.json');
+      }
+      return path.join(homeDir, '.config', 'Code', 'User', 'mcp.json');
+    }
     default:
       throw new Error(`Unknown client: ${client}`);
   }
@@ -58,31 +64,34 @@ function getMcpConfigPath(client: 'cursor' | 'claude-code' | 'vscode' | 'claude-
 /**
  * Get the command to run the MCP server
  */
-function getMcpServerCommand(): { command: string; args?: string[]; cwd?: string } {
-  const isGlobal = process.argv.includes('--global');
+function getMcpServerCommand(options: { global?: boolean }): {
+  command: string;
+  args?: string[];
+  cwd?: string;
+} {
+  const isGlobal = options?.global === true;
 
   if (isGlobal) {
-    return {
-      command: 'archdoc-mcp-server',
-    };
-  } else {
-    // For local: use npx to find the binary in node_modules/.bin
-    return {
-      command: 'npx',
-      args: ['--yes', 'archdoc-mcp-server'],
-    };
+    return { command: 'archdoc-mcp-server' };
   }
+  return {
+    command: 'npx',
+    args: ['--yes', 'archdoc-mcp-server'],
+  };
 }
 
 /**
  * Read existing MCP config file or create new one
  */
-async function readMcpConfig(configPath: string): Promise<McpConfig> {
+async function readMcpConfig(configPath: string, client: string): Promise<McpConfig> {
   try {
     const content = await fs.readFile(configPath, 'utf-8');
-    return JSON.parse(content);
+    const parsed = JSON.parse(content) as McpConfig;
+    return parsed;
   } catch (_error) {
-    // File doesn't exist or is invalid, return empty config
+    if (client === 'vscode') {
+      return { servers: {} };
+    }
     return { mcpServers: {} };
   }
 }
@@ -132,7 +141,7 @@ async function ensureApiKey(): Promise<boolean> {
 /**
  * Register MCP server in the specified client
  */
-export async function setupMcp(client: string, _options: any) {
+export async function setupMcp(client: string, options: { global?: boolean } = {}) {
   const validClients = ['cursor', 'claude-code', 'vscode', 'claude-desktop'];
 
   if (!validClients.includes(client)) {
@@ -142,38 +151,41 @@ export async function setupMcp(client: string, _options: any) {
   }
 
   try {
-    // Check if API key is configured
     const hasApiKey = await ensureApiKey();
     if (!hasApiKey && client !== 'vscode') {
-      // VS Code can prompt for API key at runtime
       logger.warn('Continuing without local config (will need to configure in client UI)');
     }
 
     const configPath = getMcpConfigPath(
       client as 'cursor' | 'claude-code' | 'vscode' | 'claude-desktop',
     );
-    const mcpCommand = getMcpServerCommand();
+    const mcpCommand = getMcpServerCommand(options);
 
     logger.info(`Setting up ArchDoc MCP for ${chalk.bold(client)}...`);
     logger.info(`Config path: ${configPath}`);
 
-    // Read existing config
-    const config = await readMcpConfig(configPath);
+    const config = await readMcpConfig(configPath, client);
 
-    // Ensure mcpServers exists
-    if (!config.mcpServers) {
-      config.mcpServers = {};
-    }
-
-    // Add/update archdoc server
-    config.mcpServers['archdoc'] = {
-      type: 'stdio',
+    const serverEntry = {
+      type: 'stdio' as const,
       command: mcpCommand.command,
       ...(mcpCommand.args && { args: mcpCommand.args }),
       ...(mcpCommand.cwd && { cwd: mcpCommand.cwd }),
     };
 
-    // Write config
+    if (client === 'vscode') {
+      // VS Code (Copilot) uses "servers" key and reads from user profile
+      if (!config.servers) {
+        config.servers = {};
+      }
+      config.servers['archdoc'] = serverEntry;
+    } else {
+      if (!config.mcpServers) {
+        config.mcpServers = {};
+      }
+      config.mcpServers['archdoc'] = serverEntry;
+    }
+
     await writeMcpConfig(configPath, config);
 
     // Success message with client-specific instructions
@@ -199,11 +211,10 @@ export async function setupMcp(client: string, _options: any) {
 
       case 'vscode':
         logger.info(chalk.bold('📋 Next steps for VS Code + GitHub Copilot:'));
-        logger.info(`1. The config has been created: ${configPath}`);
-        logger.info('2. Open VS Code settings (Cmd+, or Ctrl+,)');
-        logger.info('3. Search for "MCP" or "Model Context Protocol"');
-        logger.info('4. Configure the server settings if needed');
-        logger.info('5. Restart VS Code');
+        logger.info(`1. The config has been written to: ${configPath}`);
+        logger.info('2. Restart VS Code (or Reload Window)');
+        logger.info('3. Open Chat (Ctrl+Shift+I / Cmd+Shift+I) and use Copilot');
+        logger.info('4. MCP servers appear in Extensions view (@mcp) or run "MCP: List Servers"');
         break;
 
       case 'claude-desktop':
@@ -232,6 +243,7 @@ export function registerSetupMcpCommand(program: any) {
     .description(
       'Set up ArchDoc MCP server for an AI client (cursor, claude-code, vscode, claude-desktop)',
     )
+    .option('--global', 'Use global archdoc-mcp-server binary (for global installs)')
     .action(setupMcp);
 
   // Also add a convenience command
