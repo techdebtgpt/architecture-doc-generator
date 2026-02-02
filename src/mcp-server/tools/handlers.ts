@@ -24,7 +24,7 @@ export const handleCheckConfig: ContextualToolHandler = async (args, context) =>
   const { project_path } = args as { project_path?: string };
   // Use project_path from args if provided, otherwise use context.projectPath
   const projectPath = project_path || context.projectPath;
-  
+
   // Call the factory handler with updated context
   const handler = createCheckConfigHandler();
   const updatedContext = {
@@ -54,7 +54,16 @@ export const handleSetupConfig: ContextualToolHandler = async (args, context) =>
  * Accepts project_path parameter (like CodeWave's repo_path)
  */
 export const handleGenerateDocumentation: ContextualToolHandler = async (args, context) => {
-  const { project_path, outputDir, depth = 'normal', focusArea, selectiveAgents, maxCostDollars = 5.0, force = false, since } = args;
+  const {
+    project_path,
+    outputDir,
+    depth = 'normal',
+    focusArea,
+    selectiveAgents,
+    maxCostDollars = 5.0,
+    force = false,
+    since,
+  } = args;
 
   try {
     // CodeWave approach: use project_path from args if provided, otherwise context.projectPath
@@ -199,7 +208,11 @@ export const handleGenerateDocumentation: ContextualToolHandler = async (args, c
  * Accepts project_path parameter (like CodeWave's repo_path)
  */
 export const handleQueryDocumentation: ContextualToolHandler = async (args, context) => {
-  const { project_path, question, topK = 5 } = args as { project_path?: string; question: string; topK?: number };
+  const {
+    project_path,
+    question,
+    topK = 5,
+  } = args as { project_path?: string; question: string; topK?: number };
   // Use project_path from args if provided, otherwise use context.projectPath
   const projectPath = project_path || context.projectPath;
   const docsPath = path.join(projectPath, '.arch-docs');
@@ -275,7 +288,11 @@ export const handleQueryDocumentation: ContextualToolHandler = async (args, cont
  * Accepts project_path parameter (like CodeWave's repo_path)
  */
 export const handleUpdateDocumentation: ContextualToolHandler = async (args, context) => {
-  const { project_path, prompt, existingDocsPath } = args as { project_path?: string; prompt: string; existingDocsPath?: string };
+  const { project_path, prompt, existingDocsPath } = args as {
+    project_path?: string;
+    prompt: string;
+    existingDocsPath?: string;
+  };
   // Use project_path from args if provided, otherwise use context.projectPath
   const projectPath = project_path || context.projectPath;
 

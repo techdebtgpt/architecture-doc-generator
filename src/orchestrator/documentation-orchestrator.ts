@@ -281,7 +281,9 @@ export class DocumentationOrchestrator {
     let agents = this.agentRegistry.getAllAgents();
     if (agents.length === 0) {
       this.logger.error('AgentRegistry is empty! This should not happen.');
-      throw new Error('No agents registered in AgentRegistry. Agents must be registered before creating the orchestrator.');
+      throw new Error(
+        'No agents registered in AgentRegistry. Agents must be registered before creating the orchestrator.',
+      );
     }
 
     // Filter agents if selective list provided (from refinement check)
@@ -458,7 +460,6 @@ export class DocumentationOrchestrator {
         }
       }
     }
-
 
     if (!finalState.output) {
       throw new Error('Documentation generation failed: no output produced');
@@ -1935,7 +1936,9 @@ Needs Update: ${evaluation.needsUpdate}
     // Also skip if scanResult has no files (shouldn't happen, but safety check)
     if (!scanResult.deltaAnalysis?.enabled || scanResult.files.length === 0) {
       if (scanResult.files.length === 0) {
-        this.logger.warn('⚠️ Scan result has 0 files - this should not happen. Check project path and scanner configuration.');
+        this.logger.warn(
+          '⚠️ Scan result has 0 files - this should not happen. Check project path and scanner configuration.',
+        );
       } else {
         this.logger.info('Delta analysis not available: performing full analysis');
       }

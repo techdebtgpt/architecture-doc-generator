@@ -19,12 +19,11 @@ import { getToolHandler } from './tools/handlers';
 import { ConfigService } from './services/config.service';
 
 /**
- * Simple logger for MCP server 
+ * Simple logger for MCP server
  */
 const logger = {
   info: (message: string) => console.error(`[INFO] ${message}`),
-  error: (message: string, error?: unknown) =>
-    console.error(`[ERROR] ${message}`, error || ''),
+  error: (message: string, error?: unknown) => console.error(`[ERROR] ${message}`, error || ''),
   warn: (message: string) => console.error(`[WARN] ${message}`),
 };
 

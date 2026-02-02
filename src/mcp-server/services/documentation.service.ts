@@ -45,7 +45,12 @@ function registerAgents(): AgentRegistry {
   agentRegistry.register(new SchemaGeneratorAgent());
   agentRegistry.register(new SecurityAnalyzerAgent());
   agentRegistry.register(new KPIAnalyzerAgent());
-  logger.info(`Registered ${agentRegistry.getAllAgents().length} agents: ${agentRegistry.getAllAgents().map(a => a.getMetadata().name).join(', ')}`);
+  logger.info(
+    `Registered ${agentRegistry.getAllAgents().length} agents: ${agentRegistry
+      .getAllAgents()
+      .map((a) => a.getMetadata().name)
+      .join(', ')}`,
+  );
   return agentRegistry;
 }
 
@@ -116,14 +121,14 @@ export class DocumentationService {
     const maxCostDollars = options.maxCostDollars || 5.0;
     const force = options.force || false;
     const since = options.since;
-    
+
     // Get depth config (matches CLI exactly)
     const depthConfig = DEPTH_CONFIG[depth];
     const { searchMode, retrievalStrategy, embeddingsProvider } = this.getSearchOptions();
 
     // Check for existing documentation (mirror CLI behavior exactly)
     const hasExistingDocs = await this.checkExistingDocumentation(docsPath);
-    
+
     // Determine mode exactly like CLI does:
     // 1. Incremental mode WITH prompt: hasExistingDocs && focusArea provided → enhance specific area
     // 2. Refinement check mode: hasExistingDocs && NO focusArea → check for improvements
@@ -144,10 +149,10 @@ export class DocumentationService {
     }
 
     logger.info(`Generating documentation for ${this.projectPath}...`);
-    
+
     // Initialize LLMService with config BEFORE registering agents (matches CLI approach)
     LLMService.getInstance(this.config);
-    
+
     const agentRegistry = registerAgents();
     const scanner = new FileSystemScanner();
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, this.config);
@@ -161,7 +166,7 @@ export class DocumentationService {
         userPrompt: focusArea, // Match CLI
         selectiveAgents, // Match CLI
         incrementalMode: isIncrementalMode || isRefinementCheckMode, // Match CLI: pass if docs exist
-        existingDocsPath: (isIncrementalMode || isRefinementCheckMode) ? docsPath : undefined, // Match CLI: pass path if docs exist
+        existingDocsPath: isIncrementalMode || isRefinementCheckMode ? docsPath : undefined, // Match CLI: pass path if docs exist
         iterativeRefinement: {
           enabled: true, // Match CLI: default enabled
           maxIterations: depthConfig.maxIterations, // Match CLI
@@ -210,7 +215,8 @@ export class DocumentationService {
           metadata: {
             agentsExecuted: [],
             totalTokensUsed: 0,
-            message: 'No improvements needed - documentation is up-to-date. To force regeneration, delete the .arch-docs directory or use a focusArea/selectiveAgents parameter.',
+            message:
+              'No improvements needed - documentation is up-to-date. To force regeneration, delete the .arch-docs directory or use a focusArea/selectiveAgents parameter.',
           },
         };
         return { output: emptyOutput, docsPath };
@@ -238,7 +244,7 @@ export class DocumentationService {
 
     // Initialize LLMService with config BEFORE registering agents (matches CLI approach)
     LLMService.getInstance(this.config);
-    
+
     const agentRegistry = registerAgents();
     const scanner = new FileSystemScanner();
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, this.config);
@@ -281,7 +287,7 @@ export class DocumentationService {
   }): Promise<any> {
     // Initialize LLMService with config BEFORE registering agents (matches CLI approach)
     LLMService.getInstance(this.config);
-    
+
     const agentRegistry = registerAgents();
     const scanner = new FileSystemScanner();
     const orchestrator = new DocumentationOrchestrator(agentRegistry, scanner, this.config);
