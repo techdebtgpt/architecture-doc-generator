@@ -1,0 +1,92 @@
+diff --git a/node_modules/@langchain/google-genai/dist/utils/common.cjs b/node_modules/@langchain/google-genai/dist/utils/common.cjs
+index 8422e8c..0a38553 100644
+--- a/node_modules/@langchain/google-genai/dist/utils/common.cjs
++++ b/node_modules/@langchain/google-genai/dist/utils/common.cjs
+@@ -225,8 +225,40 @@ function mapGenerateContentResultToChatResult(response, extra) {
+     const functionCalls = response.functionCalls();
+     const [candidate] = response.candidates;
+     const { content: candidateContent, ...generationInfo } = candidate;
++    // Handle blocked/empty candidate content (e.g. SAFETY, MAX_TOKENS) - avoid reading .length on undefined
++    if (!candidateContent?.parts || candidateContent.parts.length === 0) {
++        const finishReason = candidate?.finishReason;
++        if (typeof process !== "undefined" && process.env?.DEBUG?.includes("langchain")) {
++            console.warn("[@langchain/google-genai] Empty/blocked content; returning empty generation. Evidence:", JSON.stringify({
++                hasCandidate: !!candidate,
++                hasContent: !!candidateContent,
++                contentKeys: candidateContent ? Object.keys(candidateContent) : [],
++                finishReason,
++                promptFeedback: response.promptFeedback,
++            }, null, 2));
++        }
++        return {
++            generations: [{
++                text: "",
++                message: new messages_1.AIMessage({
++                    content: "",
++                    additional_kwargs: generationInfo,
++                    usage_metadata: extra?.usageMetadata,
++                }),
++                generationInfo,
++            }],
++            llmOutput: {
++                filters: response.promptFeedback,
++                tokenUsage: extra?.usageMetadata ? {
++                    promptTokens: extra?.usageMetadata?.input_tokens,
++                    completionTokens: extra?.usageMetadata?.output_tokens,
++                    totalTokens: extra?.usageMetadata?.total_tokens,
++                } : undefined,
++            },
++        };
++    }
+     let content;
+-    if (candidateContent?.parts.length === 1 && candidateContent.parts[0].text) {
++    if (candidateContent.parts.length === 1 && candidateContent.parts[0].text) {
+         content = candidateContent.parts[0].text;
+     }
+     else {
+diff --git a/node_modules/@langchain/google-genai/dist/utils/common.js b/node_modules/@langchain/google-genai/dist/utils/common.js
+index ad800f9..093d810 100644
+--- a/node_modules/@langchain/google-genai/dist/utils/common.js
++++ b/node_modules/@langchain/google-genai/dist/utils/common.js
+@@ -218,8 +218,40 @@ export function mapGenerateContentResultToChatResult(response, extra) {
+     const functionCalls = response.functionCalls();
+     const [candidate] = response.candidates;
+     const { content: candidateContent, ...generationInfo } = candidate;
++    // Handle blocked/empty candidate content (e.g. SAFETY, MAX_TOKENS) - avoid reading .length on undefined
++    if (!candidateContent?.parts || candidateContent.parts.length === 0) {
++        const finishReason = candidate?.finishReason;
++        if (typeof process !== "undefined" && process.env?.DEBUG?.includes("langchain")) {
++            console.warn("[@langchain/google-genai] Empty/blocked content; returning empty generation. Evidence:", JSON.stringify({
++                hasCandidate: !!candidate,
++                hasContent: !!candidateContent,
++                contentKeys: candidateContent ? Object.keys(candidateContent) : [],
++                finishReason,
++                promptFeedback: response.promptFeedback,
++            }, null, 2));
++        }
++        return {
++            generations: [{
++                text: "",
++                message: new AIMessage({
++                    content: "",
++                    additional_kwargs: generationInfo,
++                    usage_metadata: extra?.usageMetadata,
++                }),
++                generationInfo,
++            }],
++            llmOutput: {
++                filters: response.promptFeedback,
++                tokenUsage: extra?.usageMetadata ? {
++                    promptTokens: extra?.usageMetadata?.input_tokens,
++                    completionTokens: extra?.usageMetadata?.output_tokens,
++                    totalTokens: extra?.usageMetadata?.total_tokens,
++                } : undefined,
++            },
++        };
++    }
+     let content;
+-    if (candidateContent?.parts.length === 1 && candidateContent.parts[0].text) {
++    if (candidateContent.parts.length === 1 && candidateContent.parts[0].text) {
+         content = candidateContent.parts[0].text;
+     }
+     else {

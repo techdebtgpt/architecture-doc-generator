@@ -183,7 +183,7 @@ Based on this structure, identify the architectural style, major components, lay
     context: AgentContext,
     structure: ReturnType<typeof this.analyzeProjectStructure>,
   ): Promise<string> {
-    const model = this.llmService.getChatModel({ temperature: 0.1, maxTokens: 100 });
+    const model = this.llmService.getChatModel({ temperature: 0.1, maxTokens: 1500 });
 
     const prompt = `Based on this project structure, identify the most likely architectural style in ONE WORD:
 

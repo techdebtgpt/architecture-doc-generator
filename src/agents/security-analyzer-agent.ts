@@ -214,7 +214,7 @@ Please perform a comprehensive security analysis:
    */
   private async discoverSecurityPatterns(context: AgentContext): Promise<string[]> {
     try {
-      const model = this.llmService.getChatModel({ temperature: 0.1, maxTokens: 500 });
+      const model = this.llmService.getChatModel({ temperature: 0.1, maxTokens: 2048 });
 
       // Sample a few representative files to understand project type
       const sampleFiles = context.files
@@ -245,6 +245,14 @@ Return ONLY a JSON array of 5-10 lowercase keywords/patterns specific to this pr
       const response = await model.invoke(prompt, { runName: 'security-pattern-discovery' });
       const content = typeof response.content === 'string' ? response.content : '';
 
+      if (!content || content.trim().length === 0) {
+        this.logger.warn(
+          'discoverSecurityPatterns: LLM returned empty content (e.g. MAX_TOKENS); using base keywords only.',
+          '⚠️',
+        );
+        return [];
+      }
+
       // Parse JSON array from response
       const parsed = LLMJsonParser.parse<string[]>(content, {
         contextName: 'security-pattern-discovery',
@@ -252,14 +260,21 @@ Return ONLY a JSON array of 5-10 lowercase keywords/patterns specific to this pr
         fallback: [],
       });
 
-      this.logger.debug('Discovered project-specific security patterns', {
-        patterns: parsed,
-      });
+      const patterns = Array.isArray(parsed) ? parsed : [];
+      if (patterns.length === 0) {
+        this.logger.debug('Discovered no extra security patterns; using base keywords only');
+      } else {
+        this.logger.debug('Discovered project-specific security patterns', { patterns });
+      }
 
-      return Array.isArray(parsed) ? parsed : [];
+      return patterns;
     } catch (error) {
       // Fallback: return empty array if discovery fails
-      this.logger.debug('Failed to discover security patterns, using base keywords only', {
+      this.logger.warn(
+        'discoverSecurityPatterns: failed (parse or network); using base keywords only.',
+        '⚠️',
+      );
+      this.logger.debug('discoverSecurityPatterns error', {
         error: error instanceof Error ? error.message : String(error),
       });
       return [];
