@@ -28,7 +28,8 @@
     "mcp:setup": "ts-node cli/commands/setup-mcp.command.ts",
     "example:basic": "ts-node examples/basic-usage.ts",
     "example:custom": "ts-node examples/custom-agent.ts",
-    "prepublish:check": "node scripts/pre-publish-check.js"
+    "prepublish:check": "node scripts/pre-publish-check.js",
+    "postinstall": "patch-package"
   },
   "keywords": [
     "documentation",
@@ -102,6 +103,7 @@
   },
   "devDependencies": {
     "@types/inquirer": "^9.0.7",
+    "patch-package": "^8.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.19.0",
     "@typescript-eslint/eslint-plugin": "^8.46.2",

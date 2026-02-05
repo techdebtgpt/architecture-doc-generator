@@ -566,6 +566,13 @@ export abstract class BaseAgentWorkflow {
 
     const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
 
+    if (!analysisText || analysisText.trim().length === 0) {
+      this.logger.warn(
+        'Initial analysis returned empty content (e.g. blocked or MAX_TOKENS); this step may use fallback behavior.',
+        '⚠️',
+      );
+    }
+
     // Try to extract tokens directly from the response object if callback failed
     if (actualOutputTokens === 0 && typeof result !== 'string') {
       const responseUsage =
@@ -667,7 +674,7 @@ export abstract class BaseAgentWorkflow {
 
     const modelOptions = {
       temperature: 0.2,
-      maxTokens: 2000,
+      maxTokens: 3072,
     };
 
     const model = this.llmService.getChatModel(modelOptions, agentName);
@@ -733,6 +740,13 @@ MISSING_INFORMATION:
     this.logger.info(`Evaluation completed in ${evalDuration}s`, '✅');
 
     const evaluationText = typeof result === 'string' ? result : result.content?.toString() || '';
+
+    if (!evaluationText || evaluationText.trim().length === 0) {
+      this.logger.warn(
+        'Clarity evaluation returned empty content (e.g. blocked or MAX_TOKENS); scores will be treated as 0.',
+        '⚠️',
+      );
+    }
 
     // Try to extract tokens directly from the response object if callback failed
     if (actualOutputTokens === 0 && typeof result !== 'string') {
