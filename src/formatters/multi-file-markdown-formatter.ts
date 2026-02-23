@@ -158,6 +158,7 @@ export class MultiFileMarkdownFormatter {
           'flow-visualization': 'flows.md',
           'schema-generator': 'schemas.md',
           'security-analyzer': 'security.md',
+          'penetration-testing': 'pentest-findings.md',
           'file-structure': 'file-structure.md',
           'dependency-analyzer': 'dependencies.md',
           'pattern-detector': 'patterns.md',
@@ -192,16 +193,14 @@ export class MultiFileMarkdownFormatter {
       // Use new files array if available, fallback to markdown (backwards compat)
       const files = customSection.files || [];
       if (files.length > 0) {
-        // NEW: Agent provides its own files with navigation
+        // NEW: Agent provides its own files with navigation (skip nav for non-markdown, e.g. .json)
         for (const file of files) {
           const filePath = path.join(options.outputDir, file.filename);
-          const contentWithNav = this.addNavigationToContent(
-            file.content,
-            file.filename,
-            options,
-            generatedFileNames,
-          );
-          await fs.writeFile(filePath, contentWithNav, 'utf-8');
+          const isMarkdown = /\.(md|markdown)$/i.test(file.filename);
+          const contentToWrite = isMarkdown
+            ? this.addNavigationToContent(file.content, file.filename, options, generatedFileNames)
+            : file.content;
+          await fs.writeFile(filePath, contentToWrite, 'utf-8');
         }
       } else if (customSection.markdown) {
         // FALLBACK: Use markdown field (deprecated pattern)
@@ -209,6 +208,7 @@ export class MultiFileMarkdownFormatter {
           'flow-visualization': 'flows.md',
           'schema-generator': 'schemas.md',
           'security-analyzer': 'security.md',
+          'penetration-testing': 'pentest-findings.md',
           'file-structure': 'file-structure.md',
           'dependency-analyzer': 'dependencies.md',
           'pattern-detector': 'patterns.md',
@@ -385,6 +385,9 @@ export class MultiFileMarkdownFormatter {
     const securitySection = output.customSections.get
       ? output.customSections.get('security-analyzer')
       : (output.customSections as Record<string, any>)['security-analyzer'];
+    const pentestSection = output.customSections.get
+      ? output.customSections.get('penetration-testing')
+      : (output.customSections as Record<string, any>)['penetration-testing'];
 
     if (flowSection) {
       content += `${docIndex++}. **[Flow Visualizations](./flows.md)** - Data flows, process flows, and component interactions\n`;
@@ -394,6 +397,9 @@ export class MultiFileMarkdownFormatter {
     }
     if (securitySection) {
       content += `${docIndex++}. **[Security Analysis](./security.md)** - Security assessment, vulnerabilities, and recommendations\n`;
+    }
+    if (pentestSection) {
+      content += `${docIndex++}. **[Penetration Testing Findings](./pentest-findings.md)** - Attack surfaces, OWASP findings, and remediation\n`;
     }
 
     // Recommendations (moved here - after security, before KPI)

@@ -16,6 +16,7 @@ export { DependencyAnalyzerAgent } from './agents/dependency-analyzer-agent';
 export { PatternDetectorAgent } from './agents/pattern-detector-agent';
 export { FlowVisualizationAgent } from './agents/flow-visualization-agent';
 export { SchemaGeneratorAgent } from './agents/schema-generator-agent';
+export { PenetrationTestingAgent } from './agents/penetration-testing-agent';
 
 // Scanners
 export * from './scanners/scanner.interface';
