@@ -401,6 +401,14 @@ export class AttackSurfaceService {
     };
   }
 
+  /**
+   * Heuristic: route has object-level path param (e.g. /users/:id) with no auth/role hint
+   * → possible IDOR / missing object-level authorization.
+   */
+  private static hasPathParam(path: string): boolean {
+    return /\/:[^/]+/.test(path);
+  }
+
   private mergeContext(
     entry: AttackSurfaceEntry,
     content: string,
@@ -408,7 +416,7 @@ export class AttackSurfaceService {
     projectContext: ProjectSecurityContext,
   ): AttackSurfaceEntry {
     const ctx = this.detectRouteFileContext(content, entry.path);
-    return {
+    const merged: AttackSurfaceEntry = {
       ...entry,
       sourceFile: entry.sourceFile ?? relativePath,
       authRequired: ctx.authMiddleware,
@@ -422,6 +430,13 @@ export class AttackSurfaceService {
       isFileUpload: entry.isFileUpload ?? ctx.isFileUpload,
       roleHint: entry.roleHint ?? ctx.roleHint,
     };
+    const hasAuthOrRole =
+      merged.authRequired === true || (merged.roleHint != null && merged.roleHint !== '');
+    if (AttackSurfaceService.hasPathParam(merged.path) && !hasAuthOrRole) {
+      merged.possibleIdor = true;
+      merged.securityHint = 'possible IDOR / missing object-level auth';
+    }
+    return merged;
   }
 
   private deduplicateEntries(entries: AttackSurfaceEntry[]): AttackSurfaceEntry[] {

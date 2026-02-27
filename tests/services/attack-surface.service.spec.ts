@@ -151,5 +151,39 @@ describe('AttackSurfaceService', () => {
       expect(deleteUser?.sensitiveOperation).toBe(true);
       expect(payment?.sensitiveOperation).toBe(true);
     });
+
+    it('flags possible IDOR on path-param routes with no auth/role hint', async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'archdoc-'));
+      const routeFile = path.join(tmpDir, 'routes', 'users.js');
+      await fs.mkdir(path.dirname(routeFile), { recursive: true });
+      await fs.writeFile(
+        routeFile,
+        `router.get('/users/:id', handler);
+         router.get('/users', listHandler);`,
+        'utf-8',
+      );
+      const result = await service.discoverEndpoints(tmpDir, [routeFile]);
+      const withParam = result.find((e) => e.path.includes('/users/:id'));
+      const noParam = result.find((e) => e.path === '/users' || e.path.endsWith('/users'));
+      expect(withParam?.possibleIdor).toBe(true);
+      expect(withParam?.securityHint).toMatch(/IDOR|object-level auth/);
+      expect(noParam?.possibleIdor).toBeFalsy();
+    });
+
+    it('does not flag IDOR when route has auth or role hint', async () => {
+      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'archdoc-'));
+      const routeFile = path.join(tmpDir, 'routes', 'users.js');
+      await fs.mkdir(path.dirname(routeFile), { recursive: true });
+      await fs.writeFile(
+        routeFile,
+        `const auth = require('express-jwt');
+         router.get('/users/:id', auth({ secret: 'x' }), handler);`,
+        'utf-8',
+      );
+      const result = await service.discoverEndpoints(tmpDir, [routeFile]);
+      const withParam = result.find((e) => e.path.includes('/users/:id'));
+      expect(withParam?.authRequired).toBe(true);
+      expect(withParam?.possibleIdor).toBeFalsy();
+    });
   });
 });
