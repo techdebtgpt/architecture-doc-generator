@@ -176,7 +176,10 @@ export function displayHelp(): void {
   console.log('    flows.md                 # Control and data flows');
   console.log('    schemas.md               # Data models and schemas');
   console.log('    security.md              # Security analysis');
-  console.log('    kpi-analysis.md          # Repository KPIs and health metrics');
+  console.log('    error-handling.md        # Error propagation and resilience architecture');
+  console.log('    data-contracts.md        # DTO, entity, model, and mapper structure');
+  console.log('    technical-debt.md        # Debt hotspots and cleanup priorities');
+  console.log('    kpi.md                   # Repository KPIs and health metrics');
   console.log('    metadata.md              # Generation metadata and costs');
   console.log('    changelog.md             # Documentation update history\n');
 
@@ -196,8 +199,13 @@ export function displayHelp(): void {
   console.log('  5. ' + chalk.cyan('flow-visualization') + '  - Control and data flows');
   console.log('  6. ' + chalk.cyan('schema-generator') + '    - Data models and schemas');
   console.log('  7. ' + chalk.cyan('security-analyzer') + '   - Security vulnerabilities');
+  console.log('  8. ' + chalk.cyan('error-handling-architecture') + ' - Error flow and resilience');
+  console.log('  9. ' + chalk.cyan('data-contracts') + '      - DTO, entity, and model boundaries');
   console.log(
-    '  8. ' +
+    '  10. ' + chalk.cyan('technical-debt') + '      - Debt hotspots and cleanup priorities',
+  );
+  console.log(
+    '  11. ' +
       chalk.cyan('kpi-analyzer') +
       '        - Repository health and KPIs ' +
       chalk.yellow('[NEW]') +

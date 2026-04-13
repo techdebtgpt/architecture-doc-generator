@@ -36,7 +36,7 @@ ArchDoc Generator is an intelligent tool that analyzes your codebase and generat
 
 ## ✨ Features
 
-- 🤖 **8 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Architecture, Security, and **Repository KPI** (NEW!).
+- 🤖 **11 Specialized AI Agents**: File Structure, Dependencies, Patterns, Flows, Schemas, Security, Error Handling Architecture, Data Contracts, Technical Debt, Repository KPI, and Architecture synthesis.
 - 🔍 **RAG-Powered Queries**: Query your architecture docs with natural language using FREE local embeddings (TF-IDF + Graph-based retrieval).
 - 📊 **Repository Health Dashboard**: LLM-powered KPI analysis with actionable insights on code quality, testing, architecture health, and technical debt.
 - 🔍 **RAG Vector Search + Hybrid Retrieval**: Semantic similarity search (FREE local TF-IDF or cloud providers) combined with dependency graph analysis - finds files by meaning AND structure. [See docs →](docs/VECTOR_SEARCH.md)
@@ -225,7 +225,7 @@ We benchmarked **6 configurations** (including OpenAI embeddings) on a real-worl
 
 **📖 Complete Analysis**: See **[Search Strategy Benchmark](./docs/SEARCH_STRATEGY_BENCHMARK.md)** for:
 
-- Per-agent clarity scores (8 agents × 6 configurations)
+- Per-agent clarity scores (11 agents × 6 configurations)
 - Why Graph + Local won (structural > semantic for code)
 - Why OpenAI underperformed (8192 token limit, context loss, batching overhead)
 - Configuration examples for all use cases
@@ -639,6 +639,9 @@ The tool generates a multi-file documentation structure:
 ├── flows.md              # Data & control flows
 ├── schemas.md            # Data models
 ├── security.md           # Security vulnerability analysis
+├── error-handling.md     # Error propagation and resilience architecture
+├── data-contracts.md     # DTO/entity/model boundaries and mapping patterns
+├── technical-debt.md     # Debt hotspots and cleanup priorities
 ├── recommendations.md    # Improvement suggestions
 ├── kpi.md                # Repository health KPI dashboard (NEW!)
 ├── metadata.md           # Generation metadata + performance metrics
@@ -648,6 +651,9 @@ The tool generates a multi-file documentation structure:
 **What's New:**
 
 - **`kpi.md`**: LLM-generated repository health dashboard with actionable insights on code quality, testing coverage, architecture health, dependency management, and technical debt.
+- **`error-handling.md`**: Error boundary strategy, exception translation, resilience patterns, and risk analysis.
+- **`data-contracts.md`**: DTO/entity/model structure quality, validation strategy, and mapper consistency checks.
+- **`technical-debt.md`**: Debt scoring, hotspot files, quick wins, and strategic cleanup initiatives.
 - **Generation Performance Metrics**: Added to `metadata.md` showing agent confidence scores, execution times, token efficiency, and cost breakdown.
 
 ### C4 Architecture Model
@@ -672,16 +678,19 @@ When using `--c4`, generates structured architecture diagrams:
 
 Each agent specializes in a specific analysis task using LLM-powered intelligence:
 
-| Agent                     | Purpose                                    | Priority    | Output File         | Notes                           |
-| ------------------------- | ------------------------------------------ | ----------- | ------------------- | ------------------------------- |
-| **File Structure**        | Project organization, entry points         | HIGH        | `file-structure.md` | Always runs                     |
-| **Dependency Analyzer**   | External deps, internal imports            | HIGH        | `dependencies.md`   | Always runs                     |
-| **Architecture Analyzer** | High-level design, components              | HIGH        | `architecture.md`   | Always runs                     |
-| **Pattern Detector**      | Design patterns, anti-patterns             | MEDIUM      | `patterns.md`       | Always runs                     |
-| **Flow Visualization**    | Control & data flows with diagrams         | MEDIUM      | `flows.md`          | Always runs                     |
-| **Schema Generator**      | Data models, interfaces, type definitions  | MEDIUM      | `schemas.md`        | **Only if schemas detected** ⚠️ |
-| **Security Analyzer**     | Vulnerabilities, auth, secrets, crypto     | MEDIUM      | `security.md`       | Always runs                     |
-| **KPI Analyzer** ⭐ NEW   | Repository health, executive KPI dashboard | MEDIUM-HIGH | `kpi.md`            | Always runs                     |
+| Agent                              | Purpose                                    | Priority    | Output File          | Notes                           |
+| ---------------------------------- | ------------------------------------------ | ----------- | -------------------- | ------------------------------- |
+| **File Structure**                 | Project organization, entry points         | HIGH        | `file-structure.md`  | Always runs                     |
+| **Dependency Analyzer**            | External deps, internal imports            | HIGH        | `dependencies.md`    | Always runs                     |
+| **Architecture Analyzer**          | High-level design, components              | HIGH        | `architecture.md`    | Always runs                     |
+| **Pattern Detector**               | Design patterns, anti-patterns             | MEDIUM      | `patterns.md`        | Always runs                     |
+| **Flow Visualization**             | Control & data flows with diagrams         | MEDIUM      | `flows.md`           | Always runs                     |
+| **Schema Generator**               | Data models, interfaces, type definitions  | MEDIUM      | `schemas.md`         | **Only if schemas detected** ⚠️ |
+| **Security Analyzer**              | Vulnerabilities, auth, secrets, crypto     | MEDIUM      | `security.md`        | Always runs                     |
+| **Error Handling Architecture**    | Error boundaries, translation, resilience  | MEDIUM      | `error-handling.md`  | Always runs                     |
+| **Data Contracts**                 | DTO/entity/model boundaries and mapping    | MEDIUM      | `data-contracts.md`  | Always runs                     |
+| **Technical Debt**                 | Debt hotspots, maintainability, priorities | MEDIUM      | `technical-debt.md`  | Always runs                     |
+| **KPI Analyzer**                   | Repository health, executive KPI dashboard | MEDIUM-HIGH | `kpi.md`             | Always runs                     |
 
 **⚠️ Schema Generator Smart Behavior:**
 
@@ -712,6 +721,7 @@ This is **not a failure** - it's smart detection saving you tokens and cost! �
 
 - 📊 Overall repository health score (0-100%)
 - 🎯 Component scores: Code quality, testing, architecture, dependencies, complexity
+- 🎯 Component scores: Code quality, testing, architecture, dependencies, complexity, error handling, data contracts, and technical debt
 - 📈 Detailed metrics with ASCII visualizations
 - 💡 8+ actionable insights with prioritized action items
 - 🚀 Executive-friendly language with quantifiable targets

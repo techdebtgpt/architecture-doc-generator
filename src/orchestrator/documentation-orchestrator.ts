@@ -1305,6 +1305,9 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       { name: 'flow-visualization', emoji: '🔄', label: 'Data Flow' },
       { name: 'schema-generator', emoji: '🗄️', label: 'Schema' },
       { name: 'security-analyzer', emoji: '🔒', label: 'Security Analysis' },
+      { name: 'error-handling-architecture', emoji: '🚨', label: 'Error Handling' },
+      { name: 'data-contracts', emoji: '🧾', label: 'Data Contracts' },
+      { name: 'technical-debt', emoji: '🛠️', label: 'Technical Debt' },
       { name: 'kpi-analyzer', emoji: '📊', label: 'KPI Analysis' },
     ];
 

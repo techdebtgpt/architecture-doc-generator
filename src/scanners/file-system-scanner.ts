@@ -187,20 +187,89 @@ export class FileSystemScanner implements IScanner {
 
   /**
    * Perform delta analysis using Git
+   *
+   * Compares against the last analysis commit (stored in cache), NOT against
+   * uncommitted changes. This ensures that on a clean working tree after the
+   * first analysis, agents still run because there IS no previous analysis.
    */
   private async performGitDeltaAnalysis(
     projectPath: string,
     files: FileEntry[],
     since?: string,
   ): Promise<DeltaAnalysisMetadata> {
-    const baseCommit = since || this.gitService.getCurrentCommitHash(projectPath);
-    const changedFilePaths = new Set(this.gitService.getChangedFiles(projectPath, since));
+    const cacheDir = path.join(projectPath, '.arch-docs', 'cache');
+    const currentCommit = this.gitService.getCurrentCommitHash(projectPath);
 
+    // If --since flag is provided, always use that as the baseline
+    if (since) {
+      const changedFilePaths = new Set(this.gitService.getChangedFiles(projectPath, since));
+      return this.markFilesWithGitStatus(projectPath, files, changedFilePaths, since);
+    }
+
+    // Check if a previous analysis has been run by looking for the cached commit hash
+    const lastAnalysisCommit = await this.gitService.loadLastAnalysisCommit(cacheDir);
+
+    if (!lastAnalysisCommit) {
+      // No previous analysis exists — this is the first run
+      // Treat ALL files as 'new' so all agents execute (same logic as hash-based approach)
+      this.logger.info(
+        'No previous analysis found in cache — treating all files as new (first run)',
+      );
+
+      for (const file of files) {
+        file.changeStatus = 'new';
+      }
+
+      // Save current commit for future delta comparisons
+      if (currentCommit) {
+        await this.gitService.saveLastAnalysisCommit(cacheDir, currentCommit);
+      }
+
+      return {
+        enabled: true,
+        baseCommit: undefined,
+        changedFiles: 0,
+        newFiles: files.length,
+        deletedFiles: 0,
+        unchangedFiles: 0,
+        detectionMethod: 'git',
+      };
+    }
+
+    // Previous analysis exists — compare against the stored commit
+    // This catches both committed changes AND uncommitted changes since last analysis
+    const changedFilePaths = new Set(
+      this.gitService.getChangedFiles(projectPath, undefined, lastAnalysisCommit),
+    );
+
+    const result = this.markFilesWithGitStatus(
+      projectPath,
+      files,
+      changedFilePaths,
+      lastAnalysisCommit,
+    );
+
+    // Save current commit for future delta comparisons
+    if (currentCommit) {
+      await this.gitService.saveLastAnalysisCommit(cacheDir, currentCommit);
+    }
+
+    return result;
+  }
+
+  /**
+   * Helper: Mark files with Git change status and return delta metadata
+   */
+  private markFilesWithGitStatus(
+    projectPath: string,
+    files: FileEntry[],
+    changedFilePaths: Set<string>,
+    baseCommit: string,
+  ): DeltaAnalysisMetadata {
     let changedFiles = 0;
     let newFiles = 0;
     let unchangedFiles = 0;
 
-    // Mark each file with its change status
     for (const file of files) {
       const isTracked = this.gitService.isFileTracked(projectPath, file.relativePath);
 
@@ -217,15 +286,15 @@ export class FileSystemScanner implements IScanner {
     }
 
     this.logger.info(
-      `Git delta analysis: ${changedFiles} changed, ${newFiles} new, ${unchangedFiles} unchanged`,
+      `Git delta analysis (vs ${baseCommit.substring(0, 8)}): ${changedFiles} changed, ${newFiles} new, ${unchangedFiles} unchanged`,
     );
 
     return {
       enabled: true,
-      baseCommit: baseCommit || undefined,
+      baseCommit,
       changedFiles,
       newFiles,
-      deletedFiles: 0, // Git doesn't track deleted files in scan
+      deletedFiles: 0,
       unchangedFiles,
       detectionMethod: 'git',
     };

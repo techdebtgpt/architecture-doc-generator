@@ -39,6 +39,9 @@ export class ArchitectureAnalyzerAgent extends BaseAgentWorkflow implements Agen
           'pattern-detector',
           'flow-visualization',
           'security-analyzer',
+          'error-handling-architecture',
+          'data-contracts',
+          'technical-debt',
         ], // Synthesizes insights from ALL other agents
         supportsIncremental: false,
         estimatedTokens: 12000,

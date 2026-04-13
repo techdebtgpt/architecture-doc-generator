@@ -13,6 +13,9 @@ import { FlowVisualizationAgent } from '../../src/agents/flow-visualization-agen
 import { SchemaGeneratorAgent } from '../../src/agents/schema-generator-agent';
 import { SecurityAnalyzerAgent } from '../../src/agents/security-analyzer-agent';
 import { KPIAnalyzerAgent } from '../../src/agents/kpi-analyzer-agent';
+import { ErrorHandlingArchitectureAgent } from '../../src/agents/error-handling-architecture-agent';
+import { DataContractsAgent } from '../../src/agents/data-contracts-agent';
+import { TechnicalDebtAgent } from '../../src/agents/technical-debt-agent';
 
 /**
  * Check if API keys are configured
@@ -119,6 +122,9 @@ export function registerAgents(spinner: Ora): AgentRegistry {
   agentRegistry.register(new FlowVisualizationAgent());
   agentRegistry.register(new SchemaGeneratorAgent());
   agentRegistry.register(new SecurityAnalyzerAgent());
+  agentRegistry.register(new ErrorHandlingArchitectureAgent());
+  agentRegistry.register(new DataContractsAgent());
+  agentRegistry.register(new TechnicalDebtAgent());
   agentRegistry.register(new KPIAnalyzerAgent()); // NEW: Repository KPI analysis with LLM
 
   const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);

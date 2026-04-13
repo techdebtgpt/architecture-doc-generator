@@ -18,6 +18,9 @@ import { FlowVisualizationAgent } from '../../agents/flow-visualization-agent';
 import { SchemaGeneratorAgent } from '../../agents/schema-generator-agent';
 import { SecurityAnalyzerAgent } from '../../agents/security-analyzer-agent';
 import { KPIAnalyzerAgent } from '../../agents/kpi-analyzer-agent';
+import { ErrorHandlingArchitectureAgent } from '../../agents/error-handling-architecture-agent';
+import { DataContractsAgent } from '../../agents/data-contracts-agent';
+import { TechnicalDebtAgent } from '../../agents/technical-debt-agent';
 import { LLMService } from '../../llm/llm-service';
 import * as fs from 'fs/promises';
 
@@ -44,6 +47,9 @@ function registerAgents(): AgentRegistry {
   agentRegistry.register(new FlowVisualizationAgent());
   agentRegistry.register(new SchemaGeneratorAgent());
   agentRegistry.register(new SecurityAnalyzerAgent());
+  agentRegistry.register(new ErrorHandlingArchitectureAgent());
+  agentRegistry.register(new DataContractsAgent());
+  agentRegistry.register(new TechnicalDebtAgent());
   agentRegistry.register(new KPIAnalyzerAgent());
   logger.info(
     `Registered ${agentRegistry.getAllAgents().length} agents: ${agentRegistry

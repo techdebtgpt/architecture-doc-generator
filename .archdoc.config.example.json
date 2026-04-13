@@ -36,9 +36,12 @@
       "pattern-detector",
       "flow-visualization",
       "schema-generator",
-      "architecture-analyzer",
       "security-analyzer",
-      "kpi-analyzer"
+      "error-handling-architecture",
+      "data-contracts",
+      "technical-debt",
+      "kpi-analyzer",
+      "architecture-analyzer"
     ],
     "parallel": true,
     "timeout": 300000
