@@ -107,12 +107,12 @@ export class OpenAIProvider implements ILLMProvider {
       // Only set temperature to 1 (required default for reasoning models)
       chatConfig.temperature = 1;
       // Use max_completion_tokens for reasoning models
-      chatConfig.maxCompletionTokens = config.maxTokens ?? 4096;
+      chatConfig.maxCompletionTokens = config.maxTokens ?? 8192;
       // Don't set topP for reasoning models (not supported)
     } else {
       // Standard models support all parameters
       chatConfig.temperature = config.temperature ?? 0.2;
-      chatConfig.maxTokens = config.maxTokens ?? 4096;
+      chatConfig.maxTokens = config.maxTokens ?? 8192;
       if (config.topP !== undefined) {
         chatConfig.topP = config.topP;
       }

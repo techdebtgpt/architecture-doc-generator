@@ -349,7 +349,7 @@ Standalone Question:`;
 
     switch (provider) {
       case LLMProvider.ANTHROPIC:
-        return 'claude-sonnet-4-5-20250929';
+        return 'claude-sonnet-4-6';
       case LLMProvider.OPENAI:
         return 'gpt-4o-mini';
       case LLMProvider.GOOGLE:
@@ -357,7 +357,7 @@ Standalone Question:`;
       case LLMProvider.XAI:
         return 'grok-3-beta';
       default:
-        return 'claude-sonnet-4-5-20250929';
+        return 'claude-sonnet-4-6';
     }
   }
 

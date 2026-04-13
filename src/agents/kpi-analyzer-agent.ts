@@ -79,7 +79,7 @@ export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
       version: '1.0.0',
       description:
         'Analyzes repository health metrics (code quality, architecture, testing, dependencies) and generates executive KPI dashboard with LLM-powered insights',
-      priority: 80 as AgentPriority, // Medium-high priority - provides overview metrics
+      priority: AgentPriority.LOW, // Run after core analysis agents and their dependencies
       capabilities: {
         supportsParallel: true,
         requiresFileContents: false, // Uses aggregated data from other agents

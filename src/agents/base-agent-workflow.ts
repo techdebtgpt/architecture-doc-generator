@@ -193,7 +193,7 @@ export abstract class BaseAgentWorkflow {
     const config: AgentWorkflowConfig = {
       maxIterations,
       clarityThreshold,
-      minImprovement: 3, // Small improvements still valuable
+      minImprovement: 10,
       enableSelfQuestioning: true,
       skipSelfRefinement: options?.skipSelfRefinement || false, // Quick mode skips refinement
       maxQuestionsPerIteration: options?.maxQuestionsPerIteration || 3, // 3 focused questions per iteration
@@ -202,7 +202,6 @@ export abstract class BaseAgentWorkflow {
 
     this.logger.info(
       `Configuration: maxIterations=${maxIterations}, clarityThreshold=${clarityThreshold}, questionsPerIteration=3, skipSelfRefinement=${config.skipSelfRefinement}`,
-      '⚙️',
     );
 
     try {
@@ -394,7 +393,10 @@ export abstract class BaseAgentWorkflow {
 
         // Count tokens from LLM result
         // OpenAI uses prompt_tokens/completion_tokens, Anthropic uses input_tokens/output_tokens
-        const usage = result?.response_metadata?.usage || result?.usage_metadata || {};
+        const usage = (result?.response_metadata?.usage || result?.usage_metadata || {}) as Record<
+          string,
+          number | undefined
+        >;
         const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
         const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
         const cachedInputTokens = usage.cache_read_input_tokens || 0;
@@ -672,15 +674,17 @@ export abstract class BaseAgentWorkflow {
 
     const model = this.llmService.getChatModel(modelOptions, agentName);
 
+    const analysisForEvaluation = this.llmService.truncateToTokenLimit(currentAnalysis, 3500);
+    const previousGapsForEvaluation = previousMissingInfo.slice(0, 8);
     const previousGapsContext =
-      iteration > 1 && previousMissingInfo.length > 0
-        ? `\n\nPrevious iteration identified these gaps (check if they were addressed):\n${previousMissingInfo.map((gap) => `- ${gap}`).join('\n')}`
+      iteration > 1 && previousGapsForEvaluation.length > 0
+        ? `\n\nPrevious iteration identified these gaps (check if they were addressed):\n${previousGapsForEvaluation.map((gap) => `- ${gap}`).join('\n')}`
         : '';
 
     const evaluationPrompt = `You are evaluating the quality and completeness of an analysis.
 
 Analysis to evaluate:
-${currentAnalysis}${previousGapsContext}
+${analysisForEvaluation}${previousGapsContext}
 
 Evaluate the analysis on these criteria (0-100 scale for each):
 1. **Completeness**: Does it cover all aspects thoroughly? Are previous gaps addressed?
@@ -772,19 +776,28 @@ MISSING_INFORMATION:
           .filter((line) => !line.toLowerCase().includes('none') && line.length > 0)
       : [];
 
-    // Deduplicate against all previously seen gaps using fuzzy matching
-    const newMissingInfo = this.deduplicateGaps(rawMissingInfo, allSeenGaps);
+    // Keep current unresolved gaps visible across iterations.
+    // Only deduplicate within the current evaluation batch.
+    // Cap to avoid runaway gap lists that cause refinement churn.
+    const currentMissingInfo = this.deduplicateCurrentGaps(rawMissingInfo).slice(0, 12);
+
+    // Track newly discovered gaps relative to the previous iteration (not all history),
+    // so logs stay consistent with net gap changes.
+    const previousIterationGapSet = new Set(
+      previousMissingInfo.map((gap) => this.normalizeGap(gap)),
+    );
+    const newlyDiscoveredGaps = this.deduplicateGaps(currentMissingInfo, previousIterationGapSet);
 
     // Update seen gaps set
     const updatedSeenGaps = new Set(allSeenGaps);
-    for (const gap of newMissingInfo) {
+    for (const gap of currentMissingInfo) {
       updatedSeenGaps.add(this.normalizeGap(gap));
     }
 
     // Calculate gap reduction rate
-    const currentGapCount = newMissingInfo.length;
+    const currentGapCount = currentMissingInfo.length;
     const gapsResolved = previousGapCount > 0 ? previousGapCount - currentGapCount : 0;
-    const gapReductionRate = previousGapCount > 0 ? (gapsResolved / previousGapCount) * 100 : 0;
+    const gapReductionRate = previousGapCount > 0 ? (gapsResolved / previousGapCount) * 100 : 100;
 
     this.logger.info(
       `Overall Clarity=${overallScore.toFixed(1)} (Completeness=${completeness}, Clarity=${clarity}, Depth=${depth}, Accuracy=${accuracy})`,
@@ -796,19 +809,26 @@ MISSING_INFORMATION:
         `Resolved ${gapsResolved} gap(s), ${currentGapCount} remaining (${gapReductionRate.toFixed(1)}% reduction)`,
         '✅',
       );
-    } else if (iteration > 1 && gapsResolved < 0) {
+    } else if (iteration > 1 && newlyDiscoveredGaps.length > 0) {
       this.logger.warn(
-        `${Math.abs(gapsResolved)} new gap(s) identified, ${currentGapCount} total`,
+        `${newlyDiscoveredGaps.length} new gap(s) identified, ${currentGapCount} total`,
         '⚠️',
       );
     } else if (currentGapCount > 0) {
       this.logger.warn(`${currentGapCount} gap(s) identified`, '⚠️');
     }
 
+    if (iteration > 1 && newlyDiscoveredGaps.length > 0) {
+      this.logger.info(
+        `${newlyDiscoveredGaps.length} newly discovered gap(s) in this iteration`,
+        '🔎',
+      );
+    }
+
     return {
       ...state,
       clarityScore: overallScore,
-      missingInformation: newMissingInfo,
+      missingInformation: currentMissingInfo,
       previousGapCount: currentGapCount,
       gapReductionRate,
       allSeenGaps: updatedSeenGaps,
@@ -848,6 +868,26 @@ MISSING_INFORMATION:
       if (!isDuplicate) {
         deduplicated.push(gap);
       }
+    }
+
+    return deduplicated;
+  }
+
+  /**
+   * Deduplicate gaps within a single evaluation batch while preserving order.
+   */
+  private deduplicateCurrentGaps(gaps: string[]): string[] {
+    const seenInBatch = new Set<string>();
+    const deduplicated: string[] = [];
+
+    for (const gap of gaps) {
+      const normalized = this.normalizeGap(gap);
+      if (!normalized || seenInBatch.has(normalized)) {
+        continue;
+      }
+
+      seenInBatch.add(normalized);
+      deduplicated.push(gap);
     }
 
     return deduplicated;
@@ -1275,13 +1315,16 @@ Example good questions:
             .join('\n')}`
         : '';
 
+    const analysisForRefinement = this.llmService.truncateToTokenLimit(currentAnalysis, 4500);
+    const filesForRefinement = retrievedFiles.slice(0, 4);
+
     // Add retrieved file contents as context
     const fileContext =
-      retrievedFiles.length > 0
-        ? `\n\nRELEVANT CODE FILES (${retrievedFiles.length} files):\n${retrievedFiles
+      filesForRefinement.length > 0
+        ? `\n\nRELEVANT CODE FILES (${filesForRefinement.length} files shown):\n${filesForRefinement
             .map((file) => {
-              const truncated = file.content.substring(0, 3000); // Limit each file to 3KB
-              return `\n--- ${file.path} ---\n${truncated}${file.content.length > 3000 ? '\n... (truncated)' : ''}`;
+              const truncated = file.content.substring(0, 1200);
+              return `\n--- ${file.path} ---\n${truncated}${file.content.length > 1200 ? '\n... (truncated)' : ''}`;
             })
             .join('\n')}`
         : '';
@@ -1289,7 +1332,7 @@ Example good questions:
     const refinementPrompt = `You are improving your previous analysis by addressing specific gaps and questions.
 
 Previous analysis:
-${currentAnalysis}
+${analysisForRefinement}
 
 Questions to answer in this iteration:
 ${selfQuestions.map((q, i) => `${i + 1}. ${q}`).join('\n')}${gapsSummary}${fileContext}
@@ -1469,8 +1512,10 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     // Check for no progress - if gap reduction rate is < 15% for 2+ iterations, stop
     // OR if clarity > 75 and gap reduction < 20%, stop early
     const hasLowProgress =
-      (state.iteration >= 2 && state.gapReductionRate < 15 && state.gapReductionRate >= 0) ||
-      (state.clarityScore > 75 && state.gapReductionRate < 20 && state.gapReductionRate >= 0);
+      state.iteration >= 2 &&
+      (state.gapReductionRate < 15 ||
+        (state.clarityScore > 75 && state.gapReductionRate < 20) ||
+        (state.iteration >= 3 && state.gapReductionRate <= 0));
 
     if (hasLowProgress && hasMissingInfo) {
       this.logger.warn(

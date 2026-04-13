@@ -66,11 +66,9 @@ export const TOOLS: Record<string, ToolDefinition> = {
           type: 'string',
           enum: [
             // Anthropic models
-            'claude-sonnet-4-20250514',
-            'claude-3-7-sonnet-20250219',
-            'claude-3-5-sonnet-20241022',
-            'claude-3-5-haiku-20241022',
-            'claude-3-opus-20240229',
+            'claude-sonnet-4-6',
+            'claude-opus-4-6',
+            'claude-haiku-4-5-20251001',
             // OpenAI models
             'gpt-4o',
             'gpt-4o-mini',

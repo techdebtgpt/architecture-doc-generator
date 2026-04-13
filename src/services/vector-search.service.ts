@@ -1,9 +1,9 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory';
+import { Document } from '@langchain/core/documents';
 import { Logger } from '../utils/logger';
 import { PerformanceTracker } from '../utils/performance-tracker';
-import { MemoryVectorStore } from 'langchain/vectorstores/memory';
-import { Document } from '@langchain/core/documents';
 import { Embeddings } from '@langchain/core/embeddings';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';

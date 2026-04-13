@@ -20,7 +20,7 @@ export interface IterativeRefinementConfig {
 
 export interface OrchestratorOptions {
   maxTokens?: number;
-  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $5)
+  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $50)
   parallel?: boolean;
   userPrompt?: string;
   /**
@@ -689,7 +689,7 @@ export class C4ModelOrchestrator {
           );
 
           // Check if total cost exceeds budget
-          const maxCost = options.maxCostDollars || 5.0; // Default $5 budget
+          const maxCost = Number(options.maxCostDollars) || 50.0; // Default $50 budget
           let totalCost = 0;
           for (const agentResult of results.values()) {
             const agentCost = this.llmService['tokenManager'].calculateCost(

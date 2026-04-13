@@ -40,20 +40,19 @@ export interface ExistingConfig {
 
 const PROVIDER_INFO = {
   anthropic: {
-    defaultModel: 'claude-sonnet-4-5-20250929',
+    defaultModel: 'claude-sonnet-4-6',
     models: [
       {
-        name: 'claude-sonnet-4-5-20250929 (recommended) - Latest, best quality',
-        value: 'claude-sonnet-4-5-20250929',
+        name: 'claude-sonnet-4-6 (recommended) - Latest, best quality',
+        value: 'claude-sonnet-4-6',
+      },
+      {
+        name: 'claude-opus-4-6 - Most powerful',
+        value: 'claude-opus-4-6',
       },
       {
         name: 'claude-haiku-4-5-20251001 - Fastest, most affordable',
         value: 'claude-haiku-4-5-20251001',
-      },
-      { name: 'claude-opus-4-1-20250805 - Most powerful', value: 'claude-opus-4-1-20250805' },
-      {
-        name: 'claude-sonnet-4-20250514 - Previous generation',
-        value: 'claude-sonnet-4-20250514',
       },
     ],
     keyFormat: 'sk-ant-...',

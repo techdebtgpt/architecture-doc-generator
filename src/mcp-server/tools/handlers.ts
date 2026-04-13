@@ -60,7 +60,7 @@ export const handleGenerateDocumentation: ContextualToolHandler = async (args, c
     depth = 'normal',
     focusArea,
     selectiveAgents,
-    maxCostDollars = 5.0,
+    maxCostDollars = 50.0,
     force = false,
     since,
   } = args;

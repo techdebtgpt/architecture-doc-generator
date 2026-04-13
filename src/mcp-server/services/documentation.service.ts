@@ -124,7 +124,7 @@ export class DocumentationService {
       : path.join(this.projectPath, '.arch-docs');
     const focusArea = options.focusArea;
     const selectiveAgents = options.selectiveAgents;
-    const maxCostDollars = options.maxCostDollars || 5.0;
+    const maxCostDollars = options.maxCostDollars || 50.0;
     const force = options.force || false;
     const since = options.since;
 

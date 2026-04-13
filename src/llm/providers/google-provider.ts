@@ -70,9 +70,9 @@ export class GoogleProvider implements ILLMProvider {
 
     return new ChatGoogleGenerativeAI({
       apiKey: this.apiKey,
-      modelName,
+      model: modelName,
       temperature: config.temperature ?? 0.2,
-      maxOutputTokens: config.maxTokens ?? 4096,
+      maxOutputTokens: config.maxTokens ?? 8192,
       topP: config.topP,
     }) as BaseChatModel;
   }

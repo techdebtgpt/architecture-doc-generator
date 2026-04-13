@@ -93,6 +93,7 @@ CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above.
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const dependencyData = await this.extractDependencies(context);
+    const externalImportUsage = this.getExternalImportUsage(context);
 
     const content = `Analyze these project dependencies:
 
@@ -102,19 +103,23 @@ CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above.
 **Production Dependencies** (${dependencyData.production?.length || 0}):
 ${
   (dependencyData.production || [])
-    .slice(0, 20)
+    .slice(0, 60)
     .map((dep: DependencyInfo) => `- ${dep.name}@${dep.version}`)
     .join('\n') || 'None'
 }
-${dependencyData.production?.length > 20 ? `\n... and ${dependencyData.production.length - 20} more` : ''}
+${dependencyData.production?.length > 60 ? `\n... and ${dependencyData.production.length - 60} more` : ''}
 
 **Development Dependencies** (${dependencyData.development?.length || 0}):
 ${
   (dependencyData.development || [])
-    .slice(0, 10)
+    .slice(0, 30)
     .map((dep: DependencyInfo) => `- ${dep.name}@${dep.version}`)
     .join('\n') || 'None'
 }
+${dependencyData.development?.length > 30 ? `\n... and ${dependencyData.development.length - 30} more` : ''}
+
+**External Import Usage (from dependency graph)**:
+${externalImportUsage}
 
 **Detected Languages**: ${context.languageHints.map((h) => h.language).join(', ')}
 
@@ -151,9 +156,14 @@ Please analyze dependency health, security, and provide recommendations.`;
 
     // FALLBACK: Extract dependencies from source code imports (language-agnostic)
     const importMap = new Map<string, Set<string>>(); // package -> files using it
+    const fallbackFiles = context.files.slice(0, 500);
 
-    for (const file of context.files) {
-      const filePath = path.join(context.projectPath, file);
+    this.logger.warn(
+      `Manifest dependencies not detected; falling back to import analysis across ${fallbackFiles.length} file(s)`,
+    );
+
+    for (const file of fallbackFiles) {
+      const filePath = file;
       try {
         const content = await fs.readFile(filePath, 'utf-8');
         // Use centralized language-agnostic import extraction
@@ -172,6 +182,12 @@ Please analyze dependency health, security, and provide recommendations.`;
       }
     }
 
+    if (context.files.length > fallbackFiles.length) {
+      this.logger.info(
+        `Import fallback sampled ${fallbackFiles.length}/${context.files.length} files for performance`,
+      );
+    }
+
     // Convert import map to dependency list
     if (importMap.size > 0) {
       dependencies.hasDependencies = true;
@@ -187,6 +203,29 @@ Please analyze dependency health, security, and provide recommendations.`;
     }
 
     return dependencies;
+  }
+
+  private getExternalImportUsage(context: AgentContext): string {
+    const imports = context.dependencyGraph?.imports || [];
+    const externalImports = imports.filter((entry) => entry.type === 'external');
+
+    if (externalImports.length === 0) {
+      return 'No external import usage data available';
+    }
+
+    const usageCounts = new Map<string, number>();
+    for (const imp of externalImports) {
+      const key = imp.target;
+      usageCounts.set(key, (usageCounts.get(key) || 0) + 1);
+    }
+
+    const topUsage = Array.from(usageCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 25)
+      .map(([pkg, count]) => `- ${pkg}: ${count} import(s)`)
+      .join('\n');
+
+    return `${externalImports.length} external imports across ${usageCounts.size} package(s)\n${topUsage}`;
   }
 
   private async extractFromManifestFiles(context: AgentContext): Promise<DependencyData> {
@@ -250,8 +289,11 @@ Please analyze dependency health, security, and provide recommendations.`;
         // Add more parsers for other package managers as needed
 
         break; // Use first found manifest
-      } catch (_error) {
+      } catch (error) {
         // File doesn't exist or couldn't be parsed, continue to next
+        this.logger.debug(`Manifest ${filename} unavailable`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
         continue;
       }
     }

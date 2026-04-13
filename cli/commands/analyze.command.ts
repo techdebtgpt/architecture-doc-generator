@@ -52,7 +52,7 @@ interface AnalyzeOptions {
   model?: string;
   verbose?: boolean;
   clean?: boolean;
-  maxCost?: number; // Maximum cost in dollars before halting (default: 5.0)
+  maxCost?: number; // Maximum cost in dollars before halting (default: 50.0)
   // Depth mode (simple) - conflicts with granular refinement flags
   depth?: 'quick' | 'normal' | 'deep';
   // Search mode for file retrieval during refinement
@@ -229,20 +229,42 @@ export async function analyzeProject(
     const agentRegistry = registerAgents(spinner);
     const availableAgents = agentRegistry.getAllAgents().map((a) => a.getMetadata().name);
 
-    // Always run all agents - prompt is used to ENHANCE, not filter
-    const agentsToRun = availableAgents;
+    // Determine agents to run: config enabled list (if present) or all available agents
+    const configuredEnabledAgents = Array.isArray((userConfig as any)?.agents?.enabled)
+      ? ((userConfig as any).agents.enabled as string[])
+      : [];
+    const validConfiguredAgents = configuredEnabledAgents.filter((agent) =>
+      availableAgents.includes(agent),
+    );
+    const agentsToRun = validConfiguredAgents.length > 0 ? validConfiguredAgents : availableAgents;
+
+    if (options.verbose && configuredEnabledAgents.length > 0) {
+      const unknownConfiguredAgents = configuredEnabledAgents.filter(
+        (agent) => !availableAgents.includes(agent),
+      );
+      if (unknownConfiguredAgents.length > 0) {
+        console.log(
+          chalk.yellow(
+            `⚠️  Ignoring unknown configured agents: ${unknownConfiguredAgents.join(', ')}`,
+          ),
+        );
+      }
+      console.log(chalk.gray(`   using configured agents: ${agentsToRun.join(', ') || '(none)'}`));
+    }
 
     // Display prompt information if provided
     if (options.prompt) {
       if (options.verbose) {
         console.log(chalk.cyan(`🎯 User focus: "${options.prompt}"`));
-        console.log(chalk.gray('  (All agents will consider this focus area in their analysis)'));
+        console.log(
+          chalk.gray('  (Selected agents will consider this focus area in their analysis)'),
+        );
       }
-      spinner.info(`Running all agents with focus on: "${options.prompt}"`);
+      spinner.info(`Running ${agentsToRun.length} agent(s) with focus on: "${options.prompt}"`);
     } else {
-      // Default: comprehensive analysis with all agents
+      // Default: run selected agents (from config or full set)
       if (options.verbose) {
-        console.log('🔍 Running comprehensive analysis (all agents)');
+        console.log(`🔍 Running comprehensive analysis (${agentsToRun.length} agent(s))`);
       }
     }
 
@@ -269,6 +291,23 @@ export async function analyzeProject(
       deep: { maxIterations: 10, clarityThreshold: 90, maxQuestions: 5, skipSelfRefinement: false },
     };
     const depthConfig = depthConfigs[depthMode];
+    const configRefinement = ((userConfig as any).refinement || {}) as {
+      enabled?: boolean;
+      maxIterations?: number;
+      clarityThreshold?: number;
+      minImprovement?: number;
+    };
+
+    // Refinement precedence: CLI flags > config file > depth mode defaults
+    const resolvedRefinementIterations =
+      options.refinementIterations ?? configRefinement.maxIterations ?? depthConfig.maxIterations;
+    const resolvedRefinementThreshold =
+      options.refinementThreshold ??
+      configRefinement.clarityThreshold ??
+      depthConfig.clarityThreshold;
+    const resolvedRefinementImprovement =
+      options.refinementImprovement ?? configRefinement.minImprovement ?? 10;
+    const refinementEnabled = options.refinement ?? configRefinement.enabled ?? true;
 
     // Determine search mode: CLI flag > config file > default (vector)
     const configSearchMode = userConfig.searchMode?.mode;
@@ -335,6 +374,11 @@ export async function analyzeProject(
           `📊 Depth: ${depthMode} (${depthConfig.maxIterations} iterations, ${depthConfig.clarityThreshold}% clarity threshold)`,
         ),
       );
+      console.log(
+        chalk.gray(
+          `🔁 Refinement: enabled=${refinementEnabled}, iterations=${resolvedRefinementIterations}, threshold=${resolvedRefinementThreshold}, minImprovement=${resolvedRefinementImprovement}%`,
+        ),
+      );
     }
 
     // Generate documentation
@@ -354,16 +398,17 @@ export async function analyzeProject(
     try {
       documentation = await orchestrator.generateDocumentation(resolvedPath, {
         maxTokens: 100000,
-        maxCostDollars: options.maxCost || 5.0, // Default $5 budget limit
+        maxCostDollars: Number(options.maxCost) || 50.0, // Default $50 budget limit
         parallel: true,
         userPrompt: options.prompt, // Pass user prompt to enhance agent analysis
         incrementalMode: isIncrementalMode || isRefinementCheckMode, // Skip full regeneration if docs exist (with or without prompt)
         existingDocsPath: isIncrementalMode || isRefinementCheckMode ? outputDir : undefined, // Path to existing docs for refinement
+        selectiveAgents: agentsToRun,
         iterativeRefinement: {
-          enabled: options.refinement !== false, // Default enabled
-          maxIterations: options.refinementIterations || depthConfig.maxIterations,
-          clarityThreshold: options.refinementThreshold || depthConfig.clarityThreshold,
-          minImprovement: options.refinementImprovement || 10,
+          enabled: refinementEnabled,
+          maxIterations: resolvedRefinementIterations,
+          clarityThreshold: resolvedRefinementThreshold,
+          minImprovement: resolvedRefinementImprovement,
         },
         runName: process.env.ARCHDOC_RUN_NAME, // Custom run name from config (supports {timestamp}, {agent}, {project})
         agentOptions: {

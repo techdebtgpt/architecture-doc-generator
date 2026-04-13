@@ -141,7 +141,7 @@ export interface IterativeRefinementConfig {
  */
 export interface OrchestratorOptions {
   maxTokens?: number;
-  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $5)
+  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $50)
   parallel?: boolean;
   userPrompt?: string; // User's focus area or question to enhance agent analysis
   incrementalMode?: boolean; // Skip full regeneration if existing docs + prompt provided
@@ -804,10 +804,11 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     // Execute workflow with agents
     let finalState = initialState;
     for await (const state of await this.workflow.stream(initialState, config)) {
-      const nodeNames = Object.keys(state);
+      const streamedState = state as Record<string, typeof initialState>;
+      const nodeNames = Object.keys(streamedState);
       if (nodeNames.length > 0) {
         const lastNodeName = nodeNames[nodeNames.length - 1];
-        finalState = state[lastNodeName];
+        finalState = streamedState[lastNodeName];
       }
     }
 
@@ -1003,13 +1004,20 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
           .replace('{project}', projectPath.split(/[\\/]/).pop() || 'unknown')
       : `Agent-${agentName}`;
 
+    const shouldSkipSelfRefinement = agentName === 'kpi-analyzer';
+
     const agentOptions: AgentExecutionOptions = {
       ...options.agentOptions,
+      skipSelfRefinement: shouldSkipSelfRefinement || options.agentOptions?.skipSelfRefinement,
       runnableConfig: {
         ...options.agentOptions?.runnableConfig,
         runName: customRunName,
       },
     };
+
+    if (shouldSkipSelfRefinement) {
+      this.logger.info('Using single-pass mode for KPI agent to reduce runtime', '⚡');
+    }
 
     try {
       const result = await agent.execute(context, agentOptions);
@@ -1042,7 +1050,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       newAgentResults.set(agentName, result);
 
       // Check if total cost exceeds budget
-      const maxCost = options.maxCostDollars || 5.0; // Default $5 budget
+      const maxCost = Number(options.maxCostDollars) || 50.0; // Default $50 budget
       let totalCost = 0;
       for (const agentResult of newAgentResults.values()) {
         const agentCost = this.llmService['tokenManager'].calculateCost(
@@ -1374,7 +1382,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     }
 
     // Use LLM to synthesize and prioritize recommendations
-    const model = this.llmService.getChatModel({ temperature: 0.3, maxTokens: 4096 });
+    const model = this.llmService.getChatModel({ temperature: 0.3, maxTokens: 8192 });
 
     const prompt = `You are a senior technical architect reviewing a comprehensive codebase analysis.
 

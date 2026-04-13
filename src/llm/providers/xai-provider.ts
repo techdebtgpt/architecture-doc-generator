@@ -49,7 +49,7 @@ export class XAIProvider implements ILLMProvider {
       openAIApiKey: this.apiKey,
       modelName,
       temperature: config.temperature ?? 0.2,
-      maxTokens: config.maxTokens ?? 4096,
+      maxTokens: config.maxTokens ?? 8192,
       topP: config.topP,
       configuration: {
         baseURL: 'https://api.x.ai/v1',

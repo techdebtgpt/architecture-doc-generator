@@ -182,7 +182,7 @@ export function createCheckConfigHandler(): ContextualToolHandler {
 {
   "llm": {
     "provider": "anthropic",
-    "model": "claude-sonnet-4-20250514"
+    "model": "claude-sonnet-4-6"
   },
   "apiKeys": {
     "anthropic": "sk-ant-..."
@@ -288,7 +288,7 @@ export function createSetupConfigHandler(): ContextualToolHandler {
         provider,
         model,
         temperature: existingConfig.llm?.temperature || 0.2,
-        maxTokens: existingConfig.llm?.maxTokens || 4096,
+        maxTokens: existingConfig.llm?.maxTokens || 8192,
         embeddingsProvider: finalEmbeddingsProvider,
       },
       apiKeys,
@@ -312,7 +312,7 @@ export function createSetupConfigHandler(): ContextualToolHandler {
       provider,
       model,
       temperature: existingConfig.llm?.temperature || 0.2,
-      maxTokens: existingConfig.llm?.maxTokens || 4096,
+      maxTokens: existingConfig.llm?.maxTokens || 8192,
       embeddingsProvider: finalEmbeddingsProvider,
     };
     config.apiKeys = apiKeys;

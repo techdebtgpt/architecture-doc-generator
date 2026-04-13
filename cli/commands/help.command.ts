@@ -44,7 +44,7 @@ export function displayHelp(): void {
   );
   console.log('      --provider <provider>           LLM provider: anthropic|openai|google|xai');
   console.log('      --model <model>                 Specific LLM model to use');
-  console.log('      --max-cost <dollars>            Maximum cost limit (default: $5.00)');
+  console.log('      --max-cost <dollars>            Maximum cost limit (default: $50.00)');
   console.log('      --c4                            Generate C4 model');
   console.log('      --single-file                   Generate single file instead of multi-file');
   console.log(
@@ -146,7 +146,7 @@ export function displayHelp(): void {
     chalk.dim(`  {
     "llm": {
       "provider": "anthropic",
-      "model": "claude-sonnet-4"
+      "model": "claude-sonnet-4-6"
     },
     "apiKeys": {
       "anthropic": "sk-ant-..."

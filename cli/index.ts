@@ -36,7 +36,7 @@ program
   .option('--provider <provider>', 'LLM provider (anthropic|openai|google|xai)', 'anthropic')
   .option('--model <model>', 'LLM model to use')
   .option('--no-clean', 'Do not clean output directory before generation')
-  .option('--max-cost <dollars>', 'Maximum cost in dollars before halting execution', '5.0')
+  .option('--max-cost <dollars>', 'Maximum cost in dollars before halting execution', '50.0')
   // Depth mode (simple)
   .option(
     '--depth <mode>',
@@ -61,7 +61,7 @@ program
     false,
   )
   .option('--refinement-threshold <number>', 'Clarity threshold to stop refinement (0-100)', '80')
-  .option('--refinement-iterations <number>', 'Maximum refinement iterations per agent', '3')
+  .option('--refinement-iterations <number>', 'Maximum refinement iterations per agent', '5')
   .option('--refinement-improvement <number>', 'Minimum improvement % to continue', '10')
   // Output format options (NEW)
   .option('--single-file', 'Generate single-file output instead of multi-file structure', false)
