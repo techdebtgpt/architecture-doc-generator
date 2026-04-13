@@ -19,7 +19,22 @@ export function createSelectiveAgentHandler(
 ): ContextualToolHandler {
   return async (args: any, context) => {
     try {
-      const docService = new DocumentationService(context.config, context.projectPath);
+      // Use project_path from args if provided, otherwise use context.projectPath
+      const project_path = args.project_path;
+      const projectPath = project_path || context.projectPath;
+
+      if (!context.config) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '❌ Error: Configuration not found. Please run: archdoc config --init or set environment variables (ANTHROPIC_API_KEY, etc.)',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const docService = new DocumentationService(context.config, projectPath);
 
       // Build user prompt if prefix provided
       let userPrompt = userPromptPrefix;
@@ -191,8 +206,10 @@ export function createCheckConfigHandler(): ContextualToolHandler {
  * Create setup config handler
  */
 export function createSetupConfigHandler(): ContextualToolHandler {
-  return async (args: any, _context) => {
-    const projectPath = process.cwd();
+  return async (args: any, context) => {
+    // Use project_path from args if provided, otherwise use context.projectPath
+    const project_path = args.project_path;
+    const projectPath = project_path || context.projectPath;
     const configPath = path.join(projectPath, '.archdoc.config.json');
 
     const {

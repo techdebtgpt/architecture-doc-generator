@@ -12,7 +12,7 @@ export const TOOLS: Record<string, ToolDefinition> = {
   check_config: {
     name: 'check_config',
     description:
-      'Check if .archdoc.config.json exists and is valid. Returns setup instructions if missing or invalid.',
+      'Use when the user asks if ArchDoc is set up or whether the project has valid ArchDoc config. Checks for .archdoc.config.json and returns status or setup instructions. Prefer over guessing when they say "is archdoc configured?", "do I have archdoc set up?", or "check archdoc config".',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -26,14 +26,19 @@ export const TOOLS: Record<string, ToolDefinition> = {
     },
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
+      },
     },
   },
 
   setup_config: {
     name: 'setup_config',
     description:
-      'Create or update .archdoc.config.json with user-provided configuration. This tool accepts all configuration options and creates the config file.',
+      'Use when the user wants to create or change ArchDoc configuration (LLM provider, API key, model). Creates or updates .archdoc.config.json. Use for "set up archdoc", "configure archdoc", "add my API key for archdoc", or "change archdoc provider/model". Requires provider, model, and apiKey.',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -48,6 +53,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         provider: {
           type: 'string',
           enum: ['anthropic', 'openai', 'google', 'xai'],
@@ -127,7 +136,8 @@ export const TOOLS: Record<string, ToolDefinition> = {
 
   generate_documentation: {
     name: 'generate_documentation',
-    description: 'Generate comprehensive architecture documentation for the current project',
+    description:
+      'Use when the user wants to generate architecture docs from scratch or refresh them after code changes. Creates or updates docs in .arch-docs; supports delta analysis so only changed areas are re-analyzed unless force is true. Use for "document the architecture", "generate architecture docs", "refresh docs after my changes", or "check if docs need updating". Not for adding a single new topic to existing docs (use update_documentation for that).',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -147,6 +157,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         outputDir: {
           type: 'string',
           description: 'Output directory (default: .arch-docs)',
@@ -171,6 +185,14 @@ export const TOOLS: Record<string, ToolDefinition> = {
           type: 'number',
           description: 'Maximum cost budget in dollars (default: 5.0)',
         },
+        force: {
+          type: 'boolean',
+          description: 'Force full analysis, ignoring delta analysis (default: false)',
+        },
+        since: {
+          type: 'string',
+          description: 'Git commit/branch/tag to compare against for delta analysis',
+        },
       },
       required: [],
     },
@@ -178,7 +200,8 @@ export const TOOLS: Record<string, ToolDefinition> = {
 
   query_documentation: {
     name: 'query_documentation',
-    description: 'Query existing documentation using RAG (semantic search over docs)',
+    description:
+      'Use when the user asks a question about the project\'s architecture, modules, or design and architecture docs already exist in .arch-docs. Answers from ArchDoc-generated docs via semantic search (RAG). Use for "what are the main modules?", "how does the architecture work?", "explain the design". Not for searching raw code—only for querying existing architecture documentation.',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -193,6 +216,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         question: {
           type: 'string',
           description: 'Question to answer from documentation',
@@ -208,7 +235,8 @@ export const TOOLS: Record<string, ToolDefinition> = {
 
   update_documentation: {
     name: 'update_documentation',
-    description: 'Update existing documentation with new focus area (incremental mode)',
+    description:
+      'Use when the user wants to add or extend existing architecture docs with a new focus (e.g. security, API layer) without regenerating everything. Takes a prompt describing what to add; updates .arch-docs incrementally. Use for "add security analysis to the docs", "document the API layer", "expand docs to cover X". Not for full generate/refresh (use generate_documentation for that). Requires prompt.',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -223,6 +251,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         prompt: {
           type: 'string',
           description:
@@ -239,7 +271,8 @@ export const TOOLS: Record<string, ToolDefinition> = {
 
   check_architecture_patterns: {
     name: 'check_architecture_patterns',
-    description: 'Detect design patterns and anti-patterns in code',
+    description:
+      'Use when the user wants to find design patterns or anti-patterns in the codebase. Scans code for patterns and anti-patterns; does not require existing architecture docs. Use for "what patterns does this use?", "find anti-patterns", "review code for bad patterns". Optional: pass filePaths to limit to specific files.',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -259,6 +292,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         filePaths: {
           type: 'array',
           items: { type: 'string' },
@@ -271,7 +308,8 @@ export const TOOLS: Record<string, ToolDefinition> = {
 
   analyze_dependencies: {
     name: 'analyze_dependencies',
-    description: 'Analyze project dependencies, detect circular deps, outdated packages',
+    description:
+      'Use when the user asks about dependencies, circular dependencies, or outdated packages. Analyzes package manifests (e.g. package.json) for dependency graph, circular deps, and outdated packages. Use for "any circular deps?", "are dependencies up to date?", "show dependency graph". Prefer over reading package.json manually.',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -291,6 +329,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         includeDevDeps: {
           type: 'boolean',
           description: 'Include dev dependencies (default: true)',
@@ -302,7 +344,8 @@ export const TOOLS: Record<string, ToolDefinition> = {
 
   get_recommendations: {
     name: 'get_recommendations',
-    description: 'Get improvement recommendations for the project',
+    description:
+      'Use when the user asks for improvement suggestions, refactoring ideas, or what to fix. Returns ArchDoc-generated recommendations (security, performance, maintainability). Use for "how can I improve this project?", "what should I refactor?", "suggest improvements". Optional focusArea: security, performance, maintainability, or all.',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -321,6 +364,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         focusArea: {
           type: 'string',
           enum: ['security', 'performance', 'maintainability', 'all'],
@@ -333,7 +380,8 @@ export const TOOLS: Record<string, ToolDefinition> = {
 
   validate_architecture: {
     name: 'validate_architecture',
-    description: 'Validate if code follows documented architecture patterns',
+    description:
+      'Use when the user wants to check if a specific file or module follows the documented architecture. Validates the given files against existing architecture docs in .arch-docs; requires docs to have been generated first. Use for "does this file follow our architecture?", "check this file for architecture violations". Requires filePath. Not for detecting patterns in code (use check_architecture_patterns for that).',
     version: '1.0.0',
     versionInfo: {
       current: { major: 1, minor: 0, patch: 0 },
@@ -353,6 +401,10 @@ export const TOOLS: Record<string, ToolDefinition> = {
     inputSchema: {
       type: 'object',
       properties: {
+        project_path: {
+          type: 'string',
+          description: 'Path to project directory (default: current working directory)',
+        },
         filePath: {
           type: 'string',
           description: 'File to validate against architecture',

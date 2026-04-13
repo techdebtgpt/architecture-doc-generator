@@ -1,4 +1,6 @@
 import {
+  handleCheckConfig,
+  handleSetupConfig,
   handleGenerateDocumentation,
   handleQueryDocumentation,
   handleUpdateDocumentation,
@@ -16,6 +18,18 @@ import { ArchDocConfig } from '../../../src/utils/config-loader';
 
 jest.mock('../../../src/mcp-server/services/documentation.service');
 jest.mock('../../../src/mcp-server/services/vector-store.service');
+jest.mock('../../../src/mcp-server/services/config.service', () => ({
+  ConfigService: {
+    getInstance: jest.fn().mockReturnValue({
+      initializeConfig: jest.fn().mockResolvedValue(null),
+    }),
+  },
+}));
+
+const mockFsAccess = jest.fn().mockResolvedValue(undefined);
+jest.mock('fs/promises', () => ({
+  access: (...args: unknown[]) => mockFsAccess(...args),
+}));
 
 const mockDocumentationService = DocumentationService as jest.MockedClass<
   typeof DocumentationService
@@ -28,6 +42,7 @@ describe('Tool Handlers', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFsAccess.mockResolvedValue(undefined);
 
     mockConfig = {
       llm: {
@@ -59,6 +74,28 @@ describe('Tool Handlers', () => {
     } as any);
   });
 
+  describe('handleCheckConfig', () => {
+    it('should use project_path from args when provided', async () => {
+      const result = await handleCheckConfig(
+        { project_path: '/custom/repo' },
+        { ...mockContext, projectPath: '/test/project' },
+      );
+      expect(result).toBeDefined();
+      expect(result.content).toBeDefined();
+    });
+  });
+
+  describe('handleSetupConfig', () => {
+    it('should use project_path from args when provided', async () => {
+      const result = await handleSetupConfig(
+        { project_path: '/custom/repo', init: true },
+        { ...mockContext, projectPath: '/test/project' },
+      );
+      expect(result).toBeDefined();
+      expect(result.content).toBeDefined();
+    });
+  });
+
   describe('handleGenerateDocumentation', () => {
     it('should generate documentation', async () => {
       mockDocumentationService.prototype.generateDocumentation = jest.fn().mockResolvedValue({
@@ -78,6 +115,7 @@ describe('Tool Handlers', () => {
 
       mockVectorStoreService.getInstance.mockReturnValueOnce({
         initialize: jest.fn().mockResolvedValue({}),
+        isReady: jest.fn().mockReturnValue(false),
       } as any);
 
       const result = await handleGenerateDocumentation({ outputDir: '/custom/docs' }, mockContext);
@@ -98,7 +136,8 @@ describe('Tool Handlers', () => {
       mockDocumentationService.prototype.formatOutput = jest.fn().mockReturnValue('Generated');
 
       mockVectorStoreService.getInstance.mockReturnValueOnce({
-        initialize: jest.fn(),
+        initialize: jest.fn().mockResolvedValue(undefined),
+        isReady: jest.fn().mockReturnValue(false),
       } as any);
 
       await handleGenerateDocumentation({ depth: 'deep' }, mockContext);
@@ -120,6 +159,7 @@ describe('Tool Handlers', () => {
 
       mockDocumentationService.prototype.formatOutput = jest.fn().mockReturnValue('Generated');
 
+      (mockVectorService as any).isReady = jest.fn().mockReturnValue(false);
       mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
 
       await handleGenerateDocumentation({}, mockContext);
@@ -127,15 +167,46 @@ describe('Tool Handlers', () => {
       expect(mockVectorService.initialize).toHaveBeenCalledWith('/docs');
     });
 
+    it('should return error when project path does not exist', async () => {
+      mockFsAccess.mockRejectedValueOnce(new Error('ENOENT'));
+
+      const result = await handleGenerateDocumentation({}, mockContext);
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Project path does not exist');
+    });
+
     it('should handle generation errors', async () => {
       mockDocumentationService.prototype.generateDocumentation = jest
         .fn()
         .mockRejectedValue(new Error('Generation failed'));
 
+      mockVectorStoreService.getInstance.mockReturnValueOnce({
+        initialize: jest.fn().mockResolvedValue(undefined),
+        isReady: jest.fn().mockReturnValue(false),
+      } as any);
+
       const result = await handleGenerateDocumentation({}, mockContext);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Generation failed');
+    });
+
+    it('should return error when configuration is missing', async () => {
+      const result = await handleGenerateDocumentation({}, { ...mockContext, config: null });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Configuration not found');
+    });
+
+    it('should return error when API keys are missing', async () => {
+      const result = await handleGenerateDocumentation(
+        {},
+        { ...mockContext, config: { llm: {}, apiKeys: {} } },
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('No API keys configured');
     });
 
     it('should support focus area parameter', async () => {
@@ -147,7 +218,8 @@ describe('Tool Handlers', () => {
       mockDocumentationService.prototype.formatOutput = jest.fn().mockReturnValue('Generated');
 
       mockVectorStoreService.getInstance.mockReturnValueOnce({
-        initialize: jest.fn(),
+        initialize: jest.fn().mockResolvedValue(undefined),
+        isReady: jest.fn().mockReturnValue(false),
       } as any);
 
       await handleGenerateDocumentation({ focusArea: 'api' }, mockContext);
@@ -168,7 +240,8 @@ describe('Tool Handlers', () => {
       mockDocumentationService.prototype.formatOutput = jest.fn().mockReturnValue('Generated');
 
       mockVectorStoreService.getInstance.mockReturnValueOnce({
-        initialize: jest.fn(),
+        initialize: jest.fn().mockResolvedValue(undefined),
+        isReady: jest.fn().mockReturnValue(false),
       } as any);
 
       await handleGenerateDocumentation({ selectiveAgents: agents }, mockContext);
@@ -187,7 +260,8 @@ describe('Tool Handlers', () => {
       mockDocumentationService.prototype.formatOutput = jest.fn().mockReturnValue('Generated');
 
       mockVectorStoreService.getInstance.mockReturnValueOnce({
-        initialize: jest.fn(),
+        initialize: jest.fn().mockResolvedValue(undefined),
+        isReady: jest.fn().mockReturnValue(false),
       } as any);
 
       await handleGenerateDocumentation({ maxCostDollars: 15.0 }, mockContext);
@@ -211,7 +285,8 @@ describe('Tool Handlers', () => {
         ]),
       };
 
-      mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
+      mockVectorStoreService.getInstance.mockReset();
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
 
       const result = await handleQueryDocumentation(
         { question: 'What is the architecture?' },
@@ -229,7 +304,7 @@ describe('Tool Handlers', () => {
         query: jest.fn().mockResolvedValue([]),
       };
 
-      mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
 
       mockDocumentationService.prototype.readDocumentationFallback = jest
         .fn()
@@ -251,7 +326,7 @@ describe('Tool Handlers', () => {
         initialize: jest.fn().mockResolvedValue(null),
       };
 
-      mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
 
       mockDocumentationService.prototype.readDocumentationFallback = jest
         .fn()
@@ -269,7 +344,7 @@ describe('Tool Handlers', () => {
         query: jest.fn().mockResolvedValue([]),
       };
 
-      mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
 
       await handleQueryDocumentation({ question: 'Query', topK: 10 }, mockContext);
 
@@ -282,12 +357,28 @@ describe('Tool Handlers', () => {
         query: jest.fn().mockRejectedValue(new Error('Query failed')),
       };
 
-      mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
 
       const result = await handleQueryDocumentation({ question: 'Query' }, mockContext);
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Query failed');
+    });
+
+    it('should return error when config is missing for fallback path', async () => {
+      const mockVectorService = {
+        isReady: jest.fn().mockReturnValue(false),
+        initialize: jest.fn().mockResolvedValue(null),
+      };
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
+
+      const result = await handleQueryDocumentation(
+        { question: 'Query' },
+        { ...mockContext, config: null },
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Configuration not found');
     });
   });
 
@@ -304,10 +395,11 @@ describe('Tool Handlers', () => {
       });
 
       const mockVectorService = {
-        initialize: jest.fn().mockResolvedValue({}),
+        initialize: jest.fn().mockResolvedValue(undefined),
+        isReady: jest.fn().mockReturnValue(false),
       };
 
-      mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
 
       const result = await handleUpdateDocumentation({ prompt: 'Add authentication' }, mockContext);
 
@@ -317,7 +409,8 @@ describe('Tool Handlers', () => {
 
     it('should reload vector store after update', async () => {
       const mockVectorService = {
-        initialize: jest.fn().mockResolvedValue({}),
+        initialize: jest.fn().mockResolvedValue(undefined),
+        isReady: jest.fn().mockReturnValue(false),
       };
 
       mockDocumentationService.prototype.updateDocumentation = jest.fn().mockResolvedValue({
@@ -325,7 +418,7 @@ describe('Tool Handlers', () => {
         docsPath: '/docs',
       });
 
-      mockVectorStoreService.getInstance.mockReturnValueOnce(mockVectorService as any);
+      mockVectorStoreService.getInstance.mockReturnValue(mockVectorService as any);
 
       await handleUpdateDocumentation({ prompt: 'Update' }, mockContext);
 
@@ -341,6 +434,16 @@ describe('Tool Handlers', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Update failed');
+    });
+
+    it('should return error when config is missing', async () => {
+      const result = await handleUpdateDocumentation(
+        { prompt: 'Update' },
+        { ...mockContext, config: null },
+      );
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Configuration not found');
     });
   });
 
@@ -367,7 +470,7 @@ describe('Tool Handlers', () => {
 
     it('should handle recommendations', async () => {
       mockDocumentationService.prototype.runSelectiveAgents = jest.fn().mockResolvedValue({
-        customSections: new Map([['recommendation-engine', { content: 'Recommendations' }]]),
+        customSections: new Map([['architecture-analyzer', { content: 'Recommendations' }]]),
       });
 
       const result = await handleGetRecommendations({}, mockContext);
@@ -377,38 +480,19 @@ describe('Tool Handlers', () => {
   });
 
   describe('handleValidateArchitecture', () => {
-    it('should validate architecture', async () => {
-      mockDocumentationService.prototype.runSelectiveAgents = jest.fn().mockResolvedValue({
-        customSections: new Map([['architecture-validator', { content: 'Validation results' }]]),
-      });
-
-      const result = await handleValidateArchitecture({ filePath: '/src/main.ts' }, mockContext);
-
-      expect(result.content[0].text).toContain('Validation results');
-    });
-
-    it('should pass file path to validator', async () => {
-      mockDocumentationService.prototype.runSelectiveAgents = jest.fn().mockResolvedValue({
-        customSections: new Map([['architecture-validator', { content: 'Results' }]]),
-      });
-
-      await handleValidateArchitecture({ filePath: '/src/api/routes.ts' }, mockContext);
-
-      expect(mockDocumentationService.prototype.runSelectiveAgents).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userPrompt: expect.stringContaining('/src/api/routes.ts'),
-        }),
-      );
-    });
-
-    it('should handle validation errors', async () => {
-      mockDocumentationService.prototype.runSelectiveAgents = jest
-        .fn()
-        .mockRejectedValue(new Error('Validation failed'));
-
+    it('should return not-implemented message (no architecture-validator agent)', async () => {
       const result = await handleValidateArchitecture({ filePath: '/src/main.ts' }, mockContext);
 
       expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('not implemented');
+      expect(result.content[0].text).toContain('validate_architecture');
+      expect(result.content[0].text).toContain('generate_documentation');
+    });
+
+    it('should not call documentation service', async () => {
+      await handleValidateArchitecture({ filePath: '/src/api/routes.ts' }, mockContext);
+
+      expect(mockDocumentationService.prototype.runSelectiveAgents).not.toHaveBeenCalled();
     });
   });
 

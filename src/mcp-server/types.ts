@@ -67,7 +67,7 @@ export interface ToolDefinition {
  */
 export interface ToolContext {
   projectPath: string;
-  config: ArchDocConfig;
+  config: ArchDocConfig | null; // Nullable to support dynamic loading
   logger: any; // Logger instance
 }
 
