@@ -1140,7 +1140,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     const output: DocumentationOutput = {
       projectName: scanResult.projectPath.split(/[/\\]/).pop() || 'Unknown Project',
       timestamp: new Date(),
-      version: '1.0.0',
+      version,
       overview: {
         description: `Documentation for ${scanResult.projectPath}`,
         primaryLanguage: scanResult.languages[0]?.language || 'Unknown',
@@ -1210,7 +1210,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
         ]),
       ),
       metadata: {
-        generatorVersion: '1.0.0',
+        generatorVersion: `TechDebtGPT ArchDoc Generator v${version}`,
         generationDuration: 0,
         totalTokensUsed: totalTokenUsage.totalTokens,
         agentsExecuted: Array.from(agentResults.keys()),
