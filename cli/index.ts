@@ -10,9 +10,12 @@ import { registerHelpCommand } from './commands/help.command';
 import { registerSetupMcpCommand } from './commands/setup-mcp.command';
 
 // Read version from package.json
-const packageJson = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8'),
-);
+let packageJsonPath = path.join(__dirname, '../../package.json');
+if (!fs.existsSync(packageJsonPath)) {
+  packageJsonPath = path.join(__dirname, '../package.json');
+}
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+
 
 const program = new Command();
 

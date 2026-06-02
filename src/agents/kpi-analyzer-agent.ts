@@ -131,12 +131,7 @@ export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
     return this.getMetadata().name;
   }
 
-  /**
-   * Override max tokens for deterministic output
-   */
-  protected override getMaxOutputTokens(_isQuickMode: boolean, _context: AgentContext): number {
-    return 3000; // Fixed size for structured output
-  }
+
 
   /**
    * Build system prompt for structured JSON output
@@ -299,6 +294,113 @@ Return ONLY the JSON object - no markdown, no explanations.`;
         contextName: 'kpi-analyzer',
         logErrors: true,
       });
+
+      // Normalize values to prevent Zod validation failures on slight LLM variations
+      if (parsed && typeof parsed === 'object') {
+        // 1. healthScore.rating
+        if (parsed.healthScore && typeof parsed.healthScore === 'object') {
+          const score = parsed.healthScore as any;
+          if (typeof score.rating === 'string') {
+            const rating = score.rating.toLowerCase().trim();
+            if (['excellent', 'good', 'fair', 'poor'].includes(rating)) {
+              score.rating = rating;
+            } else if (rating.includes('great') || rating.includes('excel')) {
+              score.rating = 'excellent';
+            } else if (rating.includes('ok') || rating.includes('satisfact') || rating.includes('average')) {
+              score.rating = 'fair';
+            } else if (rating.includes('bad') || rating.includes('crit') || rating.includes('warn')) {
+              score.rating = 'poor';
+            } else {
+              score.rating = 'good';
+            }
+          }
+        }
+
+        // 2. codeOrganization.sizeCategory
+        if (parsed.codeOrganization && typeof parsed.codeOrganization === 'object') {
+          const org = parsed.codeOrganization as any;
+          if (typeof org.sizeCategory === 'string') {
+            const size = org.sizeCategory.toLowerCase().replace(/[\s_]+/g, '-').trim();
+            if (['small', 'medium', 'large', 'very-large'].includes(size)) {
+              org.sizeCategory = size;
+            } else if (size === 'verylarge') {
+              org.sizeCategory = 'very-large';
+            } else {
+              org.sizeCategory = 'medium';
+            }
+          }
+        }
+
+        // 3. insights
+        if (Array.isArray(parsed.insights)) {
+          parsed.insights = parsed.insights.map((insight: any) => {
+            if (insight && typeof insight === 'object') {
+              // Category
+              if (typeof insight.category === 'string') {
+                let cat = insight.category.toLowerCase().replace(/[\s_]+/g, '-').trim();
+                const validCategories = [
+                  'size', 'testing', 'patterns', 'complexity', 'dependencies',
+                  'architecture', 'security', 'error-handling', 'data-contracts',
+                  'technical-debt', 'documentation'
+                ];
+                if (validCategories.includes(cat)) {
+                  insight.category = cat;
+                } else if (cat === 'contracts') {
+                  insight.category = 'data-contracts';
+                } else if (cat === 'tech-debt' || cat === 'debt') {
+                  insight.category = 'technical-debt';
+                } else {
+                  insight.category = 'architecture';
+                }
+              }
+
+              // Severity
+              if (typeof insight.severity === 'string') {
+                const sev = insight.severity.toLowerCase().trim();
+                if (['critical', 'high', 'medium', 'low', 'info'].includes(sev)) {
+                  insight.severity = sev;
+                } else {
+                  insight.severity = 'info';
+                }
+              }
+            }
+            return insight;
+          });
+        }
+
+        // 4. recommendations
+        if (Array.isArray(parsed.recommendations)) {
+          parsed.recommendations = parsed.recommendations.map((rec: any) => {
+            if (rec && typeof rec === 'object') {
+              // Priority
+              if (typeof rec.priority === 'string') {
+                let prio = rec.priority.toLowerCase().trim();
+                if (/^p[1-4]$/.test(prio)) {
+                  rec.priority = prio;
+                } else {
+                  const match = prio.match(/[1-4]/);
+                  if (match) {
+                    rec.priority = `p${match[0]}`;
+                  } else {
+                    rec.priority = 'p3';
+                  }
+                }
+              }
+
+              // Impact
+              if (typeof rec.impact === 'string') {
+                const imp = rec.impact.toLowerCase().trim();
+                if (['critical', 'high', 'medium', 'low'].includes(imp)) {
+                  rec.impact = imp;
+                } else {
+                  rec.impact = 'medium';
+                }
+              }
+            }
+            return rec;
+          });
+        }
+      }
 
       // Validate with Zod schema
       const validated = KPIOutputSchema.parse(parsed);

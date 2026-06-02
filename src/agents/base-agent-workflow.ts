@@ -5,6 +5,7 @@ import { LLMService } from '../llm/llm-service';
 import { Logger } from '../utils/logger';
 import { PerformanceTracker } from '../utils/performance-tracker';
 import { Retry } from '../utils/retry';
+import { LLMJsonParser } from '../utils/json-parser';
 
 /**
  * Agent internal state for self-refinement workflow
@@ -556,20 +557,40 @@ export abstract class BaseAgentWorkflow {
       },
     ];
 
-    this.logger.info(`Calling LLM for initial analysis...`, '⚡');
-    const llmStartTime = Date.now();
+    let result: any;
+    let analysisText = '';
+    let currentHumanPrompt = humanPrompt;
+    const maxAttempts = 2;
 
-    const result = await model.invoke([systemPrompt, humanPrompt], {
-      runName: `${agentName}-InitialAnalysis`,
-    });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      this.logger.info(`Calling LLM for initial analysis...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`, '⚡');
+      const llmStartTime = Date.now();
 
-    const llmDuration = ((Date.now() - llmStartTime) / 1000).toFixed(1);
-    this.logger.info(`LLM call completed in ${llmDuration}s`, '✅');
+      result = await model.invoke([systemPrompt, currentHumanPrompt], {
+        runName: `${agentName}-InitialAnalysis${attempt > 1 ? `-Retry${attempt}` : ''}`,
+      });
 
-    const analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
+      const llmDuration = ((Date.now() - llmStartTime) / 1000).toFixed(1);
+      this.logger.info(`LLM call completed in ${llmDuration}s`, '✅');
+
+      analysisText = typeof result === 'string' ? result : result.content?.toString() || '';
+
+      // Check if it is valid JSON
+      try {
+        LLMJsonParser.parse(analysisText, { logErrors: false });
+        break; // Successfully parsed!
+      } catch (parseError) {
+        if (attempt === maxAttempts) {
+          this.logger.warn(`Failed to parse JSON after ${maxAttempts} attempts. Using fallback parser.`);
+          break;
+        }
+        this.logger.warn(`Initial analysis returned invalid JSON (attempt ${attempt}/${maxAttempts}): ${(parseError as Error).message}. Retrying with stricter constraints...`);
+        currentHumanPrompt = humanPrompt + `\n\nCRITICAL RETRY WARNING: Your previous response was truncated or malformed and failed to parse. Please ensure your response is 100% valid JSON, starts with '{' and ends with '}', is concise, and fits completely within the output token limits.`;
+      }
+    }
 
     // Try to extract tokens directly from the response object if callback failed
-    if (actualOutputTokens === 0 && typeof result !== 'string') {
+    if (actualOutputTokens === 0 && result && typeof result !== 'string') {
       const responseUsage =
         (result as any).usage_metadata ||
         (result as any).usage ||
@@ -1386,20 +1407,40 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
       '🔄',
     );
 
-    this.logger.info('Calling LLM for refinement...', '⚡');
-    const refinementStartTime = Date.now();
+    let result: any;
+    let refinedAnalysis = '';
+    let currentRefinementPrompt = refinementPrompt;
+    const maxAttempts = 2;
 
-    const result = await model.invoke([systemPrompt, humanPrompt, refinementPrompt], {
-      runName: `${this.getAgentName()}-Refinement-${iteration}`,
-    });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      this.logger.info(`Calling LLM for refinement...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`, '⚡');
+      const refinementStartTime = Date.now();
 
-    const refinementDuration = ((Date.now() - refinementStartTime) / 1000).toFixed(1);
-    this.logger.info(`Refinement LLM call completed in ${refinementDuration}s`, '⚡');
+      result = await model.invoke([systemPrompt, humanPrompt, currentRefinementPrompt], {
+        runName: `${this.getAgentName()}-Refinement-${iteration}${attempt > 1 ? `-Retry${attempt}` : ''}`,
+      });
 
-    const refinedAnalysis = typeof result === 'string' ? result : result.content?.toString() || '';
+      const refinementDuration = ((Date.now() - refinementStartTime) / 1000).toFixed(1);
+      this.logger.info(`Refinement LLM call completed in ${refinementDuration}s`, '⚡');
+
+      refinedAnalysis = typeof result === 'string' ? result : result.content?.toString() || '';
+
+      // Check if it is valid JSON
+      try {
+        LLMJsonParser.parse(refinedAnalysis, { logErrors: false });
+        break; // Successfully parsed!
+      } catch (parseError) {
+        if (attempt === maxAttempts) {
+          this.logger.warn(`Failed to parse refinement JSON after ${maxAttempts} attempts. Using fallback parser.`);
+          break;
+        }
+        this.logger.warn(`Refinement returned invalid JSON (attempt ${attempt}/${maxAttempts}): ${(parseError as Error).message}. Retrying with stricter constraints...`);
+        currentRefinementPrompt = refinementPrompt + `\n\nCRITICAL RETRY WARNING: Your previous response was truncated or malformed and failed to parse. Please ensure your response is 100% valid JSON, starts with '{' and ends with '}', is concise, and fits completely within the output token limits.`;
+      }
+    }
 
     // Try to extract tokens directly from the response object if callback failed
-    if (actualOutputTokens === 0 && typeof result !== 'string') {
+    if (actualOutputTokens === 0 && result && typeof result !== 'string') {
       const responseUsage =
         (result as any).usage_metadata ||
         (result as any).usage ||
@@ -1789,7 +1830,7 @@ ${this.getDepthSpecificGuidance(mode)}`;
    * @returns Maximum number of output tokens
    */
   protected getMaxOutputTokens(isQuickMode: boolean, _context: AgentContext): number {
-    return isQuickMode ? 8000 : 16000; // Default limits
+    return isQuickMode ? 16000 : 32000; // Default limits (increased for Claude Opus 4 / Gemini 2.5 support)
   }
 
   // Abstract methods that subclasses must implement

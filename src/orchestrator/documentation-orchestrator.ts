@@ -512,6 +512,14 @@ export class DocumentationOrchestrator {
         }
       }
       this.logger.info(`📄 Loaded ${Object.keys(existingDocs).length} documentation files`);
+      if (Object.keys(existingDocs).length === 0) {
+        this.logger.info('No existing documentation files found. Falling back to full generation mode.');
+        return this.generateDocumentation(projectPath, {
+          ...options,
+          incrementalMode: false,
+          existingDocsPath: undefined,
+        });
+      }
     } catch (error) {
       this.logger.warn(`Failed to load existing docs: ${error}`);
       // Fall back to full generation
@@ -538,7 +546,7 @@ export class DocumentationOrchestrator {
     this.logger.info('🔍 Evaluating documentation quality per agent...');
     const model = this.llmService.getChatModel({
       temperature: 0.2,
-      maxTokens: 8000,
+      maxTokens: 16000,
     });
 
     // Build dynamic file-to-agent mapping from agent registry
@@ -1382,7 +1390,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     }
 
     // Use LLM to synthesize and prioritize recommendations
-    const model = this.llmService.getChatModel({ temperature: 0.3, maxTokens: 8192 });
+    const model = this.llmService.getChatModel({ temperature: 0.3, maxTokens: 16384 });
 
     const prompt = `You are a senior technical architect reviewing a comprehensive codebase analysis.
 

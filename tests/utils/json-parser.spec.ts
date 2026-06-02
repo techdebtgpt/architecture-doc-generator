@@ -175,7 +175,7 @@ describe('LLMJsonParser', () => {
       const input = '```json\n{"name": "test", "items": [1, 2, 3';
       const fallback = { truncated: true };
       const result = LLMJsonParser.parse(input, { fallback, logErrors: false });
-      expect(result).toEqual(fallback);
+      expect(result).toEqual({ name: 'test', items: [1, 2, 3] });
     });
   });
 
@@ -188,11 +188,11 @@ describe('LLMJsonParser', () => {
       expect(result).toEqual({ name: 'test' });
     });
 
-    it('should detect unbalanced braces and use fallback', () => {
+    it('should detect unbalanced braces and repair it', () => {
       const input = '{"name": "test", "nested": {"value": 123'; // Missing closing }
       const fallback = { truncated: true };
       const result = LLMJsonParser.parse(input, { fallback, logErrors: false });
-      expect(result).toEqual(fallback);
+      expect(result).toEqual({ name: 'test', nested: { value: 123 } });
     });
   });
 
@@ -296,6 +296,61 @@ Here are the findings:
       const fallback = { parsed: false };
       const result = LLMJsonParser.parse(input, { fallback, logErrors: false });
       expect(result).toEqual(fallback);
+    });
+  });
+
+  describe('repairJson()', () => {
+    it('should repair truncated JSON strings', () => {
+      const input = '{"summary": "ASP.NET Web API 2 project (not ASP.NET Core) running on classic System.Web pipeline with Global.asax.cs bootstrap, featuring a dedicated DTO assembly (Ps.SystemApi.Dto), explic';
+      const result = LLMJsonParser.repairJson(input);
+      expect(JSON.parse(result)).toEqual({
+        summary: 'ASP.NET Web API 2 project (not ASP.NET Core) running on classic System.Web pipeline with Global.asax.cs bootstrap, featuring a dedicated DTO assembly (Ps.SystemApi.Dto), explic'
+      });
+    });
+
+    it('should repair unescaped double quotes inside values', () => {
+      const input = '{"description": "This is a "classic" ASP.NET pipeline."}';
+      const result = LLMJsonParser.repairJson(input);
+      expect(JSON.parse(result)).toEqual({
+        description: 'This is a "classic" ASP.NET pipeline.'
+      });
+    });
+
+    it('should insert missing commas between properties', () => {
+      const input = '{"name": "test" "value": 123 "valid": true}';
+      const result = LLMJsonParser.repairJson(input);
+      expect(JSON.parse(result)).toEqual({
+        name: 'test',
+        value: 123,
+        valid: true
+      });
+    });
+
+    it('should not corrupt decimal numbers', () => {
+      const input = '{"val": 1.23, "val2": 2.34}';
+      const result = LLMJsonParser.repairJson(input);
+      expect(JSON.parse(result)).toEqual({
+        val: 1.23,
+        val2: 2.34
+      });
+    });
+
+    it('should handle deeply nested truncated objects', () => {
+      const input = '{"a": {"b": [1, 2, {"c": "hello';
+      const result = LLMJsonParser.repairJson(input);
+      expect(JSON.parse(result)).toEqual({
+        a: {
+          b: [1, 2, { c: 'hello' }]
+        }
+      });
+    });
+
+    it('should handle trailing colons gracefully', () => {
+      const input = '{"a":';
+      const result = LLMJsonParser.repairJson(input);
+      expect(JSON.parse(result)).toEqual({
+        a: null
+      });
     });
   });
 });

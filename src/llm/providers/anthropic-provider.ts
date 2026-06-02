@@ -16,13 +16,13 @@ export class AnthropicProvider implements ILLMProvider {
   private readonly models = {
     'claude-opus-4-6': {
       maxInputTokens: 200000,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 128000,
       costPerMillionInputTokens: 5.0,
       costPerMillionOutputTokens: 25.0,
     },
     'claude-sonnet-4-6': {
       maxInputTokens: 200000,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 64000,
       costPerMillionInputTokens: 3.0,
       costPerMillionOutputTokens: 15.0,
     },
@@ -98,7 +98,7 @@ export class AnthropicProvider implements ILLMProvider {
   public getChatModel(config?: any, _agentContext?: string): ChatAnthropic {
     const modelName = this.resolveModelName(config?.model);
     const temperature = config?.temperature ?? 0.2;
-    const maxTokens = config?.maxTokens ?? 8192;
+    const maxTokens = config?.maxTokens ?? 16384;
     const topP = this.normalizeTopP(config?.topP);
 
     try {
@@ -117,6 +117,7 @@ export class AnthropicProvider implements ILLMProvider {
         model: modelName,
         maxTokens,
         topP,
+        streaming: true, // Required: Anthropic SDK rejects non-streaming requests when maxTokens is large
       });
     } catch (err) {
       this.logger.error(`Failed to create ChatAnthropic model: ${(err as Error)?.message ?? err}`);

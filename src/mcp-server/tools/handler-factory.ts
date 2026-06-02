@@ -288,7 +288,6 @@ export function createSetupConfigHandler(): ContextualToolHandler {
         provider,
         model,
         temperature: existingConfig.llm?.temperature || 0.2,
-        maxTokens: existingConfig.llm?.maxTokens || 8192,
         embeddingsProvider: finalEmbeddingsProvider,
       },
       apiKeys,
@@ -312,7 +311,6 @@ export function createSetupConfigHandler(): ContextualToolHandler {
       provider,
       model,
       temperature: existingConfig.llm?.temperature || 0.2,
-      maxTokens: existingConfig.llm?.maxTokens || 8192,
       embeddingsProvider: finalEmbeddingsProvider,
     };
     config.apiKeys = apiKeys;

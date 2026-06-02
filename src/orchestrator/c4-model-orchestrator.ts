@@ -781,7 +781,7 @@ export class C4ModelOrchestrator {
       updatedAgentResults.set(name, result),
     );
 
-    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
+    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 32768 });
 
     // Compile insights from all agent responses
     const allInsights: string[] = [];
@@ -928,7 +928,7 @@ Return ONLY valid JSON, no markdown formatting.
       updatedAgentResults.set(name, result),
     );
 
-    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
+    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 32768 });
 
     // Compile insights from all agent responses
     const allInsights: string[] = [];
@@ -1084,7 +1084,7 @@ ${sampleFiles}
     const updatedAgentResults = new Map(state.agentResults);
     componentAgents.forEach((result, name) => updatedAgentResults.set(name, result));
 
-    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
+    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 32768 });
 
     // Compile insights from all agent responses across questions
     const allInsights: string[] = [];

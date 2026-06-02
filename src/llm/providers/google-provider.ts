@@ -15,19 +15,19 @@ export class GoogleProvider implements ILLMProvider {
   private readonly models = {
     'gemini-2.5-pro': {
       maxInputTokens: 2097152,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 65536,
       costPerMillionInputTokens: 1.0,
       costPerMillionOutputTokens: 4.0,
     },
     'gemini-2.5-flash': {
       maxInputTokens: 1048576,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 65536,
       costPerMillionInputTokens: 0.05,
       costPerMillionOutputTokens: 0.2,
     },
     'gemini-2.5-flash-lite': {
       maxInputTokens: 1048576,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 65536,
       costPerMillionInputTokens: 0.025,
       costPerMillionOutputTokens: 0.1,
     },
@@ -72,7 +72,7 @@ export class GoogleProvider implements ILLMProvider {
       apiKey: this.apiKey,
       model: modelName,
       temperature: config.temperature ?? 0.2,
-      maxOutputTokens: config.maxTokens ?? 8192,
+      maxOutputTokens: config.maxTokens ?? 16384,
       topP: config.topP,
     }) as BaseChatModel;
   }
