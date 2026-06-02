@@ -174,6 +174,8 @@ export class Retry {
         /ECONNRESET/i,
         /ETIMEDOUT/i,
         /ENOTFOUND/i,
+        /terminated/i,
+        /fetch failed/i,
         /429/i, // Too many requests
         /503/i, // Service unavailable
         /504/i, // Gateway timeout

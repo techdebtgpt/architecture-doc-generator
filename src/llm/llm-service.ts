@@ -10,6 +10,7 @@ import { XAIProvider } from './providers/xai-provider';
 import { TokenManager } from './token-manager';
 import { LLMProvider, LLMRequestOptions, LLMResponse, TokenUsageDetails } from '../types/llm.types';
 import { Logger } from '../utils/logger';
+import { Retry } from '../utils/retry';
 
 export interface LLMServiceConfig {
   apiKeys?: {
@@ -133,6 +134,22 @@ export class LLMService {
       );
 
       this.logger.debug(`Created model for provider=${provider}`);
+
+      const originalInvoke = model.invoke.bind(model);
+      model.invoke = async (input: any, options?: any) => {
+        return Retry.execute(() => originalInvoke(input, options), {
+          ...Retry.configs.api,
+          onRetry: (attempt, error) => {
+            this.logger.warn(
+              `LLM call attempt ${attempt} failed for provider=${provider}, retrying...`,
+              {
+                error: error instanceof Error ? error.message : String(error),
+              },
+            );
+          },
+        });
+      };
+
       return model;
     } catch (err) {
       this.logger.error(
