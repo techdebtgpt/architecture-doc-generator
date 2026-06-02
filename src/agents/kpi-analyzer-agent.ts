@@ -131,8 +131,6 @@ export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
     return this.getMetadata().name;
   }
 
-
-
   /**
    * Build system prompt for structured JSON output
    */
@@ -306,9 +304,17 @@ Return ONLY the JSON object - no markdown, no explanations.`;
               score.rating = rating;
             } else if (rating.includes('great') || rating.includes('excel')) {
               score.rating = 'excellent';
-            } else if (rating.includes('ok') || rating.includes('satisfact') || rating.includes('average')) {
+            } else if (
+              rating.includes('ok') ||
+              rating.includes('satisfact') ||
+              rating.includes('average')
+            ) {
               score.rating = 'fair';
-            } else if (rating.includes('bad') || rating.includes('crit') || rating.includes('warn')) {
+            } else if (
+              rating.includes('bad') ||
+              rating.includes('crit') ||
+              rating.includes('warn')
+            ) {
               score.rating = 'poor';
             } else {
               score.rating = 'good';
@@ -320,7 +326,10 @@ Return ONLY the JSON object - no markdown, no explanations.`;
         if (parsed.codeOrganization && typeof parsed.codeOrganization === 'object') {
           const org = parsed.codeOrganization as any;
           if (typeof org.sizeCategory === 'string') {
-            const size = org.sizeCategory.toLowerCase().replace(/[\s_]+/g, '-').trim();
+            const size = org.sizeCategory
+              .toLowerCase()
+              .replace(/[\s_]+/g, '-')
+              .trim();
             if (['small', 'medium', 'large', 'very-large'].includes(size)) {
               org.sizeCategory = size;
             } else if (size === 'verylarge') {
@@ -337,11 +346,22 @@ Return ONLY the JSON object - no markdown, no explanations.`;
             if (insight && typeof insight === 'object') {
               // Category
               if (typeof insight.category === 'string') {
-                let cat = insight.category.toLowerCase().replace(/[\s_]+/g, '-').trim();
+                const cat = insight.category
+                  .toLowerCase()
+                  .replace(/[\s_]+/g, '-')
+                  .trim();
                 const validCategories = [
-                  'size', 'testing', 'patterns', 'complexity', 'dependencies',
-                  'architecture', 'security', 'error-handling', 'data-contracts',
-                  'technical-debt', 'documentation'
+                  'size',
+                  'testing',
+                  'patterns',
+                  'complexity',
+                  'dependencies',
+                  'architecture',
+                  'security',
+                  'error-handling',
+                  'data-contracts',
+                  'technical-debt',
+                  'documentation',
                 ];
                 if (validCategories.includes(cat)) {
                   insight.category = cat;
@@ -374,7 +394,7 @@ Return ONLY the JSON object - no markdown, no explanations.`;
             if (rec && typeof rec === 'object') {
               // Priority
               if (typeof rec.priority === 'string') {
-                let prio = rec.priority.toLowerCase().trim();
+                const prio = rec.priority.toLowerCase().trim();
                 if (/^p[1-4]$/.test(prio)) {
                   rec.priority = prio;
                 } else {

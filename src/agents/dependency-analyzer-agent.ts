@@ -268,9 +268,12 @@ Please analyze dependency health, security, and provide recommendations.`;
             }
           }
         } catch (error) {
-          this.logger.debug(`Failed to parse manifest file ${file} with ${parser.packageManager} parser`, {
-            error: error instanceof Error ? error.message : String(error),
-          });
+          this.logger.debug(
+            `Failed to parse manifest file ${file} with ${parser.packageManager} parser`,
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
         }
       }
     }

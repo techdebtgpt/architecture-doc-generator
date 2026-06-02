@@ -16,7 +16,6 @@ if (!fs.existsSync(packageJsonPath)) {
 }
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
 
-
 const program = new Command();
 
 program

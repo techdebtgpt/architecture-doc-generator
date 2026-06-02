@@ -563,7 +563,10 @@ export abstract class BaseAgentWorkflow {
     const maxAttempts = 2;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      this.logger.info(`Calling LLM for initial analysis...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`, '⚡');
+      this.logger.info(
+        `Calling LLM for initial analysis...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`,
+        '⚡',
+      );
       const llmStartTime = Date.now();
 
       result = await model.invoke([systemPrompt, currentHumanPrompt], {
@@ -581,11 +584,17 @@ export abstract class BaseAgentWorkflow {
         break; // Successfully parsed!
       } catch (parseError) {
         if (attempt === maxAttempts) {
-          this.logger.warn(`Failed to parse JSON after ${maxAttempts} attempts. Using fallback parser.`);
+          this.logger.warn(
+            `Failed to parse JSON after ${maxAttempts} attempts. Using fallback parser.`,
+          );
           break;
         }
-        this.logger.warn(`Initial analysis returned invalid JSON (attempt ${attempt}/${maxAttempts}): ${(parseError as Error).message}. Retrying with stricter constraints...`);
-        currentHumanPrompt = humanPrompt + `\n\nCRITICAL RETRY WARNING: Your previous response was truncated or malformed and failed to parse. Please ensure your response is 100% valid JSON, starts with '{' and ends with '}', is concise, and fits completely within the output token limits.`;
+        this.logger.warn(
+          `Initial analysis returned invalid JSON (attempt ${attempt}/${maxAttempts}): ${(parseError as Error).message}. Retrying with stricter constraints...`,
+        );
+        currentHumanPrompt =
+          humanPrompt +
+          `\n\nCRITICAL RETRY WARNING: Your previous response was truncated or malformed and failed to parse. Please ensure your response is 100% valid JSON, starts with '{' and ends with '}', is concise, and fits completely within the output token limits.`;
       }
     }
 
@@ -1413,7 +1422,10 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
     const maxAttempts = 2;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      this.logger.info(`Calling LLM for refinement...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`, '⚡');
+      this.logger.info(
+        `Calling LLM for refinement...${attempt > 1 ? ` (attempt ${attempt}/${maxAttempts})` : ''}`,
+        '⚡',
+      );
       const refinementStartTime = Date.now();
 
       result = await model.invoke([systemPrompt, humanPrompt, currentRefinementPrompt], {
@@ -1431,11 +1443,17 @@ explicitly state "Not determinable from static analysis" rather than leaving it 
         break; // Successfully parsed!
       } catch (parseError) {
         if (attempt === maxAttempts) {
-          this.logger.warn(`Failed to parse refinement JSON after ${maxAttempts} attempts. Using fallback parser.`);
+          this.logger.warn(
+            `Failed to parse refinement JSON after ${maxAttempts} attempts. Using fallback parser.`,
+          );
           break;
         }
-        this.logger.warn(`Refinement returned invalid JSON (attempt ${attempt}/${maxAttempts}): ${(parseError as Error).message}. Retrying with stricter constraints...`);
-        currentRefinementPrompt = refinementPrompt + `\n\nCRITICAL RETRY WARNING: Your previous response was truncated or malformed and failed to parse. Please ensure your response is 100% valid JSON, starts with '{' and ends with '}', is concise, and fits completely within the output token limits.`;
+        this.logger.warn(
+          `Refinement returned invalid JSON (attempt ${attempt}/${maxAttempts}): ${(parseError as Error).message}. Retrying with stricter constraints...`,
+        );
+        currentRefinementPrompt =
+          refinementPrompt +
+          `\n\nCRITICAL RETRY WARNING: Your previous response was truncated or malformed and failed to parse. Please ensure your response is 100% valid JSON, starts with '{' and ends with '}', is concise, and fits completely within the output token limits.`;
       }
     }
 

@@ -301,10 +301,12 @@ Here are the findings:
 
   describe('repairJson()', () => {
     it('should repair truncated JSON strings', () => {
-      const input = '{"summary": "ASP.NET Web API 2 project (not ASP.NET Core) running on classic System.Web pipeline with Global.asax.cs bootstrap, featuring a dedicated DTO assembly (Ps.SystemApi.Dto), explic';
+      const input =
+        '{"summary": "ASP.NET Web API 2 project (not ASP.NET Core) running on classic System.Web pipeline with Global.asax.cs bootstrap, featuring a dedicated DTO assembly (Ps.SystemApi.Dto), explic';
       const result = LLMJsonParser.repairJson(input);
       expect(JSON.parse(result)).toEqual({
-        summary: 'ASP.NET Web API 2 project (not ASP.NET Core) running on classic System.Web pipeline with Global.asax.cs bootstrap, featuring a dedicated DTO assembly (Ps.SystemApi.Dto), explic'
+        summary:
+          'ASP.NET Web API 2 project (not ASP.NET Core) running on classic System.Web pipeline with Global.asax.cs bootstrap, featuring a dedicated DTO assembly (Ps.SystemApi.Dto), explic',
       });
     });
 
@@ -312,7 +314,7 @@ Here are the findings:
       const input = '{"description": "This is a "classic" ASP.NET pipeline."}';
       const result = LLMJsonParser.repairJson(input);
       expect(JSON.parse(result)).toEqual({
-        description: 'This is a "classic" ASP.NET pipeline.'
+        description: 'This is a "classic" ASP.NET pipeline.',
       });
     });
 
@@ -322,7 +324,7 @@ Here are the findings:
       expect(JSON.parse(result)).toEqual({
         name: 'test',
         value: 123,
-        valid: true
+        valid: true,
       });
     });
 
@@ -331,7 +333,7 @@ Here are the findings:
       const result = LLMJsonParser.repairJson(input);
       expect(JSON.parse(result)).toEqual({
         val: 1.23,
-        val2: 2.34
+        val2: 2.34,
       });
     });
 
@@ -340,8 +342,8 @@ Here are the findings:
       const result = LLMJsonParser.repairJson(input);
       expect(JSON.parse(result)).toEqual({
         a: {
-          b: [1, 2, { c: 'hello' }]
-        }
+          b: [1, 2, { c: 'hello' }],
+        },
       });
     });
 
@@ -349,7 +351,7 @@ Here are the findings:
       const input = '{"a":';
       const result = LLMJsonParser.repairJson(input);
       expect(JSON.parse(result)).toEqual({
-        a: null
+        a: null,
       });
     });
   });

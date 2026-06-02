@@ -28,7 +28,7 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
         errorHandling: 8,
         dataContracts: 9,
         technicalDebt: 8,
-        rating: 'excellent'
+        rating: 'excellent',
       },
       codeOrganization: {
         totalFiles: 100,
@@ -36,7 +36,7 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
         testFiles: 10,
         configFiles: 10,
         testCoverageRatio: 0.12,
-        sizeCategory: 'small'
+        sizeCategory: 'small',
       },
       insights: [
         {
@@ -44,8 +44,8 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
           severity: 'high',
           title: 'Clean Architecture',
           description: 'The architecture is well separated.',
-          recommendation: 'Keep doing this.'
-        }
+          recommendation: 'Keep doing this.',
+        },
       ],
       recommendations: [
         {
@@ -53,9 +53,9 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
           title: 'Write more tests',
           description: 'Currently testing score is 7.',
           effort: '1 sprint',
-          impact: 'high'
-        }
-      ]
+          impact: 'high',
+        },
+      ],
     });
 
     const result = await agent.testParseAnalysis(validJson);
@@ -75,7 +75,7 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
         errorHandling: 5,
         dataContracts: 6,
         technicalDebt: 4,
-        rating: 'FAIR' // checks rating casing normalization
+        rating: 'FAIR', // checks rating casing normalization
       },
       codeOrganization: {
         totalFiles: 1500,
@@ -83,7 +83,7 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
         testFiles: 0,
         configFiles: 300,
         testCoverageRatio: 0,
-        sizeCategory: 'very large' // checks sizeCategory spacing
+        sizeCategory: 'very large', // checks sizeCategory spacing
       },
       insights: [
         {
@@ -91,15 +91,15 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
           severity: 'HIGH', // invalid case
           title: 'Error Handling Gap',
           description: 'No global error handling filter',
-          recommendation: 'Add exception filter'
+          recommendation: 'Add exception filter',
         },
         {
           category: 'technical debt', // invalid enum (should be technical-debt)
           severity: 'medium',
           title: 'Technical Debt',
           description: 'Many TODO markers found',
-          recommendation: 'Clean up TODOs'
-        }
+          recommendation: 'Clean up TODOs',
+        },
       ],
       recommendations: [
         {
@@ -107,9 +107,9 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
           title: 'Refactor exception handling',
           description: 'Create a handler middleware',
           effort: '2 days',
-          impact: 'CRITICAL' // invalid case
-        }
-      ]
+          impact: 'CRITICAL', // invalid case
+        },
+      ],
     });
 
     const result = await agent.testParseAnalysis(jsonWithSpaces);
@@ -117,11 +117,11 @@ describe('KPIAnalyzerAgent parseAnalysis', () => {
     // Verify all normalized values match Zod enums
     expect(result.healthScore).toHaveProperty('rating', 'fair');
     expect(result.codeOrganization).toHaveProperty('sizeCategory', 'very-large');
-    
+
     const insights = result.insights as any[];
     expect(insights[0]).toHaveProperty('category', 'error-handling');
     expect(insights[0]).toHaveProperty('severity', 'high');
-    
+
     expect(insights[1]).toHaveProperty('category', 'technical-debt');
 
     const recs = result.recommendations as any[];

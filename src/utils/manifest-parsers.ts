@@ -70,7 +70,9 @@ export const MANIFEST_PARSERS: ManifestParser[] = [
     matches: (filename) => filename.endsWith('.csproj'),
     parse: async (content) => {
       const production: DependencyInfo[] = [];
-      const matches1 = content.matchAll(/<PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"/g);
+      const matches1 = content.matchAll(
+        /<PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"/g,
+      );
       for (const match of matches1) {
         production.push({ name: match[1], version: match[2] });
       }

@@ -298,28 +298,35 @@ export class LLMJsonParser {
     // 1. Tokenize the input string
     const tokens: { type: string; value: string }[] = [];
     let i = 0;
-    
+
     while (i < text.length) {
       const char = text[i];
-      
+
       // Skip whitespace
       if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
         i++;
         continue;
       }
-      
-      if (char === '{' || char === '}' || char === '[' || char === ']' || char === ':' || char === ',') {
+
+      if (
+        char === '{' ||
+        char === '}' ||
+        char === '[' ||
+        char === ']' ||
+        char === ':' ||
+        char === ','
+      ) {
         tokens.push({ type: char, value: char });
         i++;
         continue;
       }
-      
+
       if (char === '"') {
         let strVal = '"';
         let escaped = false;
         i++;
         let closed = false;
-        
+
         while (i < text.length) {
           const sChar = text[i];
           if (escaped) {
@@ -331,59 +338,64 @@ export class LLMJsonParser {
             escaped = true;
             i++;
           } else if (sChar === '"') {
-             // Check lookahead to see if this is a closing quote
-             let nextChar: string | null = null;
-             let nextStr = '';
-             for (let j = i + 1; j < text.length; j++) {
-               const nextCandidate = text[j];
-               if (nextCandidate !== ' ' && nextCandidate !== '\t' && nextCandidate !== '\n' && nextCandidate !== '\r') {
-                 nextChar = nextCandidate;
-                 nextStr = text.substring(j);
-                 break;
-               }
-             }
-             
-             let isClosing = false;
-             if (
-               nextChar === null || 
-               nextChar === ':' || 
-               nextChar === ',' || 
-               nextChar === '}' || 
-               nextChar === ']' || 
-               nextChar === '{' || 
-               nextChar === '[' || 
-               nextChar === '"' || 
-               nextChar === '-' || 
-               (nextChar >= '0' && nextChar <= '9')
-             ) {
-               isClosing = true;
-             } else if (/^(true|false|null)\b/i.test(nextStr)) {
-               isClosing = true;
-             }
-             
-             if (isClosing) {
-               strVal += '"';
-               closed = true;
-               i++;
-               break;
-             } else {
-               // Unescaped quote inside string
-               strVal += '\\"';
-               i++;
-             }
+            // Check lookahead to see if this is a closing quote
+            let nextChar: string | null = null;
+            let nextStr = '';
+            for (let j = i + 1; j < text.length; j++) {
+              const nextCandidate = text[j];
+              if (
+                nextCandidate !== ' ' &&
+                nextCandidate !== '\t' &&
+                nextCandidate !== '\n' &&
+                nextCandidate !== '\r'
+              ) {
+                nextChar = nextCandidate;
+                nextStr = text.substring(j);
+                break;
+              }
+            }
+
+            let isClosing = false;
+            if (
+              nextChar === null ||
+              nextChar === ':' ||
+              nextChar === ',' ||
+              nextChar === '}' ||
+              nextChar === ']' ||
+              nextChar === '{' ||
+              nextChar === '[' ||
+              nextChar === '"' ||
+              nextChar === '-' ||
+              (nextChar >= '0' && nextChar <= '9')
+            ) {
+              isClosing = true;
+            } else if (/^(true|false|null)\b/i.test(nextStr)) {
+              isClosing = true;
+            }
+
+            if (isClosing) {
+              strVal += '"';
+              closed = true;
+              i++;
+              break;
+            } else {
+              // Unescaped quote inside string
+              strVal += '\\"';
+              i++;
+            }
           } else {
             strVal += sChar;
             i++;
           }
         }
-        
+
         if (!closed) {
           strVal += '"'; // Auto-close truncated string
         }
         tokens.push({ type: 'STRING', value: strVal });
         continue;
       }
-      
+
       // Literal (number, boolean, null)
       let literalVal = '';
       while (i < text.length) {
@@ -395,7 +407,7 @@ export class LLMJsonParser {
           break;
         }
       }
-      
+
       if (literalVal.length > 0) {
         tokens.push({ type: 'LITERAL', value: literalVal });
       } else {
@@ -407,11 +419,11 @@ export class LLMJsonParser {
     // 2. Reconstruct valid JSON from tokens
     let repaired = '';
     const stack: { type: '{' | '['; expected: 'KEY' | 'COLON' | 'VALUE' | 'COMMA' }[] = [];
-    
+
     for (let k = 0; k < tokens.length; k++) {
       const token = tokens[k];
       const top = stack[stack.length - 1];
-      
+
       if (token.type === '{') {
         if (top) {
           if (top.expected === 'COMMA') {
@@ -421,9 +433,7 @@ export class LLMJsonParser {
         }
         repaired += '{';
         stack.push({ type: '{', expected: 'KEY' });
-      } 
-      
-      else if (token.type === '[') {
+      } else if (token.type === '[') {
         if (top) {
           if (top.expected === 'COMMA') {
             repaired += ',';
@@ -432,9 +442,7 @@ export class LLMJsonParser {
         }
         repaired += '[';
         stack.push({ type: '[', expected: 'VALUE' });
-      } 
-      
-      else if (token.type === '}') {
+      } else if (token.type === '}') {
         let found = false;
         while (stack.length > 0) {
           const popped = stack.pop();
@@ -452,9 +460,7 @@ export class LLMJsonParser {
             newTop.expected = 'COMMA';
           }
         }
-      } 
-      
-      else if (token.type === ']') {
+      } else if (token.type === ']') {
         let found = false;
         while (stack.length > 0) {
           const popped = stack.pop();
@@ -472,23 +478,17 @@ export class LLMJsonParser {
             newTop.expected = 'COMMA';
           }
         }
-      } 
-      
-      else if (token.type === ':') {
+      } else if (token.type === ':') {
         if (top && top.type === '{') {
           repaired += ':';
           top.expected = 'VALUE';
         }
-      } 
-      
-      else if (token.type === ',') {
+      } else if (token.type === ',') {
         if (top) {
           repaired += ',';
           top.expected = top.type === '{' ? 'KEY' : 'VALUE';
         }
-      } 
-      
-      else if (token.type === 'STRING') {
+      } else if (token.type === 'STRING') {
         if (top) {
           if (top.type === '{') {
             if (top.expected === 'COMMA') {
@@ -507,14 +507,12 @@ export class LLMJsonParser {
         } else {
           repaired += token.value;
         }
-      } 
-      
-      else if (token.type === 'LITERAL') {
+      } else if (token.type === 'LITERAL') {
         let val = token.value;
         if (val === 'undefined') {
           val = 'null';
         }
-        
+
         if (top) {
           if (top.type === '{') {
             if (top.expected === 'COMMA') {
@@ -540,7 +538,7 @@ export class LLMJsonParser {
         }
       }
     }
-    
+
     while (stack.length > 0) {
       const popped = stack.pop();
       if (popped) {
@@ -554,7 +552,7 @@ export class LLMJsonParser {
         }
       }
     }
-    
+
     return repaired;
   }
 }

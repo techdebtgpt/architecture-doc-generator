@@ -513,7 +513,9 @@ export class DocumentationOrchestrator {
       }
       this.logger.info(`📄 Loaded ${Object.keys(existingDocs).length} documentation files`);
       if (Object.keys(existingDocs).length === 0) {
-        this.logger.info('No existing documentation files found. Falling back to full generation mode.');
+        this.logger.info(
+          'No existing documentation files found. Falling back to full generation mode.',
+        );
         return this.generateDocumentation(projectPath, {
           ...options,
           incrementalMode: false,
