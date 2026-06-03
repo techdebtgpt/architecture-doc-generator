@@ -114,6 +114,9 @@ Extract **entities** and **relationships** — **NOT fields, attributes, or data
   Example: \`erDiagram\\\\n  Organization ||--o{ User : has\`
 - Use \`classDiagram\` for types/interfaces: show inheritance or composition
 - Keep diagrams minimal (5–12 entities)
+- **Styling Requirements**: Always include custom styling for diagrams to make them visually premium:
+  • For ER/Class diagrams, use initialization configs to set a professional theme:
+    \`%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#5c7cfa', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#3b5bdb', 'lineColor': '#74c0fc', 'secondaryColor': '#f1f3f5', 'tertiaryColor': '#e9ecef' }}}%%\`
 
 ### 📤 OUTPUT FORMAT (STRICT JSON)
 {

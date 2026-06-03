@@ -116,6 +116,10 @@ Analyze the provided codebase and create **Mermaid diagrams** for:
 - Use \`sequenceDiagram\` for interactions
 - Keep diagrams focused and readable (max 10-15 nodes per diagram)
 - Use descriptive node labels
+- **Styling Requirements**: Always include custom styling/theming to make diagrams visually premium:
+  • Initialize with a modern base theme:
+    \`%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#5c7cfa', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#3b5bdb', 'lineColor': '#74c0fc', 'actorBorder': '#3b5bdb', 'actorBkg': '#5c7cfa', 'actorTextColor': '#ffffff' }}}%%\`
+  • For flowcharts (\`graph TD\`), use \`classDef\` and \`class\` to style nodes according to their function (e.g. entrypoints, databases, logic steps).
 
 Provide **actionable, visual insights** with valid Mermaid syntax.
 
