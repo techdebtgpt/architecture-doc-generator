@@ -5,6 +5,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
+import type { Logger } from '../../src/utils/logger';
+import type { ToolStatus } from './install-security-tools';
 
 export interface ConfigAnswers {
   provider: 'anthropic' | 'openai' | 'google' | 'xai';
@@ -414,4 +416,92 @@ export async function promptFullConfig(
     },
     existingConfig,
   };
+}
+
+/**
+ * Show security tools status at the end of `config --init`.
+ * If running in an interactive terminal and tools are missing, ask the user
+ * once whether to install them now — the right place for one-time setup.
+ * Non-interactive (CI): prints status only, no prompt.
+ * Returns the current status (after any installs) so the config command can use it in the summary.
+ * @param logger - When provided (e.g. from config command), all lines use the same format as the rest of the command.
+ */
+export async function setupSecurityTools(logger?: Logger): Promise<{
+  semgrep: ToolStatus;
+  trivy: ToolStatus;
+}> {
+  const { getSecurityToolsSummaryStatus, installSemgrep, installTrivy } = await import(
+    './install-security-tools'
+  );
+  const log = (msg: string) => (logger ? logger.info(msg) : console.log(msg));
+  const warn = (msg: string) => (logger ? logger.warn(msg) : console.log(msg));
+
+  let status = await getSecurityToolsSummaryStatus();
+  const { semgrep, trivy } = status;
+
+  const semgrepLine = semgrep.available
+    ? `Semgrep ✅  ${semgrep.version ?? ''}`
+    : 'Semgrep ❌  not installed';
+  const trivyLine = trivy.available
+    ? `Trivy   ✅  ${trivy.version ?? ''}`
+    : 'Trivy   ❌  not installed';
+
+  log('\n🔒 Security tools (optional — used by the pentest agent):');
+  log(`   ${semgrepLine}`);
+  log(`   ${trivyLine}`);
+
+  if (semgrep.available && trivy.available) {
+    log('   → All security tools installed. Pentest analysis will use full toolchain.\n');
+    return status;
+  }
+
+  log('   Semgrep (SAST) and Trivy (CVE scan) improve pentest analysis quality.');
+  log('   Without them the scan falls back to npm audit + built-in + LLM.\n');
+
+  // Non-interactive: just print the hint and return
+  if (!process.stdin.isTTY) {
+    log('   → Run `archdoc security-tools install` to set these up.\n');
+    return status;
+  }
+
+  if (!semgrep.available) {
+    const { doInstall } = await inquirer.prompt<{ doInstall: boolean }>([
+      {
+        type: 'confirm',
+        name: 'doInstall',
+        message: '   Install Semgrep now?',
+        default: false,
+      },
+    ]);
+    if (doInstall) {
+      log('   Installing Semgrep (this may take a minute)...');
+      const result = await installSemgrep();
+      result.ok ? log(`   ✅ ${result.message}`) : warn(`   ⚠️  ${result.message}`);
+      if (result.extraMessage) log(`   ${result.extraMessage}`);
+    }
+  }
+
+  if (!trivy.available) {
+    const { doInstall } = await inquirer.prompt<{ doInstall: boolean }>([
+      {
+        type: 'confirm',
+        name: 'doInstall',
+        message: '   Install Trivy now?',
+        default: false,
+      },
+    ]);
+    if (doInstall) {
+      log('   Installing Trivy (this may take a moment)...');
+      const result = await installTrivy();
+      result.ok ? log(`   ✅ ${result.message}`) : warn(`   ⚠️  ${result.message}`);
+      if (result.extraMessage) log(`   ${result.extraMessage}`);
+    }
+  }
+
+  log('   Security tools setup complete.');
+  log('   → Run `archdoc security-tools install` at any time to revisit this.\n');
+
+  // Re-fetch so summary reflects any installs we just did
+  status = await getSecurityToolsSummaryStatus();
+  return status;
 }

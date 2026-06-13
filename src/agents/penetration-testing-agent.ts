@@ -26,6 +26,7 @@ import {
   extractSnippetForFile,
   FileFlagMap,
 } from '../utils/pentest-snippet-extractor';
+import { aggregateRiskScoreFromFindings } from '../utils/risk-score';
 
 // ---------------------------------------------------------------------------
 // OWASP category mapping (tool findings → schema enum)
@@ -210,7 +211,7 @@ export class PenetrationTestingAgent extends BaseAgentWorkflow implements Agent 
         supportsParallel: true,
         requiresFileContents: true,
         dependencies: ['security-analyzer', 'dependency-analyzer'],
-        supportsIncremental: true,
+        supportsIncremental: false,
         estimatedTokens: 6000,
         supportedLanguages: getSupportedLanguages(),
       },
@@ -262,15 +263,30 @@ export class PenetrationTestingAgent extends BaseAgentWorkflow implements Agent 
       ((result.data as Record<string, unknown>).findings as PentestFinding[]) ?? [];
     const allFindings = this.mergeAndDeduplicateFindings(this.deterministicFindings, llmFindings);
 
+    const criticalCount = allFindings.filter((f) => f.severity === 'critical').length;
+    const highCount = allFindings.filter((f) => f.severity === 'high').length;
+    const mediumCount = allFindings.filter((f) => f.severity === 'medium').length;
+    const lowCount = allFindings.filter((f) => f.severity === 'low').length;
+    const infoCount = allFindings.filter((f) => f.severity === 'info').length;
+
+    const riskScore = aggregateRiskScoreFromFindings({
+      critical: criticalCount,
+      high: highCount,
+      medium: mediumCount,
+      low: lowCount,
+      info: infoCount,
+    });
+
     const mergedData: Record<string, unknown> = {
       ...(result.data as Record<string, unknown>),
       findings: allFindings,
       metadata: {
         ...((result.data as Record<string, unknown>).metadata ?? {}),
         totalFindings: allFindings.length,
-        criticalCount: allFindings.filter((f) => f.severity === 'critical').length,
-        highCount: allFindings.filter((f) => f.severity === 'high').length,
+        criticalCount,
+        highCount,
       },
+      riskScore,
     };
 
     const merged = this.mergeAttackSurfaces(mergedData);

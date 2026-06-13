@@ -8,6 +8,7 @@ import { registerConfigCommand } from './commands/config.command';
 import { exportDocumentation } from './commands/export.command';
 import { registerHelpCommand } from './commands/help.command';
 import { registerSetupMcpCommand } from './commands/setup-mcp.command';
+import { registerSecurityToolsCommand } from './commands/security-tools.command';
 
 // Read version from package.json
 const packageJson = JSON.parse(
@@ -95,6 +96,9 @@ registerConfigCommand(program);
 
 // Setup MCP command
 registerSetupMcpCommand(program);
+
+// Security tools command
+registerSecurityToolsCommand(program);
 
 // Help command
 registerHelpCommand(program);

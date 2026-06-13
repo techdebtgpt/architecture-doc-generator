@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import inquirer from 'inquirer';
 import { Logger } from '../../src/utils/logger';
-import { promptFullConfig } from '../utils/config-prompts';
+import { promptFullConfig, setupSecurityTools } from '../utils/config-prompts';
 
 const logger = new Logger('ConfigCommand');
 
@@ -216,12 +216,15 @@ async function initializeConfig(): Promise<void> {
     `\n✅ ${isUpdate ? 'Updated' : 'Created'} ${path.relative(process.cwd(), configPath)}`,
   );
 
-  // Suggest adding config file to .gitignore (contains API keys)
+  // Suggest adding config file to .gitignore (contains API keys) — right after save
   const gitignorePath = path.join(process.cwd(), '.gitignore');
   let shouldAddGitignore = false;
   if (fs.existsSync(gitignorePath)) {
     const gitignoreContent = fs.readFileSync(gitignorePath, 'utf-8');
     if (!gitignoreContent.includes('.archdoc.config.json')) {
+      logger.info(
+        '   Your config file contains your API key. Adding it to .gitignore avoids committing secrets.',
+      );
       const { addToGitignore } = await inquirer.prompt([
         {
           type: 'confirm',
@@ -242,11 +245,17 @@ async function initializeConfig(): Promise<void> {
     logger.info('✅ Added .archdoc.config.json to .gitignore');
   }
 
+  // Security tools setup — show status and offer to install (TTY only, one-time)
+  const securityToolsStatus = await setupSecurityTools(logger);
+  const { formatSecurityToolsSummary } = await import('../utils/install-security-tools');
+  const { semgrepStr, trivyStr } = formatSecurityToolsSummary(securityToolsStatus);
+
   logger.info('\n🎉 Setup complete!');
   logger.info('\n📝 Configuration Summary:');
   logger.info(`  • Config file: ${path.relative(process.cwd(), configPath)}`);
   logger.info(`  • LLM Provider: ${config.llm.provider} (${config.llm.model})`);
   logger.info(`  • Tracing: ${config.tracing.enabled ? 'Enabled' : 'Disabled'}`);
+  logger.info(`  • Security tools: ${semgrepStr}, ${trivyStr}`);
   logger.info('\n💡 Tips:');
   logger.info('  • Change provider: archdoc config --set llm.provider=openai');
   logger.info('  • Change model: archdoc config --set llm.model=o1-mini');

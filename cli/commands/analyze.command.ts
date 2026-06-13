@@ -1,4 +1,4 @@
-﻿import * as path from 'path';
+import * as path from 'path';
 import * as fs from 'fs/promises';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -14,6 +14,7 @@ import {
   registerAgents,
   createScanner,
 } from '../utils/orchestrator-setup';
+import { promptSecurityToolsIfNeeded } from '../utils/security-tools-preflight';
 import { loadArchDocConfig } from '../../src/utils/config-loader';
 import { LLMService } from '../../src/llm/llm-service';
 
@@ -111,6 +112,9 @@ export async function analyzeProject(
   if (options.c4) {
     return await generateC4Model(projectPath, options);
   }
+
+  // Check for missing security tools before starting (TTY-only, non-blocking)
+  await promptSecurityToolsIfNeeded();
 
   const spinner = ora('Initializing project analysis...').start();
 
