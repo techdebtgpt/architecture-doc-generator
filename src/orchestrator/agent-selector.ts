@@ -126,6 +126,9 @@ ${agentDescriptions}
 - "flows", "process", "data flow", "sequence" → flow-visualization
 - "schema", "database", "entities", "models", "API" → schema-generator
 - "security", "vulnerabilities" → Include pattern-detector (checks for security patterns)
+- "error", "exception", "failure", "retry", "fallback", "resilience" → error-handling-architecture
+- "dto", "entity", "model", "contract", "request", "response", "mapper" → data-contracts
+- "tech debt", "technical debt", "todo", "fixme", "cleanup", "maintainability" → technical-debt
 - "quality", "code quality", "maintainability" → Include pattern-detector
 - "comprehensive", "full", "everything", "complete" → ALL
 

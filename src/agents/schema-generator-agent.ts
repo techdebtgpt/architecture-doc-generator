@@ -114,6 +114,9 @@ Extract **entities** and **relationships** — **NOT fields, attributes, or data
   Example: \`erDiagram\\\\n  Organization ||--o{ User : has\`
 - Use \`classDiagram\` for types/interfaces: show inheritance or composition
 - Keep diagrams minimal (5–12 entities)
+- **Styling Requirements**: Always include custom styling for diagrams to make them visually premium:
+  • For ER/Class diagrams, use initialization configs to set a professional theme:
+    \`%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#5c7cfa', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#3b5bdb', 'lineColor': '#74c0fc', 'secondaryColor': '#f1f3f5', 'tertiaryColor': '#e9ecef' }}}%%\`
 
 ### 📤 OUTPUT FORMAT (STRICT JSON)
 {
@@ -150,7 +153,7 @@ If you include any field-level data, the output is invalid.`;
     const schemaDetection = getSchemaFiles(context.files);
     const fileCategories = this.categorizeSchemaFiles(schemaDetection.all);
 
-    const schemaContents = await this.readSchemaContents(context, fileCategories, 8000);
+    const schemaContents = await this.readSchemaContents(context, fileCategories, 1500);
 
     return `Extract high-level schema architecture from this project:
 
@@ -272,6 +275,8 @@ ${schemaContents}
       content += `\n**${category.name} Schema Files (${category.files.length} found)**:\n`;
 
       const filesToRead = category.files.slice(0, category.limit);
+      const totalCategoryChars = maxTokensPerCategory * 4;
+      const perFileMaxChars = Math.max(1200, Math.floor(totalCategoryChars / filesToRead.length));
       for (const file of filesToRead) {
         try {
           // Files in context.files are already absolute paths, don't join with projectPath
@@ -291,8 +296,8 @@ ${schemaContents}
 
           const fileContent = await fs.readFile(filePath, 'utf-8');
 
-          // Truncate to stay within token budget (~4 chars per token)
-          const maxChars = maxTokensPerCategory * 4;
+          // Truncate each file so the category stays close to its total token budget
+          const maxChars = perFileMaxChars;
           const truncated =
             fileContent.length > maxChars
               ? fileContent.slice(0, maxChars) + '\n... (truncated)'

@@ -97,7 +97,7 @@ Please choose ONE option:
 **Option 2: Set Environment Variables**
   export ANTHROPIC_API_KEY="sk-ant-..."
   export DEFAULT_LLM_PROVIDER="anthropic"
-  export DEFAULT_LLM_MODEL="claude-sonnet-4-20250514"
+  export DEFAULT_LLM_MODEL="claude-sonnet-4-6"
 
 📖 See docs/MCP-SETUP.md for more details
       `;

@@ -16,7 +16,7 @@ export class XAIProvider implements ILLMProvider {
   private readonly models = {
     'grok-3-beta': {
       maxInputTokens: 131072,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 32768,
       costPerMillionInputTokens: 5.0,
       costPerMillionOutputTokens: 15.0,
     },
@@ -49,7 +49,7 @@ export class XAIProvider implements ILLMProvider {
       openAIApiKey: this.apiKey,
       modelName,
       temperature: config.temperature ?? 0.2,
-      maxTokens: config.maxTokens ?? 4096,
+      maxTokens: config.maxTokens ?? 16384,
       topP: config.topP,
       configuration: {
         baseURL: 'https://api.x.ai/v1',

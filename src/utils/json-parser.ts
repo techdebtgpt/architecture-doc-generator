@@ -28,14 +28,14 @@ export class LLMJsonParser {
       // Strategy 1: Extract from ```json code blocks
       const jsonCodeBlock = this.extractFromCodeBlock(result, 'json');
       if (jsonCodeBlock) {
-        return this.parseWithCleanup<T>(jsonCodeBlock, 4);
+        return this.parseWithCleanup<T>(jsonCodeBlock, 5);
       }
 
       // Strategy 2: Extract from any code block (without language identifier)
       const genericCodeBlock = this.extractFromGenericCodeBlock(result);
       if (genericCodeBlock) {
         try {
-          return this.parseWithCleanup<T>(genericCodeBlock, 4);
+          return this.parseWithCleanup<T>(genericCodeBlock, 5);
         } catch {
           // Not valid JSON, continue
         }
@@ -44,11 +44,21 @@ export class LLMJsonParser {
       // Strategy 3: Find JSON object anywhere in text
       const jsonObject = this.extractJsonObject(result);
       if (jsonObject) {
-        return this.parseWithCleanup<T>(jsonObject, 4);
+        return this.parseWithCleanup<T>(jsonObject, 5);
+      }
+
+      // Strategy 3.5: If truncated, find the first '{' and extract everything from there to the end
+      const firstBrace = result.indexOf('{');
+      if (firstBrace !== -1) {
+        try {
+          return this.parseWithCleanup<T>(result.substring(firstBrace), 5);
+        } catch {
+          // Continue to next strategy if it fails
+        }
       }
 
       // Strategy 4: Parse entire response as JSON
-      return this.parseWithCleanup<T>(result, 4);
+      return this.parseWithCleanup<T>(result, 5);
     } catch (error) {
       // Check if response is truncated (missing closing backticks or braces)
       const isTruncated = this.detectTruncation(result);
@@ -132,6 +142,10 @@ export class LLMJsonParser {
           case 2:
             // Remove multi-line comments
             currentAttempt = currentAttempt.replace(/\/\*[\s\S]*?\*\//g, '');
+            break;
+          case 3:
+            // Attempt to repair truncated or syntactically malformed JSON
+            currentAttempt = this.repairJson(currentAttempt);
             break;
         }
       }
@@ -275,5 +289,270 @@ export class LLMJsonParser {
     }
 
     return results;
+  }
+
+  /**
+   * Repair malformed or truncated JSON strings
+   */
+  public static repairJson(text: string): string {
+    // 1. Tokenize the input string
+    const tokens: { type: string; value: string }[] = [];
+    let i = 0;
+
+    while (i < text.length) {
+      const char = text[i];
+
+      // Skip whitespace
+      if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+        i++;
+        continue;
+      }
+
+      if (
+        char === '{' ||
+        char === '}' ||
+        char === '[' ||
+        char === ']' ||
+        char === ':' ||
+        char === ','
+      ) {
+        tokens.push({ type: char, value: char });
+        i++;
+        continue;
+      }
+
+      if (char === '"') {
+        let strVal = '"';
+        let escaped = false;
+        i++;
+        let closed = false;
+
+        while (i < text.length) {
+          const sChar = text[i];
+          if (escaped) {
+            strVal += sChar;
+            escaped = false;
+            i++;
+          } else if (sChar === '\\') {
+            strVal += sChar;
+            escaped = true;
+            i++;
+          } else if (sChar === '"') {
+            // Check lookahead to see if this is a closing quote
+            let nextChar: string | null = null;
+            let nextStr = '';
+            for (let j = i + 1; j < text.length; j++) {
+              const nextCandidate = text[j];
+              if (
+                nextCandidate !== ' ' &&
+                nextCandidate !== '\t' &&
+                nextCandidate !== '\n' &&
+                nextCandidate !== '\r'
+              ) {
+                nextChar = nextCandidate;
+                nextStr = text.substring(j);
+                break;
+              }
+            }
+
+            let isClosing = false;
+            if (
+              nextChar === null ||
+              nextChar === ':' ||
+              nextChar === ',' ||
+              nextChar === '}' ||
+              nextChar === ']' ||
+              nextChar === '{' ||
+              nextChar === '[' ||
+              nextChar === '"' ||
+              nextChar === '-' ||
+              (nextChar >= '0' && nextChar <= '9')
+            ) {
+              isClosing = true;
+            } else if (/^(true|false|null)\b/i.test(nextStr)) {
+              isClosing = true;
+            }
+
+            if (isClosing) {
+              strVal += '"';
+              closed = true;
+              i++;
+              break;
+            } else {
+              // Unescaped quote inside string
+              strVal += '\\"';
+              i++;
+            }
+          } else {
+            strVal += sChar;
+            i++;
+          }
+        }
+
+        if (!closed) {
+          strVal += '"'; // Auto-close truncated string
+        }
+        tokens.push({ type: 'STRING', value: strVal });
+        continue;
+      }
+
+      // Literal (number, boolean, null)
+      let literalVal = '';
+      while (i < text.length) {
+        const lChar = text[i];
+        if (/[a-zA-Z0-9_.\-+]/.test(lChar)) {
+          literalVal += lChar;
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      if (literalVal.length > 0) {
+        tokens.push({ type: 'LITERAL', value: literalVal });
+      } else {
+        // Skip invalid character to prevent infinite loops
+        i++;
+      }
+    }
+
+    // 2. Reconstruct valid JSON from tokens
+    let repaired = '';
+    const stack: { type: '{' | '['; expected: 'KEY' | 'COLON' | 'VALUE' | 'COMMA' }[] = [];
+
+    for (let k = 0; k < tokens.length; k++) {
+      const token = tokens[k];
+      const top = stack[stack.length - 1];
+
+      if (token.type === '{') {
+        if (top) {
+          if (top.expected === 'COMMA') {
+            repaired += ',';
+            top.expected = 'KEY';
+          }
+        }
+        repaired += '{';
+        stack.push({ type: '{', expected: 'KEY' });
+      } else if (token.type === '[') {
+        if (top) {
+          if (top.expected === 'COMMA') {
+            repaired += ',';
+            if (top.type === '[') top.expected = 'VALUE';
+          }
+        }
+        repaired += '[';
+        stack.push({ type: '[', expected: 'VALUE' });
+      } else if (token.type === '}') {
+        let found = false;
+        while (stack.length > 0) {
+          const popped = stack.pop();
+          if (popped && popped.type === '{') {
+            repaired += '}';
+            found = true;
+            break;
+          } else {
+            repaired += ']';
+          }
+        }
+        if (found) {
+          const newTop = stack[stack.length - 1];
+          if (newTop) {
+            newTop.expected = 'COMMA';
+          }
+        }
+      } else if (token.type === ']') {
+        let found = false;
+        while (stack.length > 0) {
+          const popped = stack.pop();
+          if (popped && popped.type === '[') {
+            repaired += ']';
+            found = true;
+            break;
+          } else {
+            repaired += '}';
+          }
+        }
+        if (found) {
+          const newTop = stack[stack.length - 1];
+          if (newTop) {
+            newTop.expected = 'COMMA';
+          }
+        }
+      } else if (token.type === ':') {
+        if (top && top.type === '{') {
+          repaired += ':';
+          top.expected = 'VALUE';
+        }
+      } else if (token.type === ',') {
+        if (top) {
+          repaired += ',';
+          top.expected = top.type === '{' ? 'KEY' : 'VALUE';
+        }
+      } else if (token.type === 'STRING') {
+        if (top) {
+          if (top.type === '{') {
+            if (top.expected === 'COMMA') {
+              repaired += ',';
+              top.expected = 'KEY';
+            }
+            repaired += token.value;
+            top.expected = top.expected === 'KEY' ? 'COLON' : 'COMMA';
+          } else if (top.type === '[') {
+            if (top.expected === 'COMMA') {
+              repaired += ',';
+            }
+            repaired += token.value;
+            top.expected = 'COMMA';
+          }
+        } else {
+          repaired += token.value;
+        }
+      } else if (token.type === 'LITERAL') {
+        let val = token.value;
+        if (val === 'undefined') {
+          val = 'null';
+        }
+
+        if (top) {
+          if (top.type === '{') {
+            if (top.expected === 'COMMA') {
+              repaired += ',';
+              top.expected = 'KEY';
+            }
+            if (top.expected === 'KEY') {
+              repaired += `"${val}"`;
+              top.expected = 'COLON';
+            } else {
+              repaired += val;
+              top.expected = 'COMMA';
+            }
+          } else if (top.type === '[') {
+            if (top.expected === 'COMMA') {
+              repaired += ',';
+            }
+            repaired += val;
+            top.expected = 'COMMA';
+          }
+        } else {
+          repaired += val;
+        }
+      }
+    }
+
+    while (stack.length > 0) {
+      const popped = stack.pop();
+      if (popped) {
+        if (popped.type === '{') {
+          if (repaired.trim().endsWith(':')) {
+            repaired += 'null';
+          }
+          repaired += '}';
+        } else if (popped.type === '[') {
+          repaired += ']';
+        }
+      }
+    }
+
+    return repaired;
   }
 }

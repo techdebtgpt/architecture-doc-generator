@@ -141,7 +141,7 @@ export interface IterativeRefinementConfig {
  */
 export interface OrchestratorOptions {
   maxTokens?: number;
-  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $5)
+  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $50)
   parallel?: boolean;
   userPrompt?: string; // User's focus area or question to enhance agent analysis
   incrementalMode?: boolean; // Skip full regeneration if existing docs + prompt provided
@@ -279,6 +279,12 @@ export class DocumentationOrchestrator {
 
     // Get all agents and sort by dependencies (topological sort)
     let agents = this.agentRegistry.getAllAgents();
+    if (agents.length === 0) {
+      this.logger.error('AgentRegistry is empty! This should not happen.');
+      throw new Error(
+        'No agents registered in AgentRegistry. Agents must be registered before creating the orchestrator.',
+      );
+    }
 
     // Filter agents if selective list provided (from refinement check)
     if (options.selectiveAgents && options.selectiveAgents.length > 0) {
@@ -293,6 +299,10 @@ export class DocumentationOrchestrator {
     const agentNames = sortedAgents.map((a) => a.getMetadata().name);
 
     this.logger.info(`Found ${agentNames.length} agents: ${agentNames.join(', ')}`);
+    if (agentNames.length === 0) {
+      this.logger.error(`[ERROR] No agent names after sorting! This should not happen.`);
+      throw new Error('No agents available after filtering and sorting. Check agent registration.');
+    }
 
     // Validate embeddings API key if vector search mode is enabled
     if (options.agentOptions?.searchMode === 'vector') {
@@ -444,7 +454,10 @@ export class DocumentationOrchestrator {
       if (nodeNames.length > 0) {
         const lastNodeName = nodeNames[nodeNames.length - 1];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        finalState = (state as any)[lastNodeName] || finalState;
+        const nodeState = (state as any)[lastNodeName];
+        if (nodeState) {
+          finalState = nodeState;
+        }
       }
     }
 
@@ -499,6 +512,16 @@ export class DocumentationOrchestrator {
         }
       }
       this.logger.info(`📄 Loaded ${Object.keys(existingDocs).length} documentation files`);
+      if (Object.keys(existingDocs).length === 0) {
+        this.logger.info(
+          'No existing documentation files found. Falling back to full generation mode.',
+        );
+        return this.generateDocumentation(projectPath, {
+          ...options,
+          incrementalMode: false,
+          existingDocsPath: undefined,
+        });
+      }
     } catch (error) {
       this.logger.warn(`Failed to load existing docs: ${error}`);
       // Fall back to full generation
@@ -525,7 +548,7 @@ export class DocumentationOrchestrator {
     this.logger.info('🔍 Evaluating documentation quality per agent...');
     const model = this.llmService.getChatModel({
       temperature: 0.2,
-      maxTokens: 8000,
+      maxTokens: 16000,
     });
 
     // Build dynamic file-to-agent mapping from agent registry
@@ -671,6 +694,8 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     this.logger.info('🔄 Running only agents that need updates...');
 
     // Run selective regeneration with only the agents that need updates
+    // Force full analysis since refinement check already determined updates are needed
+    // Delta analysis might filter out files, but we need to analyze them for the selected agents
     const output = await this.generateDocumentation(projectPath, {
       ...options,
       incrementalMode: false,
@@ -789,10 +814,11 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     // Execute workflow with agents
     let finalState = initialState;
     for await (const state of await this.workflow.stream(initialState, config)) {
-      const nodeNames = Object.keys(state);
+      const streamedState = state as Record<string, typeof initialState>;
+      const nodeNames = Object.keys(streamedState);
       if (nodeNames.length > 0) {
         const lastNodeName = nodeNames[nodeNames.length - 1];
-        finalState = state[lastNodeName];
+        finalState = streamedState[lastNodeName];
       }
     }
 
@@ -988,13 +1014,20 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
           .replace('{project}', projectPath.split(/[\\/]/).pop() || 'unknown')
       : `Agent-${agentName}`;
 
+    const shouldSkipSelfRefinement = agentName === 'kpi-analyzer';
+
     const agentOptions: AgentExecutionOptions = {
       ...options.agentOptions,
+      skipSelfRefinement: shouldSkipSelfRefinement || options.agentOptions?.skipSelfRefinement,
       runnableConfig: {
         ...options.agentOptions?.runnableConfig,
         runName: customRunName,
       },
     };
+
+    if (shouldSkipSelfRefinement) {
+      this.logger.info('Using single-pass mode for KPI agent to reduce runtime', '⚡');
+    }
 
     try {
       const result = await agent.execute(context, agentOptions);
@@ -1027,7 +1060,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       newAgentResults.set(agentName, result);
 
       // Check if total cost exceeds budget
-      const maxCost = options.maxCostDollars || 5.0; // Default $5 budget
+      const maxCost = Number(options.maxCostDollars) || 50.0; // Default $50 budget
       let totalCost = 0;
       for (const agentResult of newAgentResults.values()) {
         const agentCost = this.llmService['tokenManager'].calculateCost(
@@ -1117,7 +1150,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     const output: DocumentationOutput = {
       projectName: scanResult.projectPath.split(/[/\\]/).pop() || 'Unknown Project',
       timestamp: new Date(),
-      version: '1.0.0',
+      version,
       overview: {
         description: `Documentation for ${scanResult.projectPath}`,
         primaryLanguage: scanResult.languages[0]?.language || 'Unknown',
@@ -1187,7 +1220,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
         ]),
       ),
       metadata: {
-        generatorVersion: '1.0.0',
+        generatorVersion: `TechDebtGPT ArchDoc Generator v${version}`,
         generationDuration: 0,
         totalTokensUsed: totalTokenUsage.totalTokens,
         agentsExecuted: Array.from(agentResults.keys()),
@@ -1291,6 +1324,9 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
       { name: 'schema-generator', emoji: '🗄️', label: 'Schema' },
       { name: 'security-analyzer', emoji: '🔒', label: 'Security Analysis' },
       { name: 'penetration-testing', emoji: '🛡️', label: 'Penetration Testing' },
+      { name: 'error-handling-architecture', emoji: '🚨', label: 'Error Handling' },
+      { name: 'data-contracts', emoji: '🧾', label: 'Data Contracts' },
+      { name: 'technical-debt', emoji: '🛠️', label: 'Technical Debt' },
       { name: 'kpi-analyzer', emoji: '📊', label: 'KPI Analysis' },
     ];
 
@@ -1357,7 +1393,7 @@ IMPROVEMENTS: [List specific improvements needed, one per line, or "none" if no 
     }
 
     // Use LLM to synthesize and prioritize recommendations
-    const model = this.llmService.getChatModel({ temperature: 0.3, maxTokens: 4096 });
+    const model = this.llmService.getChatModel({ temperature: 0.3, maxTokens: 16384 });
 
     const prompt = `You are a senior technical architect reviewing a comprehensive codebase analysis.
 

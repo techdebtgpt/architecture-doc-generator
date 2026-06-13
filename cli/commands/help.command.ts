@@ -44,7 +44,7 @@ export function displayHelp(): void {
   );
   console.log('      --provider <provider>           LLM provider: anthropic|openai|google|xai');
   console.log('      --model <model>                 Specific LLM model to use');
-  console.log('      --max-cost <dollars>            Maximum cost limit (default: $5.00)');
+  console.log('      --max-cost <dollars>            Maximum cost limit (default: $50.00)');
   console.log('      --c4                            Generate C4 model');
   console.log('      --single-file                   Generate single file instead of multi-file');
   console.log(
@@ -146,7 +146,7 @@ export function displayHelp(): void {
     chalk.dim(`  {
     "llm": {
       "provider": "anthropic",
-      "model": "claude-sonnet-4"
+      "model": "claude-sonnet-4-6"
     },
     "apiKeys": {
       "anthropic": "sk-ant-..."
@@ -176,7 +176,10 @@ export function displayHelp(): void {
   console.log('    flows.md                 # Control and data flows');
   console.log('    schemas.md               # Data models and schemas');
   console.log('    security.md              # Security analysis');
-  console.log('    kpi-analysis.md          # Repository KPIs and health metrics');
+  console.log('    error-handling.md        # Error propagation and resilience architecture');
+  console.log('    data-contracts.md        # DTO, entity, model, and mapper structure');
+  console.log('    technical-debt.md        # Debt hotspots and cleanup priorities');
+  console.log('    kpi.md                   # Repository KPIs and health metrics');
   console.log('    metadata.md              # Generation metadata and costs');
   console.log('    changelog.md             # Documentation update history\n');
 
@@ -196,8 +199,13 @@ export function displayHelp(): void {
   console.log('  5. ' + chalk.cyan('flow-visualization') + '  - Control and data flows');
   console.log('  6. ' + chalk.cyan('schema-generator') + '    - Data models and schemas');
   console.log('  7. ' + chalk.cyan('security-analyzer') + '   - Security vulnerabilities');
+  console.log('  8. ' + chalk.cyan('error-handling-architecture') + ' - Error flow and resilience');
+  console.log('  9. ' + chalk.cyan('data-contracts') + '      - DTO, entity, and model boundaries');
   console.log(
-    '  8. ' +
+    '  10. ' + chalk.cyan('technical-debt') + '      - Debt hotspots and cleanup priorities',
+  );
+  console.log(
+    '  11. ' +
       chalk.cyan('kpi-analyzer') +
       '        - Repository health and KPIs ' +
       chalk.yellow('[NEW]') +

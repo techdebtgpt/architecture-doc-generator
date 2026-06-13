@@ -31,9 +31,9 @@ const DEFAULT_CONFIG = {
   },
   llm: {
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     temperature: 0.2,
-    maxTokens: 4096,
+    maxTokens: 8192,
   },
   scan: {
     maxFiles: 10000,
@@ -57,6 +57,11 @@ const DEFAULT_CONFIG = {
       'pattern-detector',
       'flow-visualization',
       'schema-generator',
+      'security-analyzer',
+      'error-handling-architecture',
+      'data-contracts',
+      'technical-debt',
+      'kpi-analyzer',
       'architecture-analyzer',
     ],
     parallel: true,

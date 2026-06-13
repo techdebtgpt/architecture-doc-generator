@@ -17,6 +17,11 @@ export { PatternDetectorAgent } from './agents/pattern-detector-agent';
 export { FlowVisualizationAgent } from './agents/flow-visualization-agent';
 export { SchemaGeneratorAgent } from './agents/schema-generator-agent';
 export { PenetrationTestingAgent } from './agents/penetration-testing-agent';
+export { SecurityAnalyzerAgent } from './agents/security-analyzer-agent';
+export { ErrorHandlingArchitectureAgent } from './agents/error-handling-architecture-agent';
+export { DataContractsAgent } from './agents/data-contracts-agent';
+export { TechnicalDebtAgent } from './agents/technical-debt-agent';
+export { KPIAnalyzerAgent } from './agents/kpi-analyzer-agent';
 
 // Scanners
 export * from './scanners/scanner.interface';

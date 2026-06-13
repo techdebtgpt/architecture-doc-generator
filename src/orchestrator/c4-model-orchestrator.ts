@@ -20,7 +20,7 @@ export interface IterativeRefinementConfig {
 
 export interface OrchestratorOptions {
   maxTokens?: number;
-  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $5)
+  maxCostDollars?: number; // Maximum cost in dollars before halting execution (default: $50)
   parallel?: boolean;
   userPrompt?: string;
   /**
@@ -689,7 +689,7 @@ export class C4ModelOrchestrator {
           );
 
           // Check if total cost exceeds budget
-          const maxCost = options.maxCostDollars || 5.0; // Default $5 budget
+          const maxCost = Number(options.maxCostDollars) || 50.0; // Default $50 budget
           let totalCost = 0;
           for (const agentResult of results.values()) {
             const agentCost = this.llmService['tokenManager'].calculateCost(
@@ -781,7 +781,7 @@ export class C4ModelOrchestrator {
       updatedAgentResults.set(name, result),
     );
 
-    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
+    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 32768 });
 
     // Compile insights from all agent responses
     const allInsights: string[] = [];
@@ -928,7 +928,7 @@ Return ONLY valid JSON, no markdown formatting.
       updatedAgentResults.set(name, result),
     );
 
-    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
+    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 32768 });
 
     // Compile insights from all agent responses
     const allInsights: string[] = [];
@@ -1084,7 +1084,7 @@ ${sampleFiles}
     const updatedAgentResults = new Map(state.agentResults);
     componentAgents.forEach((result, name) => updatedAgentResults.set(name, result));
 
-    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 16384 });
+    const model = this.llmService.getChatModel({ temperature: 0.2, maxTokens: 32768 });
 
     // Compile insights from all agent responses across questions
     const allInsights: string[] = [];

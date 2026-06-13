@@ -304,7 +304,7 @@ export function getDefaultModelForProvider(provider?: string): string {
       return 'grok-2-latest';
     case 'anthropic':
     default:
-      return 'claude-sonnet-4-20250514';
+      return 'claude-sonnet-4-6';
   }
 }
 

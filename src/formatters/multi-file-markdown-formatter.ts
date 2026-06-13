@@ -159,6 +159,9 @@ export class MultiFileMarkdownFormatter {
           'schema-generator': 'schemas.md',
           'security-analyzer': 'security.md',
           'penetration-testing': 'pentest-findings.md',
+          'error-handling-architecture': 'error-handling.md',
+          'data-contracts': 'data-contracts.md',
+          'technical-debt': 'technical-debt.md',
           'file-structure': 'file-structure.md',
           'dependency-analyzer': 'dependencies.md',
           'pattern-detector': 'patterns.md',
@@ -209,6 +212,9 @@ export class MultiFileMarkdownFormatter {
           'schema-generator': 'schemas.md',
           'security-analyzer': 'security.md',
           'penetration-testing': 'pentest-findings.md',
+          'error-handling-architecture': 'error-handling.md',
+          'data-contracts': 'data-contracts.md',
+          'technical-debt': 'technical-debt.md',
           'file-structure': 'file-structure.md',
           'dependency-analyzer': 'dependencies.md',
           'pattern-detector': 'patterns.md',
@@ -401,6 +407,15 @@ export class MultiFileMarkdownFormatter {
     if (pentestSection) {
       content += `${docIndex++}. **[Penetration Testing Findings](./pentest-findings.md)** - Attack surfaces, OWASP findings, and remediation\n`;
     }
+    if (generatedFiles.has('error-handling.md')) {
+      content += `${docIndex++}. **[Error Handling](./error-handling.md)** - Error propagation, resilience, and boundary handling\n`;
+    }
+    if (generatedFiles.has('data-contracts.md')) {
+      content += `${docIndex++}. **[Data Contracts](./data-contracts.md)** - DTOs, entities, models, and mapping boundaries\n`;
+    }
+    if (generatedFiles.has('technical-debt.md')) {
+      content += `${docIndex++}. **[Technical Debt](./technical-debt.md)** - Debt hotspots, cleanup priorities, and maintainability risks\n`;
+    }
 
     // Recommendations (moved here - after security, before KPI)
     if (generatedFiles.has('recommendations.md')) {
@@ -492,6 +507,9 @@ export class MultiFileMarkdownFormatter {
       'flows.md',
       'schemas.md',
       'security.md',
+      'error-handling.md',
+      'data-contracts.md',
+      'technical-debt.md',
       'recommendations.md', // After security
       'kpi.md', // After recommendations
       'metadata.md',
@@ -562,6 +580,9 @@ export class MultiFileMarkdownFormatter {
       'flows.md': 'Flow Visualizations',
       'schemas.md': 'Schema Documentation',
       'security.md': 'Security Analysis',
+      'error-handling.md': 'Error Handling',
+      'data-contracts.md': 'Data Contracts',
+      'technical-debt.md': 'Technical Debt',
       'metadata.md': 'Metadata',
       'changelog.md': 'Changelog',
       'kpi.md': 'Repository KPI',

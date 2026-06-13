@@ -93,6 +93,7 @@ CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above.
 
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const dependencyData = await this.extractDependencies(context);
+    const externalImportUsage = this.getExternalImportUsage(context);
 
     const content = `Analyze these project dependencies:
 
@@ -102,19 +103,23 @@ CRITICAL: You MUST respond with ONLY valid JSON matching the exact schema above.
 **Production Dependencies** (${dependencyData.production?.length || 0}):
 ${
   (dependencyData.production || [])
-    .slice(0, 20)
+    .slice(0, 60)
     .map((dep: DependencyInfo) => `- ${dep.name}@${dep.version}`)
     .join('\n') || 'None'
 }
-${dependencyData.production?.length > 20 ? `\n... and ${dependencyData.production.length - 20} more` : ''}
+${dependencyData.production?.length > 60 ? `\n... and ${dependencyData.production.length - 60} more` : ''}
 
 **Development Dependencies** (${dependencyData.development?.length || 0}):
 ${
   (dependencyData.development || [])
-    .slice(0, 10)
+    .slice(0, 30)
     .map((dep: DependencyInfo) => `- ${dep.name}@${dep.version}`)
     .join('\n') || 'None'
 }
+${dependencyData.development?.length > 30 ? `\n... and ${dependencyData.development.length - 30} more` : ''}
+
+**External Import Usage (from dependency graph)**:
+${externalImportUsage}
 
 **Detected Languages**: ${context.languageHints.map((h) => h.language).join(', ')}
 
@@ -151,9 +156,14 @@ Please analyze dependency health, security, and provide recommendations.`;
 
     // FALLBACK: Extract dependencies from source code imports (language-agnostic)
     const importMap = new Map<string, Set<string>>(); // package -> files using it
+    const fallbackFiles = context.files.slice(0, 500);
 
-    for (const file of context.files) {
-      const filePath = path.join(context.projectPath, file);
+    this.logger.warn(
+      `Manifest dependencies not detected; falling back to import analysis across ${fallbackFiles.length} file(s)`,
+    );
+
+    for (const file of fallbackFiles) {
+      const filePath = file;
       try {
         const content = await fs.readFile(filePath, 'utf-8');
         // Use centralized language-agnostic import extraction
@@ -170,6 +180,12 @@ Please analyze dependency health, security, and provide recommendations.`;
           error: error instanceof Error ? error.message : String(error),
         });
       }
+    }
+
+    if (context.files.length > fallbackFiles.length) {
+      this.logger.info(
+        `Import fallback sampled ${fallbackFiles.length}/${context.files.length} files for performance`,
+      );
     }
 
     // Convert import map to dependency list
@@ -189,6 +205,29 @@ Please analyze dependency health, security, and provide recommendations.`;
     return dependencies;
   }
 
+  private getExternalImportUsage(context: AgentContext): string {
+    const imports = context.dependencyGraph?.imports || [];
+    const externalImports = imports.filter((entry) => entry.type === 'external');
+
+    if (externalImports.length === 0) {
+      return 'No external import usage data available';
+    }
+
+    const usageCounts = new Map<string, number>();
+    for (const imp of externalImports) {
+      const key = imp.target;
+      usageCounts.set(key, (usageCounts.get(key) || 0) + 1);
+    }
+
+    const topUsage = Array.from(usageCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 25)
+      .map(([pkg, count]) => `- ${pkg}: ${count} import(s)`)
+      .join('\n');
+
+    return `${externalImports.length} external imports across ${usageCounts.size} package(s)\n${topUsage}`;
+  }
+
   private async extractFromManifestFiles(context: AgentContext): Promise<DependencyData> {
     const dependencies: DependencyData = {
       hasDependencies: false,
@@ -198,64 +237,92 @@ Please analyze dependency health, security, and provide recommendations.`;
       total: 0,
     };
 
-    // Look for package manager manifest files
-    const manifestFiles = {
-      'package.json': 'npm/yarn/pnpm',
-      'requirements.txt': 'pip',
-      Pipfile: 'pipenv',
-      'pyproject.toml': 'poetry',
-      Gemfile: 'bundler',
-      'go.mod': 'go modules',
-      'Cargo.toml': 'cargo',
-      'composer.json': 'composer',
-      'pom.xml': 'maven',
-      'build.gradle': 'gradle',
-    };
+    const { MANIFEST_PARSERS } = await import('../utils/manifest-parsers');
 
-    for (const [filename, manager] of Object.entries(manifestFiles)) {
-      const manifestPath = path.join(context.projectPath, filename);
-      try {
-        const content = await fs.readFile(manifestPath, 'utf-8');
+    // 1. Run all matching manifest parsers across scanned project files (at any depth)
+    for (const file of context.files) {
+      const basename = path.basename(file);
+      const matchingParsers = MANIFEST_PARSERS.filter((p) => p.matches(basename));
 
-        if (filename === 'package.json') {
-          const pkg = JSON.parse(content);
-          dependencies.packageManagers.push(manager);
-          dependencies.hasDependencies = true;
+      for (const parser of matchingParsers) {
+        try {
+          const content = await fs.readFile(file, 'utf-8');
+          const parsed = await parser.parse(content);
 
-          if (pkg.dependencies) {
-            Object.entries(pkg.dependencies).forEach(([name, version]) => {
-              dependencies.production!.push({ name, version: String(version) });
-            });
+          if (parsed.production.length > 0 || parsed.development.length > 0) {
+            dependencies.hasDependencies = true;
+            if (!dependencies.packageManagers.includes(parser.packageManager)) {
+              dependencies.packageManagers.push(parser.packageManager);
+            }
+
+            for (const dep of parsed.production) {
+              if (!dependencies.production.some((d) => d.name === dep.name)) {
+                dependencies.production.push(dep);
+              }
+            }
+
+            for (const dep of parsed.development) {
+              if (!dependencies.development.some((d) => d.name === dep.name)) {
+                dependencies.development.push(dep);
+              }
+            }
           }
-
-          if (pkg.devDependencies) {
-            Object.entries(pkg.devDependencies).forEach(([name, version]) => {
-              dependencies.development!.push({ name, version: String(version) });
-            });
-          }
-
-          dependencies.total =
-            (dependencies.production?.length || 0) + (dependencies.development?.length || 0);
-        } else if (filename === 'requirements.txt') {
-          dependencies.packageManagers.push(manager);
-          dependencies.hasDependencies = true;
-
-          const lines = content.split('\n').filter((l) => l.trim() && !l.startsWith('#'));
-          dependencies.production = lines.map((line) => {
-            const [name, version] = line.split(/[=<>~]/);
-            return { name: name.trim(), version: version?.trim() || 'latest' };
-          });
-          dependencies.total = dependencies.production.length;
+        } catch (error) {
+          this.logger.debug(
+            `Failed to parse manifest file ${file} with ${parser.packageManager} parser`,
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
         }
-        // Add more parsers for other package managers as needed
-
-        break; // Use first found manifest
-      } catch (_error) {
-        // File doesn't exist or couldn't be parsed, continue to next
-        continue;
       }
     }
 
+    // 2. Fallback: check files at the root directory just in case they were not scanned/included in context.files
+    if (!dependencies.hasDependencies) {
+      try {
+        const rootFiles = await fs.readdir(context.projectPath);
+        for (const filename of rootFiles) {
+          const matchingParsers = MANIFEST_PARSERS.filter((p) => p.matches(filename));
+          if (matchingParsers.length === 0) continue;
+
+          const manifestPath = path.join(context.projectPath, filename);
+          try {
+            const content = await fs.readFile(manifestPath, 'utf-8');
+            for (const parser of matchingParsers) {
+              const parsed = await parser.parse(content);
+
+              if (parsed.production.length > 0 || parsed.development.length > 0) {
+                dependencies.hasDependencies = true;
+                if (!dependencies.packageManagers.includes(parser.packageManager)) {
+                  dependencies.packageManagers.push(parser.packageManager);
+                }
+
+                for (const dep of parsed.production) {
+                  if (!dependencies.production.some((d) => d.name === dep.name)) {
+                    dependencies.production.push(dep);
+                  }
+                }
+
+                for (const dep of parsed.development) {
+                  if (!dependencies.development.some((d) => d.name === dep.name)) {
+                    dependencies.development.push(dep);
+                  }
+                }
+              }
+            }
+          } catch {
+            // File read/parse error, ignore and continue
+          }
+        }
+      } catch (error) {
+        this.logger.debug(`Failed to read root directory files: ${context.projectPath}`, {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    dependencies.total = dependencies.production.length + dependencies.development.length;
     return dependencies;
   }
 

@@ -462,12 +462,17 @@ Return ONLY a JSON array of 5-10 lowercase keywords/patterns specific to this pr
     files: string[],
   ): Promise<Array<{ relativePath: string; content: string }>> {
     const results: Array<{ relativePath: string; content: string }> = [];
+    const maxCharsPerFile = 2000;
 
     for (const file of files) {
       try {
         const content = await fs.readFile(file, 'utf-8');
         const relativePath = path.relative(projectPath, file);
-        results.push({ relativePath, content });
+        const truncated =
+          content.length > maxCharsPerFile
+            ? `${content.slice(0, maxCharsPerFile)}\n... (truncated)`
+            : content;
+        results.push({ relativePath, content: truncated });
       } catch (error) {
         // Skip files that can't be read (binary, permission issues, etc.)
         this.logger.debug(`Skipping unreadable file: ${file}`, {

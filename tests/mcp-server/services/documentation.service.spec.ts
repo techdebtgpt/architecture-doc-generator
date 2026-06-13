@@ -5,8 +5,23 @@ import { MultiFileMarkdownFormatter } from '../../../src/formatters/multi-file-m
 
 jest.mock('../../../src/orchestrator/documentation-orchestrator');
 jest.mock('../../../src/formatters/multi-file-markdown-formatter');
-jest.mock('../../../src/agents/agent-registry');
+jest.mock('../../../src/agents/agent-registry', () => ({
+  AgentRegistry: jest.fn().mockImplementation(() => ({
+    register: jest.fn(),
+    getAllAgents: jest.fn().mockReturnValue([]),
+  })),
+}));
 jest.mock('../../../src/scanners/file-system-scanner');
+
+const mockFsReaddir = jest.fn().mockResolvedValue([]);
+const mockFsReadFile = jest.fn().mockResolvedValue('');
+jest.mock('fs/promises', () => ({
+  access: jest.fn().mockRejectedValue(new Error('ENOENT')),
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  rm: jest.fn().mockResolvedValue(undefined),
+  readdir: (...args: unknown[]) => mockFsReaddir(...args),
+  readFile: (...args: unknown[]) => mockFsReadFile(...args),
+}));
 
 const mockDocumentationOrchestrator = DocumentationOrchestrator as jest.MockedClass<
   typeof DocumentationOrchestrator
@@ -97,7 +112,7 @@ describe('DocumentationService', () => {
       });
 
       const calls = mockDocumentationOrchestrator.prototype.generateDocumentation.mock.calls;
-      expect(calls[0]?.[1]?.iterativeRefinement?.maxIterations).toBe(0);
+      expect(calls[0]?.[1]?.iterativeRefinement?.maxIterations).toBe(2);
     });
 
     it('should pass focus area to orchestrator', async () => {
@@ -305,36 +320,36 @@ describe('DocumentationService', () => {
   });
 
   describe('readDocumentationFallback', () => {
-    it('should read all markdown files from directory', async () => {
-      const mockReaddir = jest.fn().mockResolvedValue(['overview.md', 'api.md', 'file.txt']);
-      const mockReadFile = jest
-        .fn()
-        .mockResolvedValueOnce('# Overview')
-        .mockResolvedValueOnce('# API Documentation');
+    it('should read and concatenate markdown files from directory', async () => {
+      mockFsReaddir.mockResolvedValueOnce(['overview.md', 'api.md', 'file.txt']);
+      mockFsReadFile
+        .mockResolvedValueOnce('# Overview content')
+        .mockResolvedValueOnce('# API Documentation content');
 
-      jest.mock('fs/promises', () => ({
-        readdir: mockReaddir,
-        readFile: mockReadFile,
-      }));
+      const result = await service.readDocumentationFallback('/docs');
 
-      // Note: This test demonstrates the expected behavior
-      // In real tests, you'd need to properly mock fs/promises for this service
-      expect(typeof service.readDocumentationFallback).toBe('function');
+      expect(mockFsReaddir).toHaveBeenCalledWith('/docs');
+      expect(result).toContain('overview.md');
+      expect(result).toContain('Overview content');
+      expect(result).toContain('api.md');
+      expect(result).toContain('API Documentation content');
+      expect(result).not.toContain('file.txt');
     });
 
-    it('should filter only markdown files', async () => {
-      // This is a demonstration of the expected behavior
-      // When readDocumentationFallback is called, it should:
-      // 1. Read directory contents
-      // 2. Filter for .md files only
-      // 3. Read each markdown file
-      // 4. Concatenate content with separators
-      expect(typeof service.readDocumentationFallback).toBe('function');
+    it('should return empty string when directory has no markdown files', async () => {
+      mockFsReaddir.mockResolvedValueOnce(['file.txt', 'readme']);
+
+      const result = await service.readDocumentationFallback('/empty');
+
+      expect(result).toBe('');
     });
 
-    it('should handle missing documentation directory', async () => {
-      // When directory doesn't exist, should throw appropriate error
-      expect(typeof service.readDocumentationFallback).toBe('function');
+    it('should throw when readdir fails', async () => {
+      mockFsReaddir.mockRejectedValueOnce(new Error('ENOENT'));
+
+      await expect(service.readDocumentationFallback('/missing')).rejects.toThrow(
+        'Failed to read documentation',
+      );
     });
   });
 

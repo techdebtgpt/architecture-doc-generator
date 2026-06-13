@@ -65,6 +65,8 @@ archdoc setup-mcp claude-desktop
 
 Then restart Claude Desktop.
 
+**Tip:** If you installed ArchDoc globally (`npm install -g @techdebtgpt/archdoc-generator`) and want the MCP config to run the binary directly (no npx), add `--global`: e.g. `archdoc setup-mcp cursor --global`. Without `--global`, the config uses `npx --yes archdoc-mcp-server`, which works for both global and local installs.
+
 ## Configuration Flexibility: Project Config vs Editor Environment
 
 ArchDoc's MCP server intelligently detects which configuration to use. You have two options:
@@ -177,13 +179,19 @@ The setup command configures ArchDoc at `~/.claude/mcp.json`.
 
 ### VS Code + GitHub Copilot
 
-The setup command creates a configuration at `~/.vscode/mcp.json`.
+The setup command writes to the **VS Code user profile** MCP config (used by GitHub Copilot). Path by OS:
+
+- **macOS:** `~/Library/Application Support/Code/User/mcp.json`
+- **Linux:** `~/.config/Code/User/mcp.json`
+- **Windows:** `%APPDATA%\Code\User\mcp.json`
+
+You can open this file from VS Code: **Command Palette** (Ctrl+Shift+P / Cmd+Shift+P) → **MCP: Open User Configuration**.
 
 **After setup:**
 
-1. Restart VS Code
-2. The MCP server should be available to Copilot
-3. Use Copilot Chat with ArchDoc commands
+1. Restart VS Code (or **Developer: Reload Window**)
+2. Open **Chat** (Ctrl+Shift+I / Cmd+Shift+I) and use Copilot
+3. MCP servers appear in **Extensions** view (search `@mcp`) or run **MCP: List Servers** from the Command Palette
 
 **Example prompts:**
 
@@ -531,7 +539,7 @@ A: Delete the archdoc entry from the client's config file:
 
 - Cursor: `~/.cursor/mcp.json`
 - Claude Code: `~/.claude/mcp.json`
-- VS Code: `~/.vscode/mcp.json`
+- VS Code: macOS `~/Library/Application Support/Code/User/mcp.json`, Linux `~/.config/Code/User/mcp.json`, Windows `%APPDATA%\Code\User\mcp.json` (or run **MCP: Open User Configuration** in VS Code)
 - Claude Desktop: See paths above for your OS
 
 ## Support

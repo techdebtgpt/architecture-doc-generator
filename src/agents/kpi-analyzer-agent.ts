@@ -16,6 +16,9 @@ const KPIOutputSchema = z.object({
     architecture: z.number().min(0).max(10),
     dependencies: z.number().min(0).max(10),
     complexity: z.number().min(0).max(10),
+    errorHandling: z.number().min(0).max(10),
+    dataContracts: z.number().min(0).max(10),
+    technicalDebt: z.number().min(0).max(10),
     rating: z.enum(['excellent', 'good', 'fair', 'poor']),
   }),
   codeOrganization: z.object({
@@ -36,6 +39,9 @@ const KPIOutputSchema = z.object({
         'dependencies',
         'architecture',
         'security',
+        'error-handling',
+        'data-contracts',
+        'technical-debt',
         'documentation',
       ]),
       severity: z.enum(['critical', 'high', 'medium', 'low', 'info']),
@@ -73,7 +79,7 @@ export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
       version: '1.0.0',
       description:
         'Analyzes repository health metrics (code quality, architecture, testing, dependencies) and generates executive KPI dashboard with LLM-powered insights',
-      priority: 80 as AgentPriority, // Medium-high priority - provides overview metrics
+      priority: AgentPriority.LOW, // Run after core analysis agents and their dependencies
       capabilities: {
         supportsParallel: true,
         requiresFileContents: false, // Uses aggregated data from other agents
@@ -85,6 +91,9 @@ export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
           'dependency-analyzer',
           'pattern-detector',
           'security-analyzer',
+          'error-handling-architecture',
+          'data-contracts',
+          'technical-debt',
         ], // Run after other agents to aggregate their insights
       },
       tags: ['metrics', 'kpi', 'health', 'quality', 'dashboard', 'executive-summary'],
@@ -123,13 +132,6 @@ export class KPIAnalyzerAgent extends BaseAgentWorkflow implements Agent {
   }
 
   /**
-   * Override max tokens for deterministic output
-   */
-  protected override getMaxOutputTokens(_isQuickMode: boolean, _context: AgentContext): number {
-    return 3000; // Fixed size for structured output
-  }
-
-  /**
    * Build system prompt for structured JSON output
    */
   protected async buildSystemPrompt(_context: AgentContext): Promise<string> {
@@ -150,6 +152,9 @@ You MUST return valid JSON matching this exact structure:
     "architecture": <0-10>,
     "dependencies": <0-10>,
     "complexity": <0-10>,
+    "errorHandling": <0-10>,
+    "dataContracts": <0-10>,
+    "technicalDebt": <0-10>,
     "rating": "excellent" | "good" | "fair" | "poor"
   },
   "codeOrganization": {
@@ -163,6 +168,7 @@ You MUST return valid JSON matching this exact structure:
   "insights": [
     {
       "category": "size" | "testing" | "patterns" | "complexity" | "dependencies" | "architecture" | "security" | "documentation",
+
       "severity": "critical" | "high" | "medium" | "low" | "info",
       "title": "Short title (3-5 words)",
       "description": "What is the issue",
@@ -184,11 +190,14 @@ You MUST return valid JSON matching this exact structure:
 ## Scoring Guidelines
 
 **Overall Health** (0-100):
-- Code Quality (30%): codeQuality * 3
-- Testing (20%): testing * 2
-- Architecture (20%): architecture * 2
-- Dependencies (15%): dependencies * 1.5
-- Complexity (15%): complexity * 1.5
+- Code Quality (15%)
+- Testing (10%)
+- Architecture (15%)
+- Dependencies (10%)
+- Complexity (10%)
+- Error Handling (15%)
+- Data Contracts (12.5%)
+- Technical Debt (12.5%)
 
 **Component Scores** (0-10 each):
 - **Code Quality**: Maintainability + reliability + security indicators
@@ -196,6 +205,9 @@ You MUST return valid JSON matching this exact structure:
 - **Architecture**: Pattern usage + organization clarity
 - **Dependencies**: Total count (0-50 = 10, 51-100 = 7, 101-200 = 5, 200+ = 3)
 - **Complexity**: Average complexity (≤5 = 10, 6-10 = 7, 11-15 = 4, 15+ = 2)
+- **Error Handling**: Boundary handling + consistency + resilience strategy
+- **Data Contracts**: Separation of DTOs/entities/models + validation + mapper clarity
+- **Technical Debt**: Lower debt = higher score; many hotspots or TODO/FIXME clusters reduce score
 
 **Rating** (based on overall score):
 - excellent: ≥80
@@ -217,7 +229,10 @@ You MUST return valid JSON matching this exact structure:
 5. **Dependencies**: Dependency health and bloat
 6. **Architecture**: Architectural clarity
 7. **Security**: Security posture
-8. **Documentation**: Documentation coverage
+8. **Error Handling**: Failure flow and exception mapping quality
+9. **Data Contracts**: Contract and model boundary quality
+10. **Technical Debt**: Cleanup and maintainability pressure
+11. **Documentation**: Documentation coverage
 
 ## Critical Rules
 
@@ -235,6 +250,7 @@ Generate the JSON object now.`;
    */
   protected async buildHumanPrompt(context: AgentContext): Promise<string> {
     const stats = this.calculateFileStatistics(context);
+    const agentSnapshot = this.buildAgentSnapshot(context);
 
     return `Analyze this repository and return JSON with health scores and insights:
 
@@ -248,6 +264,10 @@ Config Files: ${stats.configFiles}
 Languages: ${stats.languages.join(', ')}
 Test-to-Code Ratio: ${(stats.testFiles / Math.max(stats.codeFiles, 1)).toFixed(2)}
 
+## Agent Findings Snapshot
+
+${agentSnapshot}
+
 ## Instructions
 
 Calculate health scores based on the metrics above and return a JSON object matching the schema provided in the system prompt.
@@ -256,7 +276,8 @@ Focus on:
 1. Realistic test coverage assessment (test-to-code ratio)
 2. Project size category (total files)
 3. Language diversity impact
-4. Actionable insights with clear recommendations
+4. How error handling, data contracts, and technical debt affect maintainability
+5. Actionable insights with clear recommendations
 
 Return ONLY the JSON object - no markdown, no explanations.`;
   }
@@ -271,6 +292,135 @@ Return ONLY the JSON object - no markdown, no explanations.`;
         contextName: 'kpi-analyzer',
         logErrors: true,
       });
+
+      // Normalize values to prevent Zod validation failures on slight LLM variations
+      if (parsed && typeof parsed === 'object') {
+        // 1. healthScore.rating
+        if (parsed.healthScore && typeof parsed.healthScore === 'object') {
+          const score = parsed.healthScore as any;
+          if (typeof score.rating === 'string') {
+            const rating = score.rating.toLowerCase().trim();
+            if (['excellent', 'good', 'fair', 'poor'].includes(rating)) {
+              score.rating = rating;
+            } else if (rating.includes('great') || rating.includes('excel')) {
+              score.rating = 'excellent';
+            } else if (
+              rating.includes('ok') ||
+              rating.includes('satisfact') ||
+              rating.includes('average')
+            ) {
+              score.rating = 'fair';
+            } else if (
+              rating.includes('bad') ||
+              rating.includes('crit') ||
+              rating.includes('warn')
+            ) {
+              score.rating = 'poor';
+            } else {
+              score.rating = 'good';
+            }
+          }
+        }
+
+        // 2. codeOrganization.sizeCategory
+        if (parsed.codeOrganization && typeof parsed.codeOrganization === 'object') {
+          const org = parsed.codeOrganization as any;
+          if (typeof org.sizeCategory === 'string') {
+            const size = org.sizeCategory
+              .toLowerCase()
+              .replace(/[\s_]+/g, '-')
+              .trim();
+            if (['small', 'medium', 'large', 'very-large'].includes(size)) {
+              org.sizeCategory = size;
+            } else if (size === 'verylarge') {
+              org.sizeCategory = 'very-large';
+            } else {
+              org.sizeCategory = 'medium';
+            }
+          }
+        }
+
+        // 3. insights
+        if (Array.isArray(parsed.insights)) {
+          parsed.insights = parsed.insights.map((insight: any) => {
+            if (insight && typeof insight === 'object') {
+              // Category
+              if (typeof insight.category === 'string') {
+                const cat = insight.category
+                  .toLowerCase()
+                  .replace(/[\s_]+/g, '-')
+                  .trim();
+                const validCategories = [
+                  'size',
+                  'testing',
+                  'patterns',
+                  'complexity',
+                  'dependencies',
+                  'architecture',
+                  'security',
+                  'error-handling',
+                  'data-contracts',
+                  'technical-debt',
+                  'documentation',
+                ];
+                if (validCategories.includes(cat)) {
+                  insight.category = cat;
+                } else if (cat === 'contracts') {
+                  insight.category = 'data-contracts';
+                } else if (cat === 'tech-debt' || cat === 'debt') {
+                  insight.category = 'technical-debt';
+                } else {
+                  insight.category = 'architecture';
+                }
+              }
+
+              // Severity
+              if (typeof insight.severity === 'string') {
+                const sev = insight.severity.toLowerCase().trim();
+                if (['critical', 'high', 'medium', 'low', 'info'].includes(sev)) {
+                  insight.severity = sev;
+                } else {
+                  insight.severity = 'info';
+                }
+              }
+            }
+            return insight;
+          });
+        }
+
+        // 4. recommendations
+        if (Array.isArray(parsed.recommendations)) {
+          parsed.recommendations = parsed.recommendations.map((rec: any) => {
+            if (rec && typeof rec === 'object') {
+              // Priority
+              if (typeof rec.priority === 'string') {
+                const prio = rec.priority.toLowerCase().trim();
+                if (/^p[1-4]$/.test(prio)) {
+                  rec.priority = prio;
+                } else {
+                  const match = prio.match(/[1-4]/);
+                  if (match) {
+                    rec.priority = `p${match[0]}`;
+                  } else {
+                    rec.priority = 'p3';
+                  }
+                }
+              }
+
+              // Impact
+              if (typeof rec.impact === 'string') {
+                const imp = rec.impact.toLowerCase().trim();
+                if (['critical', 'high', 'medium', 'low'].includes(imp)) {
+                  rec.impact = imp;
+                } else {
+                  rec.impact = 'medium';
+                }
+              }
+            }
+            return rec;
+          });
+        }
+      }
 
       // Validate with Zod schema
       const validated = KPIOutputSchema.parse(parsed);
@@ -291,6 +441,9 @@ Return ONLY the JSON object - no markdown, no explanations.`;
           architecture: 0,
           dependencies: 0,
           complexity: 0,
+          errorHandling: 0,
+          dataContracts: 0,
+          technicalDebt: 0,
           rating: 'poor',
         },
         codeOrganization: {
@@ -374,10 +527,13 @@ Return ONLY the JSON object - no markdown, no explanations.`;
     content += `| Component | Score | Weight |\n`;
     content += `|-----------|-------|--------|\n`;
     content += `| Code Quality | ${healthScore.codeQuality}/10 | 30% |\n`;
-    content += `| Testing | ${healthScore.testing}/10 | 20% |\n`;
-    content += `| Architecture | ${healthScore.architecture}/10 | 20% |\n`;
-    content += `| Dependencies | ${healthScore.dependencies}/10 | 15% |\n`;
-    content += `| Complexity | ${healthScore.complexity}/10 | 15% |\n\n`;
+    content += `| Testing | ${healthScore.testing}/10 | 10% |\n`;
+    content += `| Architecture | ${healthScore.architecture}/10 | 15% |\n`;
+    content += `| Dependencies | ${healthScore.dependencies}/10 | 10% |\n`;
+    content += `| Complexity | ${healthScore.complexity}/10 | 10% |\n`;
+    content += `| Error Handling | ${healthScore.errorHandling}/10 | 15% |\n`;
+    content += `| Data Contracts | ${healthScore.dataContracts}/10 | 12.5% |\n`;
+    content += `| Technical Debt | ${healthScore.technicalDebt}/10 | 12.5% |\n\n`;
 
     content += `## 📁 Code Organization\n\n`;
     content += `- **Total Files**: ${codeOrg.totalFiles.toLocaleString()}\n`;
@@ -576,5 +732,31 @@ Please re-run the analysis or check logs for details.
       totalSize: 0, // Would need file stats
       languages: Array.from(languageSet).slice(0, 5), // Top 5 languages
     };
+  }
+
+  private buildAgentSnapshot(context: AgentContext): string {
+    const relevantAgents = [
+      'architecture-analyzer',
+      'dependency-analyzer',
+      'pattern-detector',
+      'security-analyzer',
+      'error-handling-architecture',
+      'data-contracts',
+      'technical-debt',
+    ];
+
+    const lines = relevantAgents
+      .map((agentName) => {
+        const result = context.previousResults.get(agentName);
+        if (!result) {
+          return null;
+        }
+
+        const warnings = result.warnings?.length ? ` | warnings: ${result.warnings.length}` : '';
+        return `- ${agentName}: ${result.summary}${warnings}`;
+      })
+      .filter((value): value is string => Boolean(value));
+
+    return lines.length > 0 ? lines.join('\n') : '- No dependent agent results available';
   }
 }

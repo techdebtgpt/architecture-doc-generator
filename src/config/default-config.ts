@@ -6,9 +6,9 @@ import { AppConfig } from './config.interface';
 export const defaultConfig: AppConfig = {
   llm: {
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5-20250929',
+    model: 'claude-sonnet-4-6',
     temperature: 0.2,
-    maxTokens: 4096,
+    maxTokens: 8192,
     maxInputTokens: 100000,
     tokenBuffer: 10000,
   },
@@ -62,10 +62,16 @@ export const defaultConfig: AppConfig = {
   agents: {
     enabled: [
       'file-structure',
-      'dependency-analysis',
-      'pattern-detection',
-      'documentation-synthesis',
-      'code-quality',
+      'dependency-analyzer',
+      'pattern-detector',
+      'flow-visualization',
+      'schema-generator',
+      'security-analyzer',
+      'error-handling-architecture',
+      'data-contracts',
+      'technical-debt',
+      'architecture-analyzer',
+      'kpi-analyzer',
     ],
     parallel: true,
     timeout: 300000, // 5 minutes

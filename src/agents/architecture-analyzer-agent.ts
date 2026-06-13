@@ -39,6 +39,9 @@ export class ArchitectureAnalyzerAgent extends BaseAgentWorkflow implements Agen
           'pattern-detector',
           'flow-visualization',
           'security-analyzer',
+          'error-handling-architecture',
+          'data-contracts',
+          'technical-debt',
         ], // Synthesizes insights from ALL other agents
         supportsIncremental: false,
         estimatedTokens: 12000,
@@ -108,6 +111,10 @@ Analyze the provided codebase and identify:
 - Use \`graph TD\` for component diagrams
 - Use \`C4Context\` or \`C4Component\` for C4 diagrams
 - Show clear component boundaries and dependencies
+- **Styling Requirements**: Always include custom styling/theming to make diagrams visually premium:
+  • Initialize with a professional base theme:
+    \`%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#5c7cfa', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#3b5bdb', 'lineColor': '#74c0fc' }}}%%\`
+  • For flowcharts/components, use \`classDef\` and \`class\` to visually distinguish different component types (e.g., frontend, backend, database).
 
 Provide **comprehensive architectural analysis** with actionable insights.
 
